@@ -16,6 +16,8 @@ from backend.app.models.gate import Gate, AccessDecision
 from backend.app.models.observation import ObservationEvent
 from backend.app.models.vehicle import Vehicle
 from backend.app.models.enums import GateStatus, ObservationSource, ObservedVehicleType, ObservationDirection
+from backend.app.models.identity import User
+from backend.app.services.auth_service import hash_password
 from backend.app.services.plate_normalizer import normalize_plate
 
 def start_backend():
@@ -23,6 +25,24 @@ def start_backend():
 
 def run_tests():
     client = httpx.Client(base_url="http://127.0.0.1:8000", timeout=10.0)
+
+    # Observation reads need a staff token (they expose plate sightings): log in as an ADMIN
+    db = SessionLocal()
+    admin_password = uuid.uuid4().hex
+    gate_admin = User(
+        username=f"p3_admin_{uuid.uuid4().hex[:6]}",
+        email=f"p3_admin_{uuid.uuid4().hex[:6]}@campus.edu",
+        full_name="Phase 3 Gate Admin",
+        role="ADMIN",
+        hashed_password=hash_password(admin_password)
+    )
+    db.add(gate_admin)
+    db.commit()
+    db.refresh(gate_admin)
+    db.close()
+    resp_login = client.post("/auth/login", json={"username": gate_admin.username, "password": admin_password})
+    assert resp_login.status_code == 200, f"Admin login failed: {resp_login.text}"
+    client.headers["Authorization"] = f"Bearer {resp_login.json()['access_token']}"
 
     print("========================================================")
     print("PHASE 3: GATE REGISTRY & GATE OBSERVATION MANAGEMENT")

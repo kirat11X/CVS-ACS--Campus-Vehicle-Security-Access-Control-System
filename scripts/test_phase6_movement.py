@@ -473,7 +473,7 @@ def run_tests():
     })
     assert r.status_code == 201, r.text
     assert r.json()["link_event"]["method"] == "ADMIN" and r.json()["link_event"]["expires_at"] is None
-    owned = client.get("/vehicles", params={"owner_id": sid}).json()
+    owned = client.get("/vehicles", params={"owner_id": sid}, headers=auth(admin)).json()
     assert {v["vehicle"]["plate"] for v in owned} == {plate_k, second_plate}, "one owner, many vehicles"
     assert not hasattr(Vehicle, "residence") and all(v["context"]["residence"] == "BH-2, Room 104" for v in owned)
     with SessionLocal() as s:

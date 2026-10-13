@@ -52,7 +52,7 @@ def register_vehicle(
     return resolved
 
 @router.get("/{plate}", response_model=VehicleDetailResponse)
-def get_vehicle_by_plate(plate: str, db: Session = Depends(get_db)):
+def get_vehicle_by_plate(plate: str, db: Session = Depends(get_db), user: CurrentUser = Depends(require_staff)):
     """
     Retrieves vehicle record and its authoritative identity and residence context.
     Executes PLATE -> VEHICLE -> PERSON -> RESIDENCE CONTEXT lookup.
@@ -75,7 +75,8 @@ def list_vehicles(
     residence_type: Optional[ResidenceType] = Query(None, description="Filter by owner residence type"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(require_staff)
 ):
     """
     Lists registered vehicles with optional filters for category, status, owner, plate, or residence type.
@@ -198,7 +199,8 @@ def get_vehicle_observations(
     plate: str,
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(require_staff)
 ):
     """
     Retrieve all sensory observation events captured for a specific license plate (format-tolerant).

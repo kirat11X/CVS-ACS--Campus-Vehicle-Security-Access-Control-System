@@ -2,6 +2,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from backend.app.db import SessionLocal
+from backend.app.dependencies import CurrentUser, require_staff
 from backend.app.models.gate import Gate
 from backend.app.models.enums import GateStatus
 from backend.app.schemas.gate import GateCreate, GateUpdate, GateResponse
@@ -117,7 +118,8 @@ def get_gate_observations(
     gate_id: str,
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(require_staff)
 ):
     """
     Retrieve sensory observation events captured at this specific gate.

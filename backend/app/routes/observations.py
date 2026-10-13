@@ -67,7 +67,8 @@ def list_observations(
     source: Optional[ObservationSource] = Query(None, description="Filter by sensor source"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(require_staff)
 ):
     """
     List historical observations with optional filtering.
@@ -84,7 +85,7 @@ def list_observations(
     return [ObservationResponse.from_orm_model(obs) for obs in observations]
 
 @router.get("/{id}", response_model=ObservationResponse)
-def get_observation(id: UUID, db: Session = Depends(get_db)):
+def get_observation(id: UUID, db: Session = Depends(get_db), user: CurrentUser = Depends(require_staff)):
     """
     Retrieve single observation by its unique identifier.
     """

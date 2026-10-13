@@ -499,6 +499,13 @@ class MovementService:
             if o.id not in logged_obs
         ]
         sightings = identity_resolution_service.resolve_many(db, observations, with_suggestions=False)
+        if vehicle is not None:
+            # A read of another plate belongs here only while its latest guard resolution names this vehicle.
+            sightings = [
+                s for s in sightings
+                if s.observation.plate.normalized == norm
+                or (s.resolution is not None and s.resolution.chosen_vehicle_id == vehicle.id)
+            ]
 
         timeline = [TimelineItem(type="MOVEMENT", time=r.movement.timestamp, gate=self._entry(r).gate, movement=self._entry(r)) for r in mine]
         timeline += [TimelineItem(type="SIGHTING", time=s.observation.observed_at, gate=s.observation.gate, sighting=s) for s in sightings]

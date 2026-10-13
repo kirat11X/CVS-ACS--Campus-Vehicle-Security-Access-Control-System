@@ -25,6 +25,10 @@ LABEL_TO_VEHICLE_TYPE = {
     "bicycle": ObservedVehicleType.BICYCLE,
 }
 
+# Objects Frigate may track that are not vehicles (gate_cam tracks `person`). They are skipped, not
+# recorded as UNKNOWN vehicles: a pedestrian on an ENTRY/EXIT lane is not a vehicle movement.
+NON_VEHICLE_LABELS = {"person"}
+
 class FrigateEventParser:
     @staticmethod
     def resolve_camera_to_gate(camera_id: str, db: Session) -> Optional[Gate]:
@@ -45,6 +49,10 @@ class FrigateEventParser:
         # Additional cameras at a gate are declared in camera_lanes (Phase 6)
         lane = db.query(CameraLane).filter(CameraLane.camera_id == camera_id, CameraLane.is_active.is_(True)).first()
         return lane.gate if lane else None
+
+    @staticmethod
+    def is_non_vehicle(data: Dict[str, Any]) -> bool:
+        return str(data.get("label") or "").lower().strip() in NON_VEHICLE_LABELS
 
     @classmethod
     def parse_event(cls, payload: Dict[str, Any], db: Session) -> Optional[ObservationCreate]:
@@ -72,6 +80,10 @@ class FrigateEventParser:
         camera_id = data.get("camera") or payload.get("camera")
         if not camera_id:
             logger.warning(f"Frigate event '{source_event_id}' missing 'camera'. Skipping event.")
+            return None
+
+        if cls.is_non_vehicle(data):
+            logger.debug(f"Frigate event '{source_event_id}' is not a vehicle ('{data.get('label')}'). Skipping event.")
             return None
 
         # Resolve Camera -> Gate

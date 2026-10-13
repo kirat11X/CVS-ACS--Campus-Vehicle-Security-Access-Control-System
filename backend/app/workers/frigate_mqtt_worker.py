@@ -45,6 +45,7 @@ class FrigateMQTTWorker:
             "observations_created": 0,
             "observations_updated": 0,
             "unmapped_cameras": 0,
+            "non_vehicle_events": 0,
             "malformed_payloads": 0,
             "errors": 0,
         }
@@ -119,13 +120,12 @@ class FrigateMQTTWorker:
             # 3. Parse event via FrigateEventParser
             obs_create = FrigateEventParser.parse_event(payload_dict, db)
             if not obs_create:
-                # Could be unmapped camera or missing event ID
-                camera = (
-                    payload_dict.get("after", {}).get("camera")
-                    if isinstance(payload_dict.get("after"), dict)
-                    else payload_dict.get("camera")
-                )
-                if camera and not FrigateEventParser.resolve_camera_to_gate(camera, db):
+                # Could be a non-vehicle object, an unmapped camera or a missing event ID
+                after = payload_dict.get("after") if isinstance(payload_dict.get("after"), dict) else payload_dict
+                camera = after.get("camera")
+                if FrigateEventParser.is_non_vehicle(after):
+                    self.stats["non_vehicle_events"] += 1
+                elif camera and not FrigateEventParser.resolve_camera_to_gate(camera, db):
                     self.stats["unmapped_cameras"] += 1
                 else:
                     self.stats["malformed_payloads"] += 1

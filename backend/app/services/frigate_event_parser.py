@@ -164,9 +164,8 @@ class FrigateEventParser:
                 except (ValueError, TypeError):
                     pass
 
-        # If plate is detected but no dedicated plate score was provided, fallback to top_score/score
-        if raw_plate and plate_confidence is None and vehicle_confidence is not None:
-            plate_confidence = vehicle_confidence
+        # A plate without an OCR score keeps plate_confidence None (LOW_CONFIDENCE downstream). The
+        # detector's top_score says the object is a car, not that the characters were read correctly.
 
         # Clamp plate confidence between 0.0 and 1.0 if set
         if plate_confidence is not None:

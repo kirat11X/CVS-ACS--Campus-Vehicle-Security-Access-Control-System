@@ -57,7 +57,7 @@ def run_tests():
             "frame_time": time.time(),
             "start_time": time.time(),
             "label": "car",
-            "sub_label": "PB 65 AB 0902",
+            "sub_label": ["PB 65 AB 0902", 0.94],
             "top_score": 0.94,
             "score": 0.94,
             "box": [100, 150, 200, 250],
@@ -233,7 +233,7 @@ def run_tests():
             "id": refine_id,
             "camera": "gate_cam",
             "label": "car",
-            "sub_label": "CH 01 AB 5555",
+            "sub_label": ["CH 01 AB 5555", 0.71],
             "score": 0.71
         }
     }
@@ -245,7 +245,7 @@ def run_tests():
             "id": refine_id,
             "camera": "gate_cam",
             "label": "car",
-            "sub_label": "CH 01 AB 5555",
+            "sub_label": ["CH 01 AB 5555", 0.98],
             "score": 0.98
         }
     }
@@ -389,7 +389,7 @@ def run_tests():
             "frame_time": time.time(),
             "start_time": time.time(),
             "label": "car",
-            "sub_label": real_test_plate,
+            "sub_label": [real_test_plate, 0.96],
             "top_score": 0.96,
             "score": 0.96,
             "box": [120, 160, 220, 270]

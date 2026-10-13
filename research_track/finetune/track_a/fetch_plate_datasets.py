@@ -128,8 +128,11 @@ def fetch_roboflow(slug: str, version: int | None, key: str) -> Path:
     from roboflow import Roboflow
 
     workspace, project = slug.split("/")
-    response = requests.get(f"https://api.roboflow.com/{workspace}/{project}", params={"api_key": key}, timeout=60)
-    response.raise_for_status()
+    try:
+        response = requests.get(f"https://api.roboflow.com/{workspace}/{project}", params={"api_key": key}, timeout=60)
+        response.raise_for_status()
+    except requests.RequestException as exc:  # requests puts the URL, i.e. ?api_key=..., in its messages
+        raise RuntimeError(str(exc).replace(key, "<redacted>")) from None
     meta = json.loads(response.text.replace(key, "<redacted>"))
     versions = sorted(int(v["id"].rsplit("/", 1)[1]) for v in meta.get("versions") or [])
     if not versions:
@@ -139,9 +142,12 @@ def fetch_roboflow(slug: str, version: int | None, key: str) -> Path:
     if (dest / "data.yaml").is_file():
         print(f"  already present: {dest}")
         return dest
-    Roboflow(api_key=key).workspace(workspace).project(project).version(version).download(
-        "yolov11", location=str(dest), overwrite=True
-    )
+    try:
+        Roboflow(api_key=key).workspace(workspace).project(project).version(version).download(
+            "yolov11", location=str(dest), overwrite=True
+        )
+    except Exception as exc:  # the SDK's errors can echo request URLs, which carry the key
+        raise RuntimeError(str(exc).replace(key, "<redacted>")) from None
     (dest / "source_meta.json").write_text(json.dumps({"source": slug, "version": version, **meta}, indent=2))
     return dest
 

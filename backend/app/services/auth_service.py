@@ -60,6 +60,8 @@ def decode_access_token(token: str) -> Optional[Dict[str, Any]]:
         payload_b64, signature = token.split(".")
     except (ValueError, AttributeError):
         return None
+    if not (payload_b64.isascii() and signature.isascii()):
+        return None  # headers are latin-1; a non-ASCII token cannot be ours and would break the HMAC compare
     if not hmac.compare_digest(signature, _sign(payload_b64)):
         return None
     try:

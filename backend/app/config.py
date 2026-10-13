@@ -31,6 +31,13 @@ WHATSAPP_PROVIDER = os.getenv("WHATSAPP_PROVIDER", "mock")
 
 # Authentication (Phase 5C). Set AUTH_SECRET_KEY in .env; without it a random
 # per-process key is used and every issued token becomes invalid on restart.
+# A guessable key lets anyone sign an ADMIN token (user ids are visible to staff), so refuse one.
+_configured_secret = os.getenv("AUTH_SECRET_KEY")
+if _configured_secret and (_configured_secret == "change-me" or len(_configured_secret) < 32):
+    raise RuntimeError(
+        "AUTH_SECRET_KEY is the .env.example placeholder or shorter than 32 characters. Generate one with: "
+        "python -c \"import secrets;print(secrets.token_urlsafe(48))\""
+    )
 AUTH_SECRET_KEY = os.getenv("AUTH_SECRET_KEY") or secrets.token_urlsafe(48)
 AUTH_SECRET_KEY_IS_EPHEMERAL = not os.getenv("AUTH_SECRET_KEY")
 AUTH_TOKEN_TTL_MINUTES = int(os.getenv("AUTH_TOKEN_TTL_MINUTES", "720"))

@@ -1,4 +1,5 @@
 import logging
+import math
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
@@ -166,6 +167,12 @@ class FrigateEventParser:
 
         # A plate without an OCR score keeps plate_confidence None (LOW_CONFIDENCE downstream). The
         # detector's top_score says the object is a car, not that the characters were read correctly.
+
+        # NaN/Infinity are not scores; the clamps below would turn NaN into 1.0 (min(1.0, nan) == 1.0).
+        if plate_confidence is not None and not math.isfinite(plate_confidence):
+            plate_confidence = None
+        if vehicle_confidence is not None and not math.isfinite(vehicle_confidence):
+            vehicle_confidence = None
 
         # Clamp plate confidence between 0.0 and 1.0 if set
         if plate_confidence is not None:

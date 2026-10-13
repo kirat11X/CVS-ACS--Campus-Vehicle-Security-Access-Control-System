@@ -13,6 +13,10 @@ from backend.app.services.observation_service import ObservationService
 
 logger = logging.getLogger("campus_security.frigate_worker")
 
+def _reject_non_finite(constant: str):
+    """json.loads hook: NaN/Infinity are not JSON (RFC 8259) and PostgreSQL's JSON type rejects them."""
+    raise ValueError(f"non-finite number {constant} in payload")
+
 class FrigateMQTTWorker:
     """
     Background worker that subscribes to Frigate NVR MQTT telemetry on 'frigate/events',
@@ -93,7 +97,7 @@ class FrigateMQTTWorker:
                     payload_str = raw_payload.decode("utf-8")
                 else:
                     payload_str = raw_payload
-                payload_dict = json.loads(payload_str)
+                payload_dict = json.loads(payload_str, parse_constant=_reject_non_finite)
             except Exception as e:
                 self.stats["malformed_payloads"] += 1
                 logger.warning(f"FrigateMQTTWorker received malformed JSON payload: {e}")

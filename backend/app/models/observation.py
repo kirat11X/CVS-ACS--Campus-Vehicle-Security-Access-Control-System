@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, Float, DateTime, ForeignKey, JSON, Text, BigInteger, CheckConstraint, Enum as SQLEnum, Index, event
+from sqlalchemy import Column, String, Float, DateTime, ForeignKey, JSON, Text, BigInteger, CheckConstraint, Enum as SQLEnum, Index, event, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from backend.app.models.base import Base, TimestampMixin, utc_now
@@ -30,7 +30,9 @@ class ObservationEvent(Base, TimestampMixin):
     created_by = relationship("User", foreign_keys=[created_by_id])
 
     __table_args__ = (
-        Index("ix_observation_events_source_event", "source", "source_event_id"),
+        # One observation per sensor event: refinements of a source_event_id update this row.
+        Index("ix_observation_events_source_event", "source", "source_event_id", unique=True,
+              postgresql_where=text("source_event_id IS NOT NULL")),
     )
 
 class ObservationResolution(Base):

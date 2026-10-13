@@ -1,5 +1,6 @@
 from typing import Optional, List
 from uuid import UUID
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 from backend.app.models.gate import Gate
 from backend.app.models.observation import ObservationEvent
@@ -10,6 +11,10 @@ from backend.app.schemas.feed import ManualObservationCreate
 from backend.app.services.plate_normalizer import normalize_plate
 from backend.app.services.feed_events import record_feed_event
 from backend.app.services.movement_service import movement_service
+
+# Namespace for the per-event advisory lock (two-key form, so it cannot collide with the
+# single-key feed cursor lock in feed_events.py).
+SOURCE_EVENT_LOCK_NAMESPACE = 5_031_603
 
 class ObservationService:
     @staticmethod
@@ -29,6 +34,12 @@ class ObservationService:
 
         # Deduplication check via source_event_id
         if data.source_event_id:
+            # Serialise writers of one event (two backend processes on the broker, or the worker and
+            # POST /observations) until commit; otherwise both can miss the row and both insert it.
+            db.execute(
+                text("SELECT pg_advisory_xact_lock(:ns, hashtext(:key))"),
+                {"ns": SOURCE_EVENT_LOCK_NAMESPACE, "key": f"{data.source.value}:{data.source_event_id}"},
+            )
             existing = db.query(ObservationEvent).filter_by(
                 source=data.source,
                 source_event_id=data.source_event_id

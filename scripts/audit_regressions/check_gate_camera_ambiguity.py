@@ -19,7 +19,7 @@ def second_live_gate_cannot_claim_a_camera():
     first, second = (f"AUDIT_{uuid.uuid4().hex[:6].upper()}" for _ in range(2))
     assert client().post("/gates", headers=auth(admin), json={"id": first, "name": "A", "camera_id": camera}).status_code == 201
     created = client().post("/gates", headers=auth(admin), json={"id": second, "name": "B", "camera_id": camera})
-    moved = client().put(f"/gates/GATE_3", headers=auth(admin), json={"camera_id": camera})
+    moved = client().put("/gates/GATE_3", headers=auth(admin), json={"camera_id": camera})
     with SessionLocal() as db:  # undo whatever was accepted so no two live gates share a camera
         db.get(Gate, "GATE_3").camera_id = "gate_3_cam"
         if db.get(Gate, second) is not None:

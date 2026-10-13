@@ -15,8 +15,7 @@ def check_db_connection() -> dict:
     try:
         with engine.connect() as conn:
             result = conn.execute(text("SELECT 1")).scalar()
-            # Also record or update health check
-            init_db()
+            # Read-only probe: the schema is owned by Alembic migrations, never created from here.
             return {"status": "ok", "query_result": result}
     except Exception as e:
         return {"status": "error", "detail": str(e)}

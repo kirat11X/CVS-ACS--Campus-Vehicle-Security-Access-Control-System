@@ -32,6 +32,9 @@ CROP_LIKE_AREA = 0.6  # a box covering this much of the frame means the "scene" 
 # (audit 2026-10-13): pairs at 1-2 bits are re-exports/re-encodes of one photo, 4-6 bits are frames of one
 # fixed-camera scene, and 8 bits already chains unrelated images into a 162-image component.
 DETECTOR_NEAR_DUP_BITS = 6
+# Plate crops all look alike at 9x8, so OCR uses a tighter bound. Measured on ocr_in_v1: crop pairs within
+# 2 bits carry the same text or a <=2-edit label typo (1648 of 1651 pairs); at 3-4 bits different plates appear.
+OCR_NEAR_DUP_BITS = 2
 
 DETECTOR_SOURCES = {
     # name: (licence, path relative to ROOT)
@@ -270,16 +273,12 @@ def cmd_ocr(args: argparse.Namespace) -> None:
         else:
             records.append({**rec, "text": text})
 
-    # Group by plate text, and merge texts whose images are pixel-identical (relabelled duplicates).
+    # Group by plate text, and merge texts whose crops are near-identical: frames of one plate whose labels
+    # differ by a typo (GJO1HW3542 / GJ01HW3542) must not straddle splits.
     uf = UnionFind()
-    by_hash = {}
     for rec in records:
         uf.find(rec["text"])
-        h = image_hash(rec["image"])
-        if h is not None:
-            if h in by_hash:
-                uf.union(rec["text"], by_hash[h])
-            by_hash.setdefault(h, rec["text"])
+    merge_near_duplicates(uf, [(rec["text"], image_hash(rec["image"])) for rec in records], OCR_NEAR_DUP_BITS)
     group_of = lambda rec: uf.find(rec["text"])  # noqa: E731
     split = grouped_split(records, group_of, (0.7, 0.15), args.seed)
 
@@ -298,7 +297,7 @@ def cmd_ocr(args: argparse.Namespace) -> None:
                 writer.writerow([os.path.relpath(rec["image"].resolve(), out), rec["text"], rec["source"]])
     manifest = {
         "seed": args.seed,
-        "group_key": "plate_text, merged across pixel-identical images (dHash)",
+        "group_key": f"plate_text, merged across crops within {OCR_NEAR_DUP_BITS} bits of dHash",
         "ratios": [0.7, 0.15, 0.15],
         "sources": {k: {"licence": v[0], "path": str(ROOT / v[1])} for k, v in OCR_SOURCES.items()},
         "dropped": dict(dropped),

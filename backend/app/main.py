@@ -107,7 +107,7 @@ def get_frigate_worker_status():
 
 @app.post("/webhook/n8n-test")
 def receive_n8n_test_webhook(payload: WebhookTestPayload):
-    logger.info(f"Received n8n test webhook: {payload.dict()}")
+    logger.info(f"Received n8n test webhook: source={payload.source} event={payload.event}")
     # Record in database for E2E verification
     try:
         from backend.app.db import SessionLocal, HealthCheckRecord
@@ -133,7 +133,7 @@ class LPREventPayload(BaseModel):
 
 @app.post("/api/test/lpr-event")
 def receive_lpr_event(payload: LPREventPayload):
-    logger.info(f"Received LPR event: {payload.dict()}")
+    logger.info(f"Received LPR test event from camera '{payload.camera}'")
     from backend.app.db import SessionLocal, HealthCheckRecord
     db = SessionLocal()
     rec = HealthCheckRecord(

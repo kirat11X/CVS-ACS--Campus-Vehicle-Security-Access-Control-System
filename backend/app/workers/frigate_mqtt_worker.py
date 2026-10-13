@@ -149,9 +149,10 @@ class FrigateMQTTWorker:
                 )
             else:
                 self.stats["observations_created"] += 1
+                # No plate text in the shared log (personal data); the observation id leads to it.
                 logger.info(
                     f"Created ObservationEvent '{saved_obs.id}' for gate='{saved_obs.gate_id}' "
-                    f"plate='{saved_obs.normalized_plate}' type='{saved_obs.vehicle_type.value}'"
+                    f"has_plate={bool(saved_obs.normalized_plate)} type='{saved_obs.vehicle_type.value}'"
                 )
 
             return saved_obs

@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, Float, DateTime, ForeignKey, Text, JSON, Enum as SQLEnum, Index, event, text
+from sqlalchemy import Column, String, Float, DateTime, ForeignKey, Text, JSON, Enum as SQLEnum, Index, event, select, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from backend.app.models.base import Base, TimestampMixin, utc_now
@@ -83,14 +83,22 @@ class EntryExitLog(Base, TimestampMixin):
     observation = relationship("ObservationEvent")
     created_by = relationship("User", foreign_keys=[created_by_id])
 
+def _is_movement_row(connection, target) -> bool:
+    """True if the pending or the stored direction_method is set: clearing it must not unlock the row."""
+    if target.direction_method is not None:
+        return True
+    table = EntryExitLog.__table__
+    stored = connection.execute(select(table.c.direction_method).where(table.c.id == target.id)).scalar()
+    return stored is not None
+
 @event.listens_for(EntryExitLog, "before_update")
 def _reject_movement_update(mapper, connection, target):
-    if target.direction_method is not None:
+    if _is_movement_row(connection, target):
         raise ValueError("Movement records are append-only; add a correction row instead.")
 
 @event.listens_for(EntryExitLog, "before_delete")
 def _reject_movement_delete(mapper, connection, target):
-    if target.direction_method is not None:
+    if _is_movement_row(connection, target):
         raise ValueError("Movement records are append-only; they cannot be deleted.")
 
 class SecurityAlert(Base, TimestampMixin):

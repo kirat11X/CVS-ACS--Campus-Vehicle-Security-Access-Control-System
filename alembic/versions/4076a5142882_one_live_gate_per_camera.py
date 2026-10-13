@@ -24,19 +24,23 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Upgrade schema."""
-    shared = op.get_bind().execute(sa.text(
-        "SELECT camera_id, string_agg(id, ', ' ORDER BY id) FROM gates "
-        "WHERE camera_id IS NOT NULL AND status <> 'INACTIVE' GROUP BY camera_id HAVING count(*) > 1"
-    )).all()
-    if shared:
-        raise RuntimeError(
-            "Cannot enforce one live gate per camera; deactivate or re-map these gates first: "
-            + "; ".join(f"{camera}: {gates}" for camera, gates in shared)
+    # 'INACTIVE' was added to gate_status_enum by 1c9f9a684531. On a fresh database every revision
+    # runs in one transaction and PostgreSQL refuses to use an enum value added in the same
+    # transaction, so commit first and run this step on its own.
+    with op.get_context().autocommit_block():
+        shared = op.get_bind().execute(sa.text(
+            "SELECT camera_id, string_agg(id, ', ' ORDER BY id) FROM gates "
+            "WHERE camera_id IS NOT NULL AND status <> 'INACTIVE' GROUP BY camera_id HAVING count(*) > 1"
+        )).all()
+        if shared:
+            raise RuntimeError(
+                "Cannot enforce one live gate per camera; deactivate or re-map these gates first: "
+                + "; ".join(f"{camera}: {gates}" for camera, gates in shared)
+            )
+        op.create_index(
+            'uq_gates_live_camera_id', 'gates', ['camera_id'], unique=True,
+            postgresql_where=sa.text("camera_id IS NOT NULL AND status <> 'INACTIVE'"),
         )
-    op.create_index(
-        'uq_gates_live_camera_id', 'gates', ['camera_id'], unique=True,
-        postgresql_where=sa.text("camera_id IS NOT NULL AND status <> 'INACTIVE'"),
-    )
 
 
 def downgrade() -> None:

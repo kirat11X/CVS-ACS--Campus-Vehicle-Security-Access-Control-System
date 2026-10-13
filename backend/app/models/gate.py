@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, Float, DateTime, ForeignKey, Text, JSON, Enum as SQLEnum, event
+from sqlalchemy import Column, String, Float, DateTime, ForeignKey, Text, JSON, Enum as SQLEnum, Index, event, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from backend.app.models.base import Base, TimestampMixin, utc_now
@@ -20,6 +20,12 @@ class Gate(Base, TimestampMixin):
     entry_exit_logs = relationship("EntryExitLog", back_populates="gate")
     delivery_orders = relationship("DeliveryOrder", back_populates="gate")
     observations = relationship("ObservationEvent", back_populates="gate")
+
+    __table_args__ = (
+        # A Frigate camera belongs to at most one gate that is not INACTIVE.
+        Index("uq_gates_live_camera_id", "camera_id", unique=True,
+              postgresql_where=text("camera_id IS NOT NULL AND status <> 'INACTIVE'")),
+    )
 
 class AccessDecision(Base):
     __tablename__ = "access_decisions"

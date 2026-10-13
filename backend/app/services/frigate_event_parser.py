@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.models.gate import Gate
 from backend.app.models.movement import CameraLane
-from backend.app.models.enums import ObservationSource, ObservedVehicleType, ObservationDirection
+from backend.app.models.enums import GateStatus, ObservationSource, ObservedVehicleType, ObservationDirection
 from backend.app.schemas.observation import ObservationCreate
 from backend.app.services.plate_normalizer import normalize_plate
 from backend.app.models.base import utc_now
@@ -31,13 +31,14 @@ class FrigateEventParser:
         Resolves a Frigate camera identifier to a registered Gate record via
         Gate.camera_id, or an active declared camera lane. If the camera is not
         mapped in the database, returns None.
-        Never falls back to a default gate.
+        Never falls back to a default gate. A gate that is not INACTIVE wins over
+        retired gates that once used the same camera.
         """
         if not camera_id:
             return None
         gate = db.query(Gate).filter(
             (Gate.camera_id == camera_id) | (Gate.id == camera_id)
-        ).first()
+        ).order_by((Gate.status == GateStatus.INACTIVE).asc(), Gate.id.asc()).first()
         if gate:
             return gate
         # Additional cameras at a gate are declared in camera_lanes (Phase 6)

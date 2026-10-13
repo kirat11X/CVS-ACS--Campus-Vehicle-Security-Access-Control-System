@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from backend.app.db import SessionLocal
 from backend.app.dependencies import CurrentUser, require_admin, require_staff
 from backend.app.models.gate import Gate
+from backend.app.models.movement import CameraLane
 from backend.app.models.enums import GateStatus
 from backend.app.schemas.gate import GateCreate, GateUpdate, GateResponse
 from backend.app.schemas.observation import ObservationResponse
@@ -17,6 +18,22 @@ def get_db():
         yield db
     finally:
         db.close()
+
+def _camera_owner_conflict(db: Session, camera_id: Optional[str], gate_id: str) -> Optional[str]:
+    """Why camera_id cannot be this gate's camera: another live gate or another gate's active lane owns it."""
+    if not camera_id:
+        return None
+    other = db.query(Gate).filter(
+        Gate.camera_id == camera_id, Gate.id != gate_id, Gate.status != GateStatus.INACTIVE
+    ).first()
+    if other:
+        return f"Camera '{camera_id}' is the registered camera of gate '{other.id}'."
+    lane = db.query(CameraLane).filter(
+        CameraLane.camera_id == camera_id, CameraLane.gate_id != gate_id, CameraLane.is_active.is_(True)
+    ).first()
+    if lane:
+        return f"Camera '{camera_id}' is a declared lane of gate '{lane.gate_id}'."
+    return None
 
 @router.get("", response_model=List[GateResponse])
 def list_gates(
@@ -55,6 +72,10 @@ def create_gate(payload: GateCreate, db: Session = Depends(get_db), user: Curren
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Gate with ID '{payload.id}' already exists."
         )
+    if payload.status != GateStatus.INACTIVE:
+        conflict = _camera_owner_conflict(db, payload.camera_id, payload.id)
+        if conflict:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=conflict)
 
     gate = Gate(
         id=payload.id,
@@ -80,6 +101,12 @@ def update_gate(gate_id: str, payload: GateUpdate, db: Session = Depends(get_db)
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Gate with ID '{gate_id}' not found."
         )
+    new_status = payload.status if payload.status is not None else gate.status
+    if new_status != GateStatus.INACTIVE:
+        new_camera = payload.camera_id if payload.camera_id is not None else gate.camera_id
+        conflict = _camera_owner_conflict(db, new_camera, gate.id)
+        if conflict:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=conflict)
 
     if payload.name is not None:
         gate.name = payload.name

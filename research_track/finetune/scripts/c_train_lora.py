@@ -3,7 +3,7 @@
 All hyperparameter defaults are UNVERIFIED STARTING POINTS; tune only on the validation split.
 The model proposes a category only. Policy (ALLOW/REVIEW/ALERT) stays in the deterministic engine.
 
-Resumable: re-running with the same --run-id resumes from the last checkpoint in <run_dir>/checkpoints.
+Resumable: re-running with the same --run-id resumes from the last complete checkpoint in <run_dir>/checkpoints.
 Stops cleanly (checkpoint + exit) when <run_dir>/STOP appears (watchdog) or the wall-time cap is hit.
 
 Usage:
@@ -28,12 +28,12 @@ from transformers import (
     EarlyStoppingCallback,
     TrainerCallback,
 )
-from transformers.trainer_utils import get_last_checkpoint
 from trl import SFTConfig, SFTTrainer
 
 from c_common import (
     QWEN_PATH,
     RUNS_C,
+    last_complete_checkpoint,
     load_split,
     render_prompt,
     seed_everything,
@@ -176,7 +176,7 @@ def main() -> None:
         processing_class=tok,
         callbacks=[guard, EarlyStoppingCallback(early_stopping_patience=args.patience)],
     )
-    last = get_last_checkpoint(str(ckpt_dir)) if ckpt_dir.exists() else None
+    last = last_complete_checkpoint(ckpt_dir)
     write_run_manifest(
         run_dir, run_id=args.run_id, kind="train_lora", status="RUNNING", seed=args.seed, config=config,
         config_sha256=config_sha, data_sha256={s: sha256_file(args.split_dir / f"{s}.csv") for s in ("train", "val")},

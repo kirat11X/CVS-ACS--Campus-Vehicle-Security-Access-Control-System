@@ -141,6 +141,23 @@ def lib_versions() -> dict:
     return out
 
 
+def last_complete_checkpoint(ckpt_dir: Path) -> str | None:
+    """Newest checkpoint-N whose trainer_state.json parses. transformers writes that file last and saves
+    in place, so a checkpoint interrupted mid-save (e.g. a spot reclaim) is skipped, not resumed from."""
+    ckpt_dir = Path(ckpt_dir)
+    if not ckpt_dir.is_dir():
+        return None
+    numbered = [(int(p.name.split("-")[1]), p) for p in ckpt_dir.glob("checkpoint-*")
+                if p.is_dir() and p.name.split("-")[1].isdigit()]
+    for _, path in sorted(numbered, reverse=True):
+        try:
+            json.loads((path / "trainer_state.json").read_text())
+        except (OSError, ValueError):
+            continue
+        return str(path)
+    return None
+
+
 def write_run_manifest(run_dir: Path, **fields) -> Path:
     run_dir.mkdir(parents=True, exist_ok=True)
     path = run_dir / "run_manifest.json"

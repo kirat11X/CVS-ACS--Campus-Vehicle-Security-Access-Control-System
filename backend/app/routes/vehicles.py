@@ -1,5 +1,5 @@
-from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from typing import Annotated, List, Optional
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 
@@ -210,7 +210,7 @@ def get_vehicle_observations(
 
 @router.post("/{plate}/link", response_model=VehicleLinkResponse, status_code=status.HTTP_201_CREATED)
 def link_vehicle_to_owner(
-    plate: str,
+    plate: Annotated[str, Path(max_length=30)],
     payload: VehicleLinkRequest,
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(require_staff)

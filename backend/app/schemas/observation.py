@@ -18,12 +18,15 @@ class VehicleTypeObservation(BaseModel):
     confidence: Optional[float] = None
 
 class ObservationCreate(BaseModel):
-    gate_id: str = Field(..., description="Gate where observation occurred")
-    camera_id: Optional[str] = Field(None, description="Camera identifier")
+    # Also built from MQTT payloads: keep plate text out of validation error messages (and so the log).
+    model_config = ConfigDict(hide_input_in_errors=True)
+
+    gate_id: str = Field(..., max_length=30, description="Gate where observation occurred")
+    camera_id: Optional[str] = Field(None, max_length=50, description="Camera identifier")
     observed_at: Optional[datetime] = Field(None, description="Timestamp of observation")
     source: ObservationSource = Field(default=ObservationSource.FRIGATE, description="Sensor/ingestion source")
-    source_event_id: Optional[str] = Field(None, description="Source event or tracked object ID")
-    raw_plate: Optional[str] = Field(None, description="Raw plate string detected by OCR/LPR")
+    source_event_id: Optional[str] = Field(None, max_length=100, description="Source event or tracked object ID")
+    raw_plate: Optional[str] = Field(None, max_length=30, description="Raw plate string detected by OCR/LPR")
     plate_confidence: Optional[float] = Field(None, ge=0.0, le=1.0, description="LPR detection confidence")
     vehicle_type: ObservedVehicleType = Field(default=ObservedVehicleType.UNKNOWN, description="Observed physical vehicle type")
     vehicle_confidence: Optional[float] = Field(None, ge=0.0, le=1.0, description="Vehicle classification confidence")

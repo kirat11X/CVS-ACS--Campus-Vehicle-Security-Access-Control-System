@@ -56,7 +56,8 @@ def database_error_logs_carry_no_plate():
     ensure_gates()
     plate = unique_plate()
     worker = FrigateMQTTWorker(client_id=f"audit_{uuid.uuid4().hex[:6]}")
-    # raw_plate is VARCHAR(30): a 50-character read is parsed, then rejected by PostgreSQL on INSERT.
+    # raw_plate is VARCHAR(30): a 50-character read is parsed and then rejected while being stored
+    # (by PostgreSQL before the schema had length limits, by ObservationCreate validation since).
     payload = {"after": {"id": f"audit-dberr-{uuid.uuid4().hex[:8]}", "camera": "gate_cam", "label": "car",
                          "sub_label": [plate + "X" * 40, 0.9]}}
 

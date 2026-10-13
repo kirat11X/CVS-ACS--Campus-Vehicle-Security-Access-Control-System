@@ -4,11 +4,11 @@ from datetime import datetime
 from backend.app.models.enums import VehicleCategory, VehicleStatus
 
 class VehicleCreate(BaseModel):
-    plate: str = Field(..., description="License plate number (will be normalized)", example="PB65 AB 1234")
+    plate: str = Field(..., max_length=30, description="License plate number (will be normalized)", example="PB65 AB 1234")
     vehicle_category: VehicleCategory = Field(default=VehicleCategory.STUDENT, description="Classification category")
     owner_id: Optional[str] = Field(None, description="UUID or Institutional Identifier (e.g. STUDENT-2026-123)")
-    make_model: Optional[str] = Field(None, description="Vehicle make and model", example="Hyundai i20")
-    color: Optional[str] = Field(None, description="Vehicle color", example="White")
+    make_model: Optional[str] = Field(None, max_length=100, description="Vehicle make and model", example="Hyundai i20")
+    color: Optional[str] = Field(None, max_length=50, description="Vehicle color", example="White")
     valid_from: Optional[datetime] = Field(None, description="Access validity start time (UTC)")
     valid_until: Optional[datetime] = Field(None, description="Access validity end time (UTC)")
     notes: Optional[str] = Field(None, description="Security / parking notes")
@@ -17,8 +17,8 @@ class VehicleUpdate(BaseModel):
     owner_id: Optional[str] = Field(None, description="Updated owner UUID or institutional identifier")
     vehicle_category: Optional[VehicleCategory] = None
     status: Optional[VehicleStatus] = None
-    make_model: Optional[str] = None
-    color: Optional[str] = None
+    make_model: Optional[str] = Field(None, max_length=100)
+    color: Optional[str] = Field(None, max_length=50)
     valid_from: Optional[datetime] = None
     valid_until: Optional[datetime] = None
     notes: Optional[str] = None

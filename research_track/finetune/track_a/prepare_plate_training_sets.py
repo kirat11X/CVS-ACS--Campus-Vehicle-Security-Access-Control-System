@@ -5,8 +5,9 @@
 
 Only sources with an explicit permissive licence are used (CC0, CC BY 4.0, MIT, Apache-2.0); "unknown",
 NC and ND sets are excluded. Splits are grouped so near-identical images never straddle splits:
-Roboflow augmentations of one source image, byte/dHash-identical images across datasets, and (for OCR)
-every crop of the same plate text. Images are symlinked, not copied.
+Roboflow augmentations of one source image, near-identical images across datasets (dHash of the upright
+image within DETECTOR_NEAR_DUP_BITS), and (for OCR) every crop of the same plate text. Images are
+symlinked, not copied.
 """
 
 from __future__ import annotations
@@ -27,6 +28,10 @@ from fetch_plate_datasets import IMAGE_EXTS, dhash, label_for, norm_plate, parse
 
 ROOT = Path.home() / "ml-assets" / "campus" / "datasets"
 CROP_LIKE_AREA = 0.6  # a box covering this much of the frame means the "scene" is really a plate crop
+# Images whose 64-bit dHash differs by at most this many bits share a group. Measured on plate_det_in_v1
+# (audit 2026-10-13): pairs at 1-2 bits are re-exports/re-encodes of one photo, 4-6 bits are frames of one
+# fixed-camera scene, and 8 bits already chains unrelated images into a 162-image component.
+DETECTOR_NEAR_DUP_BITS = 6
 
 DETECTOR_SOURCES = {
     # name: (licence, path relative to ROOT)
@@ -74,13 +79,33 @@ def source_stem(path: Path) -> str:
 
 
 def image_hash(path: Path) -> int | None:
-    from PIL import Image
+    """dHash of the image as it is written to the split (EXIF orientation applied)."""
+    from PIL import Image, ImageOps
 
     try:
         with Image.open(path) as img:
-            return dhash(img)
+            return dhash(ImageOps.exif_transpose(img))
     except Exception:  # unreadable image: no cross-source grouping, still kept in its own group
         return None
+
+
+def merge_near_duplicates(uf: UnionFind, keyed_hashes: list, max_bits: int) -> None:
+    """Union the keys of images whose dHashes differ by at most max_bits (None hashes are skipped)."""
+    import numpy as np
+
+    pairs = [(key, h) for key, h in keyed_hashes if h is not None]
+    if not pairs:
+        return
+    keys = [key for key, _ in pairs]
+    hashes = np.array([h for _, h in pairs], dtype=np.uint64)
+    m1, m2, m4 = np.uint64(0x5555555555555555), np.uint64(0x3333333333333333), np.uint64(0x0F0F0F0F0F0F0F0F)
+    for i in range(len(hashes) - 1):
+        x = np.bitwise_xor(hashes[i + 1:], hashes[i])
+        x = x - ((x >> np.uint64(1)) & m1)
+        x = (x & m2) + ((x >> np.uint64(2)) & m2)
+        bits = (((x + (x >> np.uint64(4))) & m4) * np.uint64(0x0101010101010101)) >> np.uint64(56)
+        for j in np.nonzero(bits <= max_bits)[0]:
+            uf.union(keys[i], keys[i + 1 + int(j)])
 
 
 def grouped_split(items: list, group_of, ratios: tuple[float, float], seed: int, forced: dict | None = None) -> dict:
@@ -175,14 +200,9 @@ def cmd_detector(args: argparse.Namespace) -> None:
         print(f"{name:20s} kept {len(recs):5d}  dropped {dict(drop)}")
 
     uf = UnionFind()
-    by_hash = {}
     for rec in records:
         uf.find(rec["key"])
-        h = image_hash(rec["image"])
-        if h is not None:
-            if h in by_hash:
-                uf.union(rec["key"], by_hash[h])
-            by_hash.setdefault(h, rec["key"])
+    merge_near_duplicates(uf, [(rec["key"], image_hash(rec["image"])) for rec in records], DETECTOR_NEAR_DUP_BITS)
     group_of = lambda rec: uf.find(rec["key"])  # noqa: E731
     forced = {group_of(r): "train" for r in records if r["source"] in TRAIN_ONLY_SOURCES}
     split = grouped_split(records, group_of, (0.8, 0.1), args.seed, forced)
@@ -205,7 +225,7 @@ def cmd_detector(args: argparse.Namespace) -> None:
     )
     manifest = {
         "seed": args.seed,
-        "group_key": "roboflow source stem + exact dHash, union-find",
+        "group_key": f"roboflow source stem + dHash of the upright image within {DETECTOR_NEAR_DUP_BITS} bits, union-find",
         "train_only_sources": sorted(TRAIN_ONLY_SOURCES),
         "crop_like_area_threshold": CROP_LIKE_AREA,
         "exif_rotated_images_written_upright": rewritten,

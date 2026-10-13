@@ -24,7 +24,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from fetch_plate_datasets import IMAGE_EXTS, dhash, label_for, norm_plate, parse_yolo  # noqa: E402
+from fetch_plate_datasets import IMAGE_EXTS, INDIAN_PLATE, dhash, label_for, norm_plate, parse_yolo  # noqa: E402
 
 ROOT = Path.home() / "ml-assets" / "campus" / "datasets"
 CROP_LIKE_AREA = 0.6  # a box covering this much of the frame means the "scene" is really a plate crop
@@ -306,6 +306,10 @@ def cmd_ocr(args: argparse.Namespace) -> None:
         "per_source": {s: dict(Counter(r["source"] for r in recs)) for s, recs in rows.items()},
         "max_text_len": max(len(r["text"]) for r in records),
         "text_overlap_train_test": len({r["text"] for r in rows["train"]} & {r["text"] for r in rows["test"]}),
+        # Flagged for human review, never rewritten: neither a standard nor a BH-series Indian plate.
+        "labels_not_indian_format": {
+            s: sorted({r["text"] for r in recs if not INDIAN_PLATE.match(r["text"])}) for s, recs in rows.items()
+        },
     }
     (out / "manifest.json").write_text(json.dumps(manifest, indent=2))
     print(json.dumps(manifest, indent=2))

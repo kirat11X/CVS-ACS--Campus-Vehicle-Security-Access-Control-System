@@ -1,10 +1,11 @@
 import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, status
 from pydantic import BaseModel
 from typing import Dict, Any, Optional
 
 from backend.app.db import check_db_connection
+from backend.app.dependencies import CurrentUser, require_admin
 from backend.app.mqtt import mqtt_manager
 from backend.app.workers.frigate_mqtt_worker import frigate_worker
 from backend.app.whatsapp.mock import mock_whatsapp
@@ -176,5 +177,6 @@ def receive_invoice_ocr(payload: InvoiceOCRTestPayload):
     }
 
 @app.get("/api/events/frigate")
-def get_frigate_events():
+def get_frigate_events(user: CurrentUser = Depends(require_admin)):
+    """Last raw frigate/# messages (plate reads, snapshot payloads): ADMIN only."""
     return {"events": mqtt_manager.last_events}

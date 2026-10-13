@@ -1,0 +1,1842 @@
+[
+  {
+    "test_case_id": "TC-001",
+    "line_item_id": "li-001",
+    "raw_item_description": "Gold Flake Kings (10s)",
+    "quantity": 1.0,
+    "unit": "PACK",
+    "platform": "BLINKIT",
+    "notes": "Direct tobacco brand match",
+    "simulated_classification": {
+      "predicted_category": "TOBACCO_NICOTINE",
+      "confidence": 0.98,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-002",
+    "line_item_id": "li-002",
+    "raw_item_description": "Classic Milds 20 Pack",
+    "quantity": 2.0,
+    "unit": "PACK",
+    "platform": "ZEPTO",
+    "notes": "Classic milds cigarette pack",
+    "simulated_classification": {
+      "predicted_category": "TOBACCO_NICOTINE",
+      "confidence": 0.95,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-003",
+    "line_item_id": "li-003",
+    "raw_item_description": "Marlboro Advance Filter",
+    "quantity": 1.0,
+    "unit": "PACK",
+    "platform": "INSTAMART",
+    "notes": "Marlboro advance pack",
+    "simulated_classification": {
+      "predicted_category": "TOBACCO_NICOTINE",
+      "confidence": 0.97,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-004",
+    "line_item_id": "li-004",
+    "raw_item_description": "Chhoti Gold Flake",
+    "quantity": 1.0,
+    "unit": "PACK",
+    "platform": "BLINKIT",
+    "notes": "Hinglish tobacco phrase",
+    "simulated_classification": {
+      "predicted_category": "TOBACCO_NICOTINE",
+      "confidence": 0.91,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-005",
+    "line_item_id": "li-005",
+    "raw_item_description": "Badi Advance sutta",
+    "quantity": 2.0,
+    "unit": "PCS",
+    "platform": "ZEPTO",
+    "notes": "Hinglish sutta slang",
+    "simulated_classification": {
+      "predicted_category": "TOBACCO_NICOTINE",
+      "confidence": 0.93,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-006",
+    "line_item_id": "li-006",
+    "raw_item_description": "Classic Reg 10 Pk",
+    "quantity": 1.0,
+    "unit": "PACK",
+    "platform": "BLINKIT",
+    "notes": "Quick commerce truncated tobacco",
+    "simulated_classification": {
+      "predicted_category": "TOBACCO_NICOTINE",
+      "confidence": 0.92,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-007",
+    "line_item_id": "li-007",
+    "raw_item_description": "Marl Adv 20s",
+    "quantity": 1.0,
+    "unit": "PACK",
+    "platform": "INSTAMART",
+    "notes": "Truncated Marlboro Advance",
+    "simulated_classification": {
+      "predicted_category": "TOBACCO_NICOTINE",
+      "confidence": 0.94,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-008",
+    "line_item_id": "li-008",
+    "raw_item_description": "Ganesh Beedi Bundle",
+    "quantity": 5.0,
+    "unit": "PACK",
+    "platform": "BLINKIT",
+    "notes": "Beedi bundle",
+    "simulated_classification": {
+      "predicted_category": "TOBACCO_NICOTINE",
+      "confidence": 0.96,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-009",
+    "line_item_id": "li-009",
+    "raw_item_description": "bidi packet chota",
+    "quantity": 2.0,
+    "unit": "PACK",
+    "platform": "ZEPTO",
+    "notes": "Hinglish bidi packet",
+    "simulated_classification": {
+      "predicted_category": "TOBACCO_NICOTINE",
+      "confidence": 0.90,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-010",
+    "line_item_id": "li-010",
+    "raw_item_description": "Rajnigandha Pan Masala",
+    "quantity": 1.0,
+    "unit": "PACK",
+    "platform": "BLINKIT",
+    "notes": "Pan masala with tobacco context",
+    "simulated_classification": {
+      "predicted_category": "TOBACCO_NICOTINE",
+      "confidence": 0.94,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-011",
+    "line_item_id": "li-011",
+    "raw_item_description": "Shikhar gutka",
+    "quantity": 10.0,
+    "unit": "PACK",
+    "platform": "BLINKIT",
+    "notes": "Hinglish gutka entry",
+    "simulated_classification": {
+      "predicted_category": "TOBACCO_NICOTINE",
+      "confidence": 0.95,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-012",
+    "line_item_id": "li-012",
+    "raw_item_description": "Vape Pen 5000 puffs",
+    "quantity": 1.0,
+    "unit": "PCS",
+    "platform": "INSTAMART",
+    "notes": "Electronic vape device",
+    "simulated_classification": {
+      "predicted_category": "TOBACCO_NICOTINE",
+      "confidence": 0.96,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-013",
+    "line_item_id": "li-013",
+    "raw_item_description": "Elfbar Kiwi Passion",
+    "quantity": 1.0,
+    "unit": "PCS",
+    "platform": "ZEPTO",
+    "notes": "Disposable vape pod",
+    "simulated_classification": {
+      "predicted_category": "TOBACCO_NICOTINE",
+      "confidence": 0.95,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-014",
+    "line_item_id": "li-014",
+    "raw_item_description": "Nicotex 2mg Mint",
+    "quantity": 1.0,
+    "unit": "PACK",
+    "platform": "BLINKIT",
+    "notes": "Nicotine cessation gum classified under nicotine",
+    "simulated_classification": {
+      "predicted_category": "TOBACCO_NICOTINE",
+      "confidence": 0.88,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-015",
+    "line_item_id": "li-015",
+    "raw_item_description": "Hookah flavor double apple",
+    "quantity": 1.0,
+    "unit": "PACK",
+    "platform": "BLINKIT",
+    "notes": "Molasses tobacco hookah flavor",
+    "simulated_classification": {
+      "predicted_category": "TOBACCO_NICOTINE",
+      "confidence": 0.92,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-016",
+    "line_item_id": "li-016",
+    "raw_item_description": "Kingfisher Premium Beer 650ml",
+    "quantity": 2.0,
+    "unit": "BOTTLE",
+    "platform": "BLINKIT",
+    "notes": "Beer bottle",
+    "simulated_classification": {
+      "predicted_category": "ALCOHOL",
+      "confidence": 0.99,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-017",
+    "line_item_id": "li-017",
+    "raw_item_description": "Budweiser Magnum Strong 500ml",
+    "quantity": 4.0,
+    "unit": "BOTTLE",
+    "platform": "ZEPTO",
+    "notes": "Strong beer can",
+    "simulated_classification": {
+      "predicted_category": "ALCOHOL",
+      "confidence": 0.99,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-018",
+    "line_item_id": "li-018",
+    "raw_item_description": "Bira 91 White Pint",
+    "quantity": 1.0,
+    "unit": "BOTTLE",
+    "platform": "INSTAMART",
+    "notes": "Craft beer bottle",
+    "simulated_classification": {
+      "predicted_category": "ALCOHOL",
+      "confidence": 0.98,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-019",
+    "line_item_id": "li-019",
+    "raw_item_description": "KF Strong 650ml",
+    "quantity": 1.0,
+    "unit": "BOTTLE",
+    "platform": "BLINKIT",
+    "notes": "Truncated beer name",
+    "simulated_classification": {
+      "predicted_category": "ALCOHOL",
+      "confidence": 0.96,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-020",
+    "line_item_id": "li-020",
+    "raw_item_description": "Thandi beer bottle",
+    "quantity": 2.0,
+    "unit": "BOTTLE",
+    "platform": "ZEPTO",
+    "notes": "Hinglish beer slang",
+    "simulated_classification": {
+      "predicted_category": "ALCOHOL",
+      "confidence": 0.94,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-021",
+    "line_item_id": "li-021",
+    "raw_item_description": "Royal Stag Deluxe Whisky 750ml",
+    "quantity": 1.0,
+    "unit": "BOTTLE",
+    "platform": "BLINKIT",
+    "notes": "Full bottle whisky",
+    "simulated_classification": {
+      "predicted_category": "ALCOHOL",
+      "confidence": 0.99,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-022",
+    "line_item_id": "li-022",
+    "raw_item_description": "Blenders Pride Rare Premium 750ml",
+    "quantity": 1.0,
+    "unit": "BOTTLE",
+    "platform": "INSTAMART",
+    "notes": "Blenders Pride whisky",
+    "simulated_classification": {
+      "predicted_category": "ALCOHOL",
+      "confidence": 0.99,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-023",
+    "line_item_id": "li-023",
+    "raw_item_description": "RS Whisky qtr",
+    "quantity": 2.0,
+    "unit": "BOTTLE",
+    "platform": "BLINKIT",
+    "notes": "Truncated whisky quarter",
+    "simulated_classification": {
+      "predicted_category": "ALCOHOL",
+      "confidence": 0.95,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-024",
+    "line_item_id": "li-024",
+    "raw_item_description": "desi daru quarter",
+    "quantity": 1.0,
+    "unit": "BOTTLE",
+    "platform": "ZEPTO",
+    "notes": "Hinglish country liquor quarter",
+    "simulated_classification": {
+      "predicted_category": "ALCOHOL",
+      "confidence": 0.97,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-025",
+    "line_item_id": "li-025",
+    "raw_item_description": "Old Monk Rum 750ml",
+    "quantity": 1.0,
+    "unit": "BOTTLE",
+    "platform": "BLINKIT",
+    "notes": "Dark rum bottle",
+    "simulated_classification": {
+      "predicted_category": "ALCOHOL",
+      "confidence": 0.99,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-026",
+    "line_item_id": "li-026",
+    "raw_item_description": "Bacardi Carta Blanca 750ml",
+    "quantity": 1.0,
+    "unit": "BOTTLE",
+    "platform": "INSTAMART",
+    "notes": "White rum bottle",
+    "simulated_classification": {
+      "predicted_category": "ALCOHOL",
+      "confidence": 0.98,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-027",
+    "line_item_id": "li-027",
+    "raw_item_description": "Sula Chenin Blanc 750ml",
+    "quantity": 1.0,
+    "unit": "BOTTLE",
+    "platform": "BLINKIT",
+    "notes": "White wine bottle",
+    "simulated_classification": {
+      "predicted_category": "ALCOHOL",
+      "confidence": 0.98,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-028",
+    "line_item_id": "li-028",
+    "raw_item_description": "Magic Moments Vodka 750ml",
+    "quantity": 1.0,
+    "unit": "BOTTLE",
+    "platform": "ZEPTO",
+    "notes": "Vodka bottle",
+    "simulated_classification": {
+      "predicted_category": "ALCOHOL",
+      "confidence": 0.98,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-029",
+    "line_item_id": "li-029",
+    "raw_item_description": "vodka santra flavor",
+    "quantity": 1.0,
+    "unit": "BOTTLE",
+    "platform": "BLINKIT",
+    "notes": "Hinglish orange vodka",
+    "simulated_classification": {
+      "predicted_category": "ALCOHOL",
+      "confidence": 0.95,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-030",
+    "line_item_id": "li-030",
+    "raw_item_description": "Breezer Cranberry 275ml",
+    "quantity": 3.0,
+    "unit": "BOTTLE",
+    "platform": "INSTAMART",
+    "notes": "Alcoholic alcopop beverage",
+    "simulated_classification": {
+      "predicted_category": "ALCOHOL",
+      "confidence": 0.95,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-031",
+    "line_item_id": "li-031",
+    "raw_item_description": "Corex Cough Syrup",
+    "quantity": 1.0,
+    "unit": "BOTTLE",
+    "platform": "BLINKIT",
+    "notes": "Codeine cough syrup",
+    "simulated_classification": {
+      "predicted_category": "RX_SCHEDULED_DRUG",
+      "confidence": 0.97,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-032",
+    "line_item_id": "li-032",
+    "raw_item_description": "Phensedyl Linctus",
+    "quantity": 1.0,
+    "unit": "BOTTLE",
+    "platform": "ZEPTO",
+    "notes": "Scheduled codeine linctus",
+    "simulated_classification": {
+      "predicted_category": "RX_SCHEDULED_DRUG",
+      "confidence": 0.98,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-033",
+    "line_item_id": "li-033",
+    "raw_item_description": "Rexcod cough",
+    "quantity": 1.0,
+    "unit": "BOTTLE",
+    "platform": "INSTAMART",
+    "notes": "Truncated scheduled syrup",
+    "simulated_classification": {
+      "predicted_category": "RX_SCHEDULED_DRUG",
+      "confidence": 0.94,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-034",
+    "line_item_id": "li-034",
+    "raw_item_description": "khasi ki dawai nasha",
+    "quantity": 1.0,
+    "unit": "BOTTLE",
+    "platform": "BLINKIT",
+    "notes": "Hinglish codeine abuse phrase",
+    "simulated_classification": {
+      "predicted_category": "RX_SCHEDULED_DRUG",
+      "confidence": 0.91,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-035",
+    "line_item_id": "li-035",
+    "raw_item_description": "Alprax 0.5mg Tablets",
+    "quantity": 1.0,
+    "unit": "PACK",
+    "platform": "ZEPTO",
+    "notes": "Alprazolam tranquilizer",
+    "simulated_classification": {
+      "predicted_category": "RX_SCHEDULED_DRUG",
+      "confidence": 0.98,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-036",
+    "line_item_id": "li-036",
+    "raw_item_description": "Restyl 0.25mg",
+    "quantity": 1.0,
+    "unit": "PACK",
+    "platform": "BLINKIT",
+    "notes": "Alprazolam brand",
+    "simulated_classification": {
+      "predicted_category": "RX_SCHEDULED_DRUG",
+      "confidence": 0.97,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-037",
+    "line_item_id": "li-037",
+    "raw_item_description": "neend ki goli",
+    "quantity": 1.0,
+    "unit": "PACK",
+    "platform": "ZEPTO",
+    "notes": "Hinglish sleeping pills",
+    "simulated_classification": {
+      "predicted_category": "RX_SCHEDULED_DRUG",
+      "confidence": 0.92,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-038",
+    "line_item_id": "li-038",
+    "raw_item_description": "Tramadol Hydrochloride 50mg",
+    "quantity": 1.0,
+    "unit": "PACK",
+    "platform": "INSTAMART",
+    "notes": "Scheduled opioid analgesic",
+    "simulated_classification": {
+      "predicted_category": "RX_SCHEDULED_DRUG",
+      "confidence": 0.99,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-039",
+    "line_item_id": "li-039",
+    "raw_item_description": "Ultracet Tablet",
+    "quantity": 1.0,
+    "unit": "PACK",
+    "platform": "BLINKIT",
+    "notes": "Tramadol compound tablet",
+    "simulated_classification": {
+      "predicted_category": "RX_SCHEDULED_DRUG",
+      "confidence": 0.98,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-040",
+    "line_item_id": "li-040",
+    "raw_item_description": "dard ki heavy goli",
+    "quantity": 1.0,
+    "unit": "PACK",
+    "platform": "ZEPTO",
+    "notes": "Hinglish potent analgesic",
+    "simulated_classification": {
+      "predicted_category": "RX_SCHEDULED_DRUG",
+      "confidence": 0.89,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-041",
+    "line_item_id": "li-041",
+    "raw_item_description": "Ritalin 10mg",
+    "quantity": 1.0,
+    "unit": "PACK",
+    "platform": "BLINKIT",
+    "notes": "Methylphenidate controlled stimulant",
+    "simulated_classification": {
+      "predicted_category": "RX_SCHEDULED_DRUG",
+      "confidence": 0.99,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-042",
+    "line_item_id": "li-042",
+    "raw_item_description": "Modalert 200mg",
+    "quantity": 1.0,
+    "unit": "PACK",
+    "platform": "INSTAMART",
+    "notes": "Modafinil wakefulness agent",
+    "simulated_classification": {
+      "predicted_category": "RX_SCHEDULED_DRUG",
+      "confidence": 0.97,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-043",
+    "line_item_id": "li-043",
+    "raw_item_description": "Testoviron Depot",
+    "quantity": 2.0,
+    "unit": "BOTTLE",
+    "platform": "BLINKIT",
+    "notes": "Anabolic steroid ampoule",
+    "simulated_classification": {
+      "predicted_category": "RX_SCHEDULED_DRUG",
+      "confidence": 0.98,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-044",
+    "line_item_id": "li-044",
+    "raw_item_description": "Diazepam 5mg",
+    "quantity": 1.0,
+    "unit": "PACK",
+    "platform": "ZEPTO",
+    "notes": "Benzodiazepine sedative",
+    "simulated_classification": {
+      "predicted_category": "RX_SCHEDULED_DRUG",
+      "confidence": 0.99,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-045",
+    "line_item_id": "li-045",
+    "raw_item_description": "calmpose goli",
+    "quantity": 1.0,
+    "unit": "PACK",
+    "platform": "BLINKIT",
+    "notes": "Hinglish diazepam brand",
+    "simulated_classification": {
+      "predicted_category": "RX_SCHEDULED_DRUG",
+      "confidence": 0.95,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-046",
+    "line_item_id": "li-046",
+    "raw_item_description": "Crocin Advance 500mg",
+    "quantity": 1.0,
+    "unit": "PACK",
+    "platform": "BLINKIT",
+    "notes": "Paracetamol OTC tablet",
+    "simulated_classification": {
+      "predicted_category": "OTC_MEDICINE",
+      "confidence": 0.99,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-047",
+    "line_item_id": "li-047",
+    "raw_item_description": "Dolo 650 Tablets",
+    "quantity": 1.0,
+    "unit": "PACK",
+    "platform": "ZEPTO",
+    "notes": "Dolo paracetamol 650mg",
+    "simulated_classification": {
+      "predicted_category": "OTC_MEDICINE",
+      "confidence": 0.99,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-048",
+    "line_item_id": "li-048",
+    "raw_item_description": "bukhar ki goli",
+    "quantity": 1.0,
+    "unit": "PACK",
+    "platform": "BLINKIT",
+    "notes": "Hinglish fever tablet",
+    "simulated_classification": {
+      "predicted_category": "OTC_MEDICINE",
+      "confidence": 0.92,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-049",
+    "line_item_id": "li-049",
+    "raw_item_description": "Vicks VapoRub 25ml",
+    "quantity": 1.0,
+    "unit": "BOTTLE",
+    "platform": "INSTAMART",
+    "notes": "Vaporub OTC balm",
+    "simulated_classification": {
+      "predicted_category": "OTC_MEDICINE",
+      "confidence": 0.98,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-050",
+    "line_item_id": "li-050",
+    "raw_item_description": "Strepsils Orange 8s",
+    "quantity": 2.0,
+    "unit": "PACK",
+    "platform": "BLINKIT",
+    "notes": "Sore throat lozenges",
+    "simulated_classification": {
+      "predicted_category": "OTC_MEDICINE",
+      "confidence": 0.97,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-051",
+    "line_item_id": "li-051",
+    "raw_item_description": "Burnol Cream 10g",
+    "quantity": 1.0,
+    "unit": "PCS",
+    "platform": "ZEPTO",
+    "notes": "Antiseptic burn ointment",
+    "simulated_classification": {
+      "predicted_category": "OTC_MEDICINE",
+      "confidence": 0.96,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-052",
+    "line_item_id": "li-052",
+    "raw_item_description": "Digene Tablets Mint",
+    "quantity": 1.0,
+    "unit": "PACK",
+    "platform": "BLINKIT",
+    "notes": "Antacid chewable tablets",
+    "simulated_classification": {
+      "predicted_category": "OTC_MEDICINE",
+      "confidence": 0.97,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-053",
+    "line_item_id": "li-053",
+    "raw_item_description": "Volini Spray 40g",
+    "quantity": 1.0,
+    "unit": "BOTTLE",
+    "platform": "INSTAMART",
+    "notes": "Topical pain relief spray",
+    "simulated_classification": {
+      "predicted_category": "OTC_MEDICINE",
+      "confidence": 0.98,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-054",
+    "line_item_id": "li-054",
+    "raw_item_description": "Band-Aid Standard",
+    "quantity": 1.0,
+    "unit": "PACK",
+    "platform": "BLINKIT",
+    "notes": "First aid adhesive bandages",
+    "simulated_classification": {
+      "predicted_category": "OTC_MEDICINE",
+      "confidence": 0.99,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-055",
+    "line_item_id": "li-055",
+    "raw_item_description": "Eno Lemon Sachet",
+    "quantity": 5.0,
+    "unit": "PACK",
+    "platform": "ZEPTO",
+    "notes": "Digestive antacid powder",
+    "simulated_classification": {
+      "predicted_category": "OTC_MEDICINE",
+      "confidence": 0.98,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-056",
+    "line_item_id": "li-056",
+    "raw_item_description": "Harpic Power Plus 500ml",
+    "quantity": 3.0,
+    "unit": "BOTTLE",
+    "platform": "BLINKIT",
+    "notes": "Hazardous toilet acid cleaner at threshold (>= 3)",
+    "simulated_classification": {
+      "predicted_category": "HAZARDOUS_CHEMICAL",
+      "confidence": 0.98,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-057",
+    "line_item_id": "li-057",
+    "raw_item_description": "Kiwi Dranex Drain Cleaner",
+    "quantity": 4.0,
+    "unit": "PACK",
+    "platform": "ZEPTO",
+    "notes": "Caustic drain cleaner in bulk (4 packs)",
+    "simulated_classification": {
+      "predicted_category": "HAZARDOUS_CHEMICAL",
+      "confidence": 0.97,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-058",
+    "line_item_id": "li-058",
+    "raw_item_description": "Lizol Floor Cleaner 1L",
+    "quantity": 5.0,
+    "unit": "BOTTLE",
+    "platform": "INSTAMART",
+    "notes": "Disinfectant cleaner in bulk (5 bottles)",
+    "simulated_classification": {
+      "predicted_category": "HAZARDOUS_CHEMICAL",
+      "confidence": 0.96,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-059",
+    "line_item_id": "li-059",
+    "raw_item_description": "safai acid toilet",
+    "quantity": 3.0,
+    "unit": "BOTTLE",
+    "platform": "BLINKIT",
+    "notes": "Hinglish raw acid at threshold (3 bottles)",
+    "simulated_classification": {
+      "predicted_category": "HAZARDOUS_CHEMICAL",
+      "confidence": 0.95,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-060",
+    "line_item_id": "li-060",
+    "raw_item_description": "phenyl ki bottle",
+    "quantity": 6.0,
+    "unit": "BOTTLE",
+    "platform": "ZEPTO",
+    "notes": "Hinglish bulk phenyl disinfectant",
+    "simulated_classification": {
+      "predicted_category": "HAZARDOUS_CHEMICAL",
+      "confidence": 0.94,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-061",
+    "line_item_id": "li-061",
+    "raw_item_description": "HIT Black Aerosol",
+    "quantity": 3.0,
+    "unit": "BOTTLE",
+    "platform": "BLINKIT",
+    "notes": "Insecticide spray at threshold (3 cans)",
+    "simulated_classification": {
+      "predicted_category": "HAZARDOUS_CHEMICAL",
+      "confidence": 0.96,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-062",
+    "line_item_id": "li-062",
+    "raw_item_description": "Baygon Roach Killer",
+    "quantity": 4.0,
+    "unit": "BOTTLE",
+    "platform": "INSTAMART",
+    "notes": "Roach pesticide spray bulk",
+    "simulated_classification": {
+      "predicted_category": "HAZARDOUS_CHEMICAL",
+      "confidence": 0.95,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-063",
+    "line_item_id": "li-063",
+    "raw_item_description": "Ratol Rat Poison",
+    "quantity": 3.0,
+    "unit": "PACK",
+    "platform": "ZEPTO",
+    "notes": "Rodenticide zinc phosphide paste bulk",
+    "simulated_classification": {
+      "predicted_category": "HAZARDOUS_CHEMICAL",
+      "confidence": 0.98,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-064",
+    "line_item_id": "li-064",
+    "raw_item_description": "Paint Thinner Bottle",
+    "quantity": 3.0,
+    "unit": "BOTTLE",
+    "platform": "BLINKIT",
+    "notes": "Flammable solvent bulk (3 bottles)",
+    "simulated_classification": {
+      "predicted_category": "HAZARDOUS_CHEMICAL",
+      "confidence": 0.97,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-065",
+    "line_item_id": "li-065",
+    "raw_item_description": "Bleaching Powder 500g",
+    "quantity": 5.0,
+    "unit": "PACK",
+    "platform": "ZEPTO",
+    "notes": "Bulk chlorine bleach (5 packs)",
+    "simulated_classification": {
+      "predicted_category": "HAZARDOUS_CHEMICAL",
+      "confidence": 0.95,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-066",
+    "line_item_id": "li-066",
+    "raw_item_description": "Harpic Power Plus 500ml",
+    "quantity": 1.0,
+    "unit": "BOTTLE",
+    "platform": "BLINKIT",
+    "notes": "Household chemical below threshold (1 bottle)",
+    "simulated_classification": {
+      "predicted_category": "HAZARDOUS_CHEMICAL",
+      "confidence": 0.98,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-067",
+    "line_item_id": "li-067",
+    "raw_item_description": "Kiwi Dranex Drain Cleaner",
+    "quantity": 2.0,
+    "unit": "PACK",
+    "platform": "ZEPTO",
+    "notes": "Drain cleaner below threshold (2 packs)",
+    "simulated_classification": {
+      "predicted_category": "HAZARDOUS_CHEMICAL",
+      "confidence": 0.97,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-068",
+    "line_item_id": "li-068",
+    "raw_item_description": "Lizol Floor Cleaner 1L",
+    "quantity": 1.0,
+    "unit": "BOTTLE",
+    "platform": "INSTAMART",
+    "notes": "Floor cleaner below threshold (1 bottle)",
+    "simulated_classification": {
+      "predicted_category": "HAZARDOUS_CHEMICAL",
+      "confidence": 0.96,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-069",
+    "line_item_id": "li-069",
+    "raw_item_description": "HIT Black Aerosol",
+    "quantity": 1.0,
+    "unit": "BOTTLE",
+    "platform": "BLINKIT",
+    "notes": "Mosquito spray below threshold (1 can)",
+    "simulated_classification": {
+      "predicted_category": "HAZARDOUS_CHEMICAL",
+      "confidence": 0.96,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-070",
+    "line_item_id": "li-070",
+    "raw_item_description": "Colorbar Nail Polish Remover",
+    "quantity": 1.0,
+    "unit": "BOTTLE",
+    "platform": "INSTAMART",
+    "notes": "Acetone cosmetic remover (1 bottle)",
+    "simulated_classification": {
+      "predicted_category": "HAZARDOUS_CHEMICAL",
+      "confidence": 0.88,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-071",
+    "line_item_id": "li-071",
+    "raw_item_description": "Mortein Mosquito Spray",
+    "quantity": 2.0,
+    "unit": "BOTTLE",
+    "platform": "ZEPTO",
+    "notes": "Mosquito spray below threshold (2 cans)",
+    "simulated_classification": {
+      "predicted_category": "HAZARDOUS_CHEMICAL",
+      "confidence": 0.97,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-072",
+    "line_item_id": "li-072",
+    "raw_item_description": "chuhe marne ki dawa",
+    "quantity": 1.0,
+    "unit": "PACK",
+    "platform": "BLINKIT",
+    "notes": "Hinglish single pack rat poison",
+    "simulated_classification": {
+      "predicted_category": "HAZARDOUS_CHEMICAL",
+      "confidence": 0.92,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-073",
+    "line_item_id": "li-073",
+    "raw_item_description": "Acetone Thinner 100ml",
+    "quantity": 1.0,
+    "unit": "BOTTLE",
+    "platform": "ZEPTO",
+    "notes": "Single small acetone bottle",
+    "simulated_classification": {
+      "predicted_category": "HAZARDOUS_CHEMICAL",
+      "confidence": 0.95,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-074",
+    "line_item_id": "li-074",
+    "raw_item_description": "Bleach Pdr 50",
+    "quantity": 2.0,
+    "unit": "PACK",
+    "platform": "BLINKIT",
+    "notes": "Truncated bleach 2 packs",
+    "simulated_classification": {
+      "predicted_category": "HAZARDOUS_CHEMICAL",
+      "confidence": 0.93,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-075",
+    "line_item_id": "li-075",
+    "raw_item_description": "Hrpc Pwr 500m",
+    "quantity": 2.0,
+    "unit": "BOTTLE",
+    "platform": "BLINKIT",
+    "notes": "Truncated Harpic 2 bottles",
+    "simulated_classification": {
+      "predicted_category": "HAZARDOUS_CHEMICAL",
+      "confidence": 0.94,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-076",
+    "line_item_id": "li-076",
+    "raw_item_description": "Kiwi Dranex Drain Cleaner",
+    "quantity": null,
+    "unit": null,
+    "platform": "BLINKIT",
+    "notes": "Chemical with missing quantity -> REVIEW (MISSING_QUANTITY)",
+    "simulated_classification": {
+      "predicted_category": "HAZARDOUS_CHEMICAL",
+      "confidence": 0.97,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-077",
+    "line_item_id": "li-077",
+    "raw_item_description": "Harpic Power Plus 500ml",
+    "quantity": -2.0,
+    "unit": "BOTTLE",
+    "platform": "ZEPTO",
+    "notes": "Chemical with negative quantity -> REVIEW (INVALID_QUANTITY)",
+    "simulated_classification": {
+      "predicted_category": "HAZARDOUS_CHEMICAL",
+      "confidence": 0.98,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-078",
+    "line_item_id": "li-078",
+    "raw_item_description": "Lizol Floor Cleaner 1L",
+    "quantity": 1.0,
+    "unit": "INVALID_UNIT_XYZ",
+    "platform": "INSTAMART",
+    "notes": "Chemical with unsupported unit -> REVIEW (UNSUPPORTED_QUANTITY_UNIT)",
+    "simulated_classification": {
+      "predicted_category": "HAZARDOUS_CHEMICAL",
+      "confidence": 0.96,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-079",
+    "line_item_id": "li-079",
+    "raw_item_description": "Mortein Mosquito Spray",
+    "quantity": null,
+    "unit": "BOTTLE",
+    "platform": "BLINKIT",
+    "notes": "Chemical with null quantity -> REVIEW (MISSING_QUANTITY)",
+    "simulated_classification": {
+      "predicted_category": "HAZARDOUS_CHEMICAL",
+      "confidence": 0.97,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-080",
+    "line_item_id": "li-080",
+    "raw_item_description": "Paint Thinner Bottle",
+    "quantity": -1.0,
+    "unit": "BOTTLE",
+    "platform": "ZEPTO",
+    "notes": "Negative quantity thinner -> REVIEW",
+    "simulated_classification": {
+      "predicted_category": "HAZARDOUS_CHEMICAL",
+      "confidence": 0.95,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-081",
+    "line_item_id": "li-081",
+    "raw_item_description": "Crystal Stainless Steel Knife",
+    "quantity": 1.0,
+    "unit": "PCS",
+    "platform": "BLINKIT",
+    "notes": "Kitchen knife blade -> REVIEW",
+    "simulated_classification": {
+      "predicted_category": "SHARP_OBJECT",
+      "confidence": 0.98,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-082",
+    "line_item_id": "li-082",
+    "raw_item_description": "Gillette Mach3 Razor",
+    "quantity": 1.0,
+    "unit": "PACK",
+    "platform": "ZEPTO",
+    "notes": "Shaving razor cartridge -> REVIEW",
+    "simulated_classification": {
+      "predicted_category": "SHARP_OBJECT",
+      "confidence": 0.97,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-083",
+    "line_item_id": "li-083",
+    "raw_item_description": "Gillette 7 O'Clock Blades",
+    "quantity": 2.0,
+    "unit": "PACK",
+    "platform": "BLINKIT",
+    "notes": "Razor blades pack -> REVIEW",
+    "simulated_classification": {
+      "predicted_category": "SHARP_OBJECT",
+      "confidence": 0.98,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-084",
+    "line_item_id": "li-084",
+    "raw_item_description": "chaaku kitchen wala",
+    "quantity": 1.0,
+    "unit": "PCS",
+    "platform": "ZEPTO",
+    "notes": "Hinglish knife description -> REVIEW",
+    "simulated_classification": {
+      "predicted_category": "SHARP_OBJECT",
+      "confidence": 0.94,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-085",
+    "line_item_id": "li-085",
+    "raw_item_description": "blade packet",
+    "quantity": 1.0,
+    "unit": "PACK",
+    "platform": "BLINKIT",
+    "notes": "Hinglish razor blade pack -> REVIEW",
+    "simulated_classification": {
+      "predicted_category": "SHARP_OBJECT",
+      "confidence": 0.95,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-086",
+    "line_item_id": "li-086",
+    "raw_item_description": "Kangaro Paper Cutter",
+    "quantity": 1.0,
+    "unit": "PCS",
+    "platform": "BLINKIT",
+    "notes": "Paper utility cutter -> REVIEW",
+    "simulated_classification": {
+      "predicted_category": "SHARP_OBJECT",
+      "confidence": 0.96,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-087",
+    "line_item_id": "li-087",
+    "raw_item_description": "Maped Scissors 17cm",
+    "quantity": 1.0,
+    "unit": "PCS",
+    "platform": "ZEPTO",
+    "notes": "Craft scissors -> REVIEW",
+    "simulated_classification": {
+      "predicted_category": "SHARP_OBJECT",
+      "confidence": 0.97,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-088",
+    "line_item_id": "li-088",
+    "raw_item_description": "Box Cutter Utility",
+    "quantity": 1.0,
+    "unit": "PCS",
+    "platform": "BLINKIT",
+    "notes": "Heavy utility box cutter -> REVIEW",
+    "simulated_classification": {
+      "predicted_category": "SHARP_OBJECT",
+      "confidence": 0.98,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-089",
+    "line_item_id": "li-089",
+    "raw_item_description": "kainchi chhoti",
+    "quantity": 1.0,
+    "unit": "PCS",
+    "platform": "ZEPTO",
+    "notes": "Hinglish scissors -> REVIEW",
+    "simulated_classification": {
+      "predicted_category": "SHARP_OBJECT",
+      "confidence": 0.93,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-090",
+    "line_item_id": "li-090",
+    "raw_item_description": "Surgical Blades Pack",
+    "quantity": 1.0,
+    "unit": "PACK",
+    "platform": "BLINKIT",
+    "notes": "Scalpel blades pack -> REVIEW",
+    "simulated_classification": {
+      "predicted_category": "SHARP_OBJECT",
+      "confidence": 0.97,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-091",
+    "line_item_id": "li-091",
+    "raw_item_description": "Crystal Stainless Steel Knife",
+    "quantity": 1.0,
+    "unit": "PCS",
+    "platform": "INSTAMART",
+    "notes": "Platform override test: Sharp object on Instamart escalates to ALERT (priority 5)",
+    "simulated_classification": {
+      "predicted_category": "SHARP_OBJECT",
+      "confidence": 0.98,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-092",
+    "line_item_id": "li-092",
+    "raw_item_description": "Meat Cleaver Heavy Duty",
+    "quantity": 1.0,
+    "unit": "PCS",
+    "platform": "INSTAMART",
+    "notes": "Platform override test: Cleaver on Instamart escalates to ALERT (priority 5)",
+    "simulated_classification": {
+      "predicted_category": "SHARP_OBJECT",
+      "confidence": 0.98,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-093",
+    "line_item_id": "li-093",
+    "raw_item_description": "Victorinox Swiss Army Knife",
+    "quantity": 1.0,
+    "unit": "PCS",
+    "platform": "INSTAMART",
+    "notes": "Platform override test: Swiss knife on Instamart escalates to ALERT (priority 5)",
+    "simulated_classification": {
+      "predicted_category": "SHARP_OBJECT",
+      "confidence": 0.96,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-094",
+    "line_item_id": "li-094",
+    "raw_item_description": "Crocin Advance 500mg",
+    "quantity": 1.0,
+    "unit": "PACK",
+    "platform": "TEST_CONFLICT",
+    "notes": "Deliberate conflict test: Priority 15 tie between ALERT and ALLOW -> REVIEW (POLICY_RULE_CONFLICT)",
+    "simulated_classification": {
+      "predicted_category": "OTC_MEDICINE",
+      "confidence": 0.99,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-095",
+    "line_item_id": "li-095",
+    "raw_item_description": "Dolo 650 Tablets",
+    "quantity": 2.0,
+    "unit": "PACK",
+    "platform": "TEST_CONFLICT",
+    "notes": "Deliberate conflict test 2: Conflict tie -> REVIEW",
+    "simulated_classification": {
+      "predicted_category": "OTC_MEDICINE",
+      "confidence": 0.99,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-096",
+    "line_item_id": "li-096",
+    "raw_item_description": "Vicks Action 500",
+    "quantity": 1.0,
+    "unit": "PACK",
+    "platform": "TEST_CONFLICT",
+    "notes": "Deliberate conflict test 3: Conflict tie -> REVIEW",
+    "simulated_classification": {
+      "predicted_category": "OTC_MEDICINE",
+      "confidence": 0.98,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-097",
+    "line_item_id": "li-097",
+    "raw_item_description": "Band-Aid Standard",
+    "quantity": 1.0,
+    "unit": "PACK",
+    "platform": "TEST_CONFLICT",
+    "notes": "Deliberate conflict test 4: Conflict tie -> REVIEW",
+    "simulated_classification": {
+      "predicted_category": "OTC_MEDICINE",
+      "confidence": 0.99,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-098",
+    "line_item_id": "li-098",
+    "raw_item_description": "Lays Magic Masala 52g",
+    "quantity": 1.0,
+    "unit": "PACK",
+    "platform": "BLINKIT",
+    "notes": "Low classifier confidence (0.45 < 0.70): Downgrades ALLOW to REVIEW (LOW_CLASSIFIER_CONFIDENCE)",
+    "simulated_classification": {
+      "predicted_category": "NORMAL",
+      "confidence": 0.45,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": true
+    }
+  },
+  {
+    "test_case_id": "TC-099",
+    "line_item_id": "li-099",
+    "raw_item_description": "Amul Taaza Milk 500ml",
+    "quantity": 1.0,
+    "unit": "PACK",
+    "platform": "ZEPTO",
+    "notes": "Low classifier confidence (0.62 < 0.70): Downgrades ALLOW to REVIEW",
+    "simulated_classification": {
+      "predicted_category": "NORMAL",
+      "confidence": 0.62,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": true
+    }
+  },
+  {
+    "test_case_id": "TC-100",
+    "line_item_id": "li-100",
+    "raw_item_description": "Crocin Advance 500mg",
+    "quantity": 1.0,
+    "unit": "PACK",
+    "platform": "BLINKIT",
+    "notes": "Low classifier confidence on OTC (0.55 < 0.70): Downgrades ALLOW to REVIEW",
+    "simulated_classification": {
+      "predicted_category": "OTC_MEDICINE",
+      "confidence": 0.55,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": true
+    }
+  },
+  {
+    "test_case_id": "TC-101",
+    "line_item_id": "li-101",
+    "raw_item_description": "Maggi 2-Min Masala Pack",
+    "quantity": 2.0,
+    "unit": "PACK",
+    "platform": "BLINKIT",
+    "notes": "Missing confidence (null): Downgrades ALLOW to REVIEW (MISSING_CLASSIFIER_CONFIDENCE)",
+    "simulated_classification": {
+      "predicted_category": "NORMAL",
+      "confidence": null,
+      "classifier_name": "lexical_baseline_v1",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-102",
+    "line_item_id": "li-102",
+    "raw_item_description": "Britannia Brown Bread 400g",
+    "quantity": 1.0,
+    "unit": "PACK",
+    "platform": "ZEPTO",
+    "notes": "Missing confidence on grocery item: Downgrades ALLOW to REVIEW",
+    "simulated_classification": {
+      "predicted_category": "NORMAL",
+      "confidence": null,
+      "classifier_name": "lexical_baseline_v1",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-103",
+    "line_item_id": "li-103",
+    "raw_item_description": "Dolo 650 Tablets",
+    "quantity": 1.0,
+    "unit": "PACK",
+    "platform": "INSTAMART",
+    "notes": "Missing confidence on OTC item: Downgrades ALLOW to REVIEW",
+    "simulated_classification": {
+      "predicted_category": "OTC_MEDICINE",
+      "confidence": null,
+      "classifier_name": "lexical_baseline_v1",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-104",
+    "line_item_id": "li-104",
+    "raw_item_description": "XKJ-9943 1pc",
+    "quantity": 1.0,
+    "unit": "PCS",
+    "platform": "BLINKIT",
+    "notes": "Unrecognized SKU token -> UNKNOWN category -> REVIEW (UNKNOWN_CATEGORY)",
+    "simulated_classification": {
+      "predicted_category": "UNKNOWN",
+      "confidence": 0.20,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": true
+    }
+  },
+  {
+    "test_case_id": "TC-105",
+    "line_item_id": "li-105",
+    "raw_item_description": "random barcode ###",
+    "quantity": 1.0,
+    "unit": "PCS",
+    "platform": "ZEPTO",
+    "notes": "Garbled barcode string -> UNKNOWN -> REVIEW",
+    "simulated_classification": {
+      "predicted_category": "UNKNOWN",
+      "confidence": null,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": true
+    }
+  },
+  {
+    "test_case_id": "TC-106",
+    "line_item_id": "li-106",
+    "raw_item_description": "Unknown Box item #44",
+    "quantity": 1.0,
+    "unit": "BOX",
+    "platform": "INSTAMART",
+    "notes": "Unlabeled box -> UNKNOWN -> REVIEW",
+    "simulated_classification": {
+      "predicted_category": "UNKNOWN",
+      "confidence": 0.15,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": true
+    }
+  },
+  {
+    "test_case_id": "TC-107",
+    "line_item_id": "li-107",
+    "raw_item_description": "Misprinted receipt text ??",
+    "quantity": 1.0,
+    "unit": "PCS",
+    "platform": "BLINKIT",
+    "notes": "Corrupted text -> UNKNOWN -> REVIEW",
+    "simulated_classification": {
+      "predicted_category": "UNKNOWN",
+      "confidence": null,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": true
+    }
+  },
+  {
+    "test_case_id": "TC-108",
+    "line_item_id": "li-108",
+    "raw_item_description": "Unspecified Chemical Vial",
+    "quantity": 1.0,
+    "unit": "BOTTLE",
+    "platform": "ZEPTO",
+    "notes": "Suspicious unlabeled chemical -> UNKNOWN -> REVIEW",
+    "simulated_classification": {
+      "predicted_category": "UNKNOWN",
+      "confidence": 0.35,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": true
+    }
+  },
+  {
+    "test_case_id": "TC-109",
+    "line_item_id": "li-109",
+    "raw_item_description": "Lays Magic Masala 52g",
+    "quantity": 2.0,
+    "unit": "PACK",
+    "platform": "BLINKIT",
+    "notes": "Normal snack with high confidence -> ALLOW",
+    "simulated_classification": {
+      "predicted_category": "NORMAL",
+      "confidence": 0.99,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-110",
+    "line_item_id": "li-110",
+    "raw_item_description": "Parle-G Biscuit 800g",
+    "quantity": 1.0,
+    "unit": "PACK",
+    "platform": "ZEPTO",
+    "notes": "Biscuits standard grocery -> ALLOW",
+    "simulated_classification": {
+      "predicted_category": "NORMAL",
+      "confidence": 0.99,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-111",
+    "line_item_id": "li-111",
+    "raw_item_description": "Amul Taaza Milk 500ml",
+    "quantity": 2.0,
+    "unit": "PACK",
+    "platform": "BLINKIT",
+    "notes": "Fresh milk pouches -> ALLOW",
+    "simulated_classification": {
+      "predicted_category": "NORMAL",
+      "confidence": 0.99,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-112",
+    "line_item_id": "li-112",
+    "raw_item_description": "Kinley Water Bottle 1L",
+    "quantity": 6.0,
+    "unit": "BOTTLE",
+    "platform": "INSTAMART",
+    "notes": "Packaged water bottles -> ALLOW",
+    "simulated_classification": {
+      "predicted_category": "NORMAL",
+      "confidence": 0.99,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-113",
+    "line_item_id": "li-113",
+    "raw_item_description": "Classmate Notebook 140 Pages",
+    "quantity": 3.0,
+    "unit": "PCS",
+    "platform": "BLINKIT",
+    "notes": "College stationery notebook -> ALLOW",
+    "simulated_classification": {
+      "predicted_category": "NORMAL",
+      "confidence": 0.98,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-114",
+    "line_item_id": "li-114",
+    "raw_item_description": "Apple iPhone 20W Charger",
+    "quantity": 1.0,
+    "unit": "PCS",
+    "platform": "ZEPTO",
+    "notes": "Electronics phone charger -> ALLOW",
+    "simulated_classification": {
+      "predicted_category": "NORMAL",
+      "confidence": 0.97,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  },
+  {
+    "test_case_id": "TC-115",
+    "line_item_id": "li-115",
+    "raw_item_description": "Cadbury Dairy Milk Silk 150g",
+    "quantity": 1.0,
+    "unit": "PACK",
+    "platform": "BLINKIT",
+    "notes": "Confectionery chocolate -> ALLOW",
+    "simulated_classification": {
+      "predicted_category": "NORMAL",
+      "confidence": 0.99,
+      "classifier_name": "qwen3_simulated",
+      "classifier_version": "1.0.0",
+      "is_uncertain": false
+    }
+  }
+]

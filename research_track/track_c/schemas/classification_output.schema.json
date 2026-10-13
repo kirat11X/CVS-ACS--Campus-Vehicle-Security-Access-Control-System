@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pec.edu/schemas/track_c/classification_output.schema.json",
+  "title": "ClassificationOutputSchema",
+  "description": "Output schema for item classifier perception. Does NOT include final screening outcomes (ALLOW/REVIEW/ALERT).",
+  "type": "object",
+  "required": [
+    "line_item_id",
+    "predicted_category",
+    "classifier_name",
+    "classifier_version",
+    "is_uncertain"
+  ],
+  "properties": {
+    "line_item_id": {
+      "type": "string",
+      "description": "Matching identifier from ClassificationInput"
+    },
+    "predicted_category": {
+      "type": "string",
+      "enum": [
+        "TOBACCO_NICOTINE",
+        "ALCOHOL",
+        "RX_SCHEDULED_DRUG",
+        "OTC_MEDICINE",
+        "HAZARDOUS_CHEMICAL",
+        "SHARP_OBJECT",
+        "NORMAL",
+        "UNKNOWN"
+      ],
+      "description": "Standardized category code proposed by the classifier"
+    },
+    "confidence": {
+      "type": ["number", "null"],
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Model confidence score in [0.0, 1.0], or null if unavailable/uncalibrated"
+    },
+    "alternative_categories": {
+      "type": "array",
+      "description": "Alternative candidate categories ranked by confidence",
+      "items": {
+        "type": "object",
+        "required": ["category", "confidence"],
+        "properties": {
+          "category": { "type": "string" },
+          "confidence": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
+        }
+      }
+    },
+    "classifier_name": {
+      "type": "string",
+      "description": "Identifier of the classifier model or heuristic (e.g. lexical_baseline_v1, qwen3_1.7b_zeroshot)"
+    },
+    "classifier_version": {
+      "type": "string",
+      "description": "Version or commit tag of the classifier"
+    },
+    "prediction_timestamp": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "explanation": {
+      "type": ["string", "null"],
+      "description": "Rationale, attention evidence, or matched keyword from the classifier"
+    },
+    "is_uncertain": {
+      "type": "boolean",
+      "description": "True if confidence is low, missing, or multiple top categories conflict"
+    }
+  }
+}

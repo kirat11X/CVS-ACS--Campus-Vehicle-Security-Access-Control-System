@@ -1,0 +1,80 @@
+# Track B — Invoice Line-Item Extraction Research Prototype Configuration
+# Version: 1.0.0
+# Scope: Offline research staging for invoice document parsing and deterministic arithmetic reconciliation.
+
+normalization:
+  default_locale: "en_IN"
+  decimal_separator: "."
+  thousands_separator: ","
+  strip_surrounding_whitespace: true
+  normalize_unicode_spaces: true
+  allowed_date_formats:
+    - "%Y-%m-%d"
+    - "%d/%m/%Y"
+    - "%d-%m-%Y"
+    - "%d %b %Y"
+    - "%d %B %Y"
+    - "%m/%d/%Y"
+  ambiguous_date_policy: "DAY_FIRST"  # Standard for India/UK; if ambiguous e.g. 05/06/2026, parse as 5th June
+  currency_symbols:
+    "₹": "INR"
+    "RS": "INR"
+    "RS.": "INR"
+    "INR": "INR"
+    "$": "USD"
+    "USD": "USD"
+    "€": "EUR"
+    "EUR": "EUR"
+    "£": "GBP"
+    "GBP": "GBP"
+  unit_aliases:
+    "pcs": "PCS"
+    "pc": "PCS"
+    "pieces": "PCS"
+    "piece": "PCS"
+    "nos": "NOS"
+    "no": "NOS"
+    "kg": "KG"
+    "kgs": "KG"
+    "kilogram": "KG"
+    "g": "G"
+    "gm": "G"
+    "grams": "G"
+    "ltr": "LTR"
+    "l": "LTR"
+    "liter": "LTR"
+    "litre": "LTR"
+    "ml": "ML"
+    "box": "BOX"
+    "boxes": "BOX"
+    "pack": "PACK"
+    "packs": "PACK"
+    "pkt": "PACK"
+
+validation:
+  decimal_precision: 2
+  rounding_tolerance: "0.02"         # Maximum allowable discrepancy due to legitimate rounding in Decimal currency
+  tax_calculation_tolerance: "0.05"  # Tolerated tax rounding drift across lines
+  allow_tax_inclusive: true
+  allow_tax_exclusive: true
+  flag_unreconciled_as_human_review: true
+
+baseline_extractor:
+  supported_format: "tabular_text"
+  max_header_search_lines: 15
+  max_footer_search_lines: 15
+  table_delimiters:
+    - "|"
+    - "\t"
+    - "  "                           # Two or more spaces for column alignment
+
+evaluation:
+  dataset_path: "fixtures/synthetic_invoices.json"
+  ground_truth_path: "fixtures/synthetic_ground_truth.json"
+  adversarial_path: "fixtures/adversarial_cases.json"
+  line_item_matching_threshold: 0.70 # Minimum token/character similarity to align predicted vs ground truth line items
+  tolerance_threshold: "0.05"        # Tolerance for approximate numeric match
+  split:
+    validation_ratio: 0.30
+    test_ratio: 0.70
+    random_seed: 42

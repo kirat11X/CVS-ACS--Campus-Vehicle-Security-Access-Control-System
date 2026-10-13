@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pec.edu/schemas/track_b/extraction_result_schema.v1.json",
+  "title": "ExtractionResultSchema",
+  "description": "Schema representing complete extraction outputs, candidate hypotheses, deterministic validation findings, and audit state.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "document_id",
+    "extractor_name",
+    "extractor_version",
+    "candidates",
+    "reconciliation_status",
+    "requires_human_review",
+    "validation_findings"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "document_id": {
+      "type": "string",
+      "description": "Identifier of the parsed document"
+    },
+    "extractor_name": {
+      "type": "string",
+      "description": "Identifier of the model or algorithmic extractor"
+    },
+    "extractor_version": {
+      "type": "string",
+      "description": "Version of the extractor"
+    },
+    "execution_timestamp": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "latency_ms": {
+      "type": ["number", "null"],
+      "minimum": 0.0,
+      "description": "Execution duration in milliseconds"
+    },
+    "candidates": {
+      "type": "array",
+      "description": "One or more extracted candidate hypotheses (e.g. from multiple models or beams)",
+      "items": {
+        "type": "object",
+        "required": ["candidate_id", "invoice", "ranking_score"],
+        "properties": {
+          "candidate_id": { "type": "string" },
+          "ranking_score": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+          "invoice": { "$ref": "invoice_schema.json" },
+          "rationale": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "selected_candidate_id": {
+      "type": ["string", "null"],
+      "description": "ID of the top-ranked candidate selected for operational review"
+    },
+    "reconciliation_status": {
+      "type": "string",
+      "enum": [
+        "RECONCILED",
+        "RECONCILED_WITH_WARNINGS",
+        "DISCREPANCY_FLAGGED",
+        "CRITICAL_ARITHMETIC_FAILURE",
+        "SCHEMA_VALIDATION_ERROR"
+      ],
+      "description": "Deterministic arithmetic and schema resolution status"
+    },
+    "requires_human_review": {
+      "type": "boolean",
+      "description": "True if validation detected discrepancies or low-confidence extractions"
+    },
+    "validation_findings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ValidationFinding"
+      }
+    },
+    "raw_output": {
+      "type": ["string", "object", "null"],
+      "description": "Preserved raw model or OCR text output for auditability"
+    }
+  },
+  "$defs": {
+    "ValidationFinding": {
+      "type": "object",
+      "required": [
+        "code",
+        "severity",
+        "message",
+        "requires_human_review"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "description": "Stable uppercase reason code (e.g. VAL_LINE_ARITHMETIC_MISMATCH)"
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["INFO", "WARNING", "ERROR", "CRITICAL"]
+        },
+        "field_or_line_id": {
+          "type": ["string", "null"],
+          "description": "Affected field name or line_item_id"
+        },
+        "expected_value": {
+          "type": ["string", "number", "null"],
+          "description": "Deterministically calculated value, if applicable"
+        },
+        "observed_value": {
+          "type": ["string", "number", "null"],
+          "description": "Extracted value reported by model, if applicable"
+        },
+        "difference": {
+          "type": ["string", "number", "null"],
+          "description": "Discrepancy delta, if applicable"
+        },
+        "message": {
+          "type": "string",
+          "description": "Human-readable concise explanation"
+        },
+        "requires_human_review": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

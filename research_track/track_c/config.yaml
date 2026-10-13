@@ -1,0 +1,52 @@
+# Track C — Item Classification & Deterministic Policy Engine Configuration
+# Version: 1.0.0
+# Scope: Model-independent item categorization and deterministic screening policy evaluation.
+
+policy:
+  default_policy_version: "v1.0"
+  fallback_action_on_conflict: "REVIEW"
+  fallback_action_on_unmatched: "REVIEW"
+  default_action_for_unknown: "REVIEW"
+  confidence_review_threshold: 0.70  # Below this confidence, flag as LOW_CLASSIFIER_CONFIDENCE (forces REVIEW)
+  treat_missing_confidence_as_review: true
+
+categories:
+  active_categories:
+    - "TOBACCO_NICOTINE"
+    - "ALCOHOL"
+    - "RX_SCHEDULED_DRUG"
+    - "OTC_MEDICINE"
+    - "HAZARDOUS_CHEMICAL"
+    - "SHARP_OBJECT"
+    - "NORMAL"
+    - "UNKNOWN"
+
+hazardous_chemical_policy:
+  threshold_quantity: 3.0
+  threshold_unit: "PACK"
+  action_at_or_above_threshold: "REVIEW"
+  action_below_threshold: "ALLOW"  # With audit trail
+  action_on_missing_quantity: "REVIEW"
+  action_on_unsupported_unit: "REVIEW"
+
+unit_conversions:
+  supported_units:
+    - "PCS"
+    - "PACK"
+    - "BOX"
+    - "BOTTLE"
+    - "KG"
+    - "G"
+    - "LTR"
+    - "ML"
+  allow_cross_unit_inference: false  # Strict safety: never assume 1 KG == 1 PACK without domain mapping
+
+evaluation:
+  dataset_path: "fixtures/synthetic_screening_cases.json"
+  ground_truth_path: "fixtures/synthetic_ground_truth.json"
+  taxonomy_path: "fixtures/item_taxonomy_seed.csv"
+  rules_path: "fixtures/policy_rules.json"
+  split:
+    validation_ratio: 0.30
+    test_ratio: 0.70
+    random_seed: 42

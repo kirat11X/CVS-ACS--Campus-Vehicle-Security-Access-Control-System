@@ -1,0 +1,807 @@
+[
+  {
+    "test_case_id": "TC-001",
+    "ground_truth_category": "TOBACCO_NICOTINE",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-TOBACCO-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-002",
+    "ground_truth_category": "TOBACCO_NICOTINE",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-TOBACCO-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-003",
+    "ground_truth_category": "TOBACCO_NICOTINE",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-TOBACCO-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-004",
+    "ground_truth_category": "TOBACCO_NICOTINE",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-TOBACCO-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-005",
+    "ground_truth_category": "TOBACCO_NICOTINE",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-TOBACCO-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-006",
+    "ground_truth_category": "TOBACCO_NICOTINE",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-TOBACCO-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-007",
+    "ground_truth_category": "TOBACCO_NICOTINE",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-TOBACCO-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-008",
+    "ground_truth_category": "TOBACCO_NICOTINE",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-TOBACCO-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-009",
+    "ground_truth_category": "TOBACCO_NICOTINE",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-TOBACCO-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-010",
+    "ground_truth_category": "TOBACCO_NICOTINE",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-TOBACCO-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-011",
+    "ground_truth_category": "TOBACCO_NICOTINE",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-TOBACCO-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-012",
+    "ground_truth_category": "TOBACCO_NICOTINE",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-TOBACCO-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-013",
+    "ground_truth_category": "TOBACCO_NICOTINE",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-TOBACCO-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-014",
+    "ground_truth_category": "TOBACCO_NICOTINE",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-TOBACCO-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-015",
+    "ground_truth_category": "TOBACCO_NICOTINE",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-TOBACCO-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-016",
+    "ground_truth_category": "ALCOHOL",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-ALCOHOL-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-017",
+    "ground_truth_category": "ALCOHOL",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-ALCOHOL-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-018",
+    "ground_truth_category": "ALCOHOL",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-ALCOHOL-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-019",
+    "ground_truth_category": "ALCOHOL",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-ALCOHOL-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-020",
+    "ground_truth_category": "ALCOHOL",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-ALCOHOL-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-021",
+    "ground_truth_category": "ALCOHOL",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-ALCOHOL-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-022",
+    "ground_truth_category": "ALCOHOL",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-ALCOHOL-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-023",
+    "ground_truth_category": "ALCOHOL",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-ALCOHOL-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-024",
+    "ground_truth_category": "ALCOHOL",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-ALCOHOL-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-025",
+    "ground_truth_category": "ALCOHOL",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-ALCOHOL-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-026",
+    "ground_truth_category": "ALCOHOL",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-ALCOHOL-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-027",
+    "ground_truth_category": "ALCOHOL",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-ALCOHOL-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-028",
+    "ground_truth_category": "ALCOHOL",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-ALCOHOL-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-029",
+    "ground_truth_category": "ALCOHOL",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-ALCOHOL-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-030",
+    "ground_truth_category": "ALCOHOL",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-ALCOHOL-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-031",
+    "ground_truth_category": "RX_SCHEDULED_DRUG",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-RX-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-032",
+    "ground_truth_category": "RX_SCHEDULED_DRUG",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-RX-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-033",
+    "ground_truth_category": "RX_SCHEDULED_DRUG",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-RX-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-034",
+    "ground_truth_category": "RX_SCHEDULED_DRUG",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-RX-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-035",
+    "ground_truth_category": "RX_SCHEDULED_DRUG",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-RX-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-036",
+    "ground_truth_category": "RX_SCHEDULED_DRUG",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-RX-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-037",
+    "ground_truth_category": "RX_SCHEDULED_DRUG",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-RX-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-038",
+    "ground_truth_category": "RX_SCHEDULED_DRUG",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-RX-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-039",
+    "ground_truth_category": "RX_SCHEDULED_DRUG",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-RX-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-040",
+    "ground_truth_category": "RX_SCHEDULED_DRUG",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-RX-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-041",
+    "ground_truth_category": "RX_SCHEDULED_DRUG",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-RX-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-042",
+    "ground_truth_category": "RX_SCHEDULED_DRUG",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-RX-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-043",
+    "ground_truth_category": "RX_SCHEDULED_DRUG",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-RX-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-044",
+    "ground_truth_category": "RX_SCHEDULED_DRUG",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-RX-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-045",
+    "ground_truth_category": "RX_SCHEDULED_DRUG",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-RX-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-046",
+    "ground_truth_category": "OTC_MEDICINE",
+    "expected_outcome": "ALLOW",
+    "expected_reason_codes": ["CATEGORY_RULE_ALLOW"],
+    "expected_applied_rule_id": "RULE-OTC-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-047",
+    "ground_truth_category": "OTC_MEDICINE",
+    "expected_outcome": "ALLOW",
+    "expected_reason_codes": ["CATEGORY_RULE_ALLOW"],
+    "expected_applied_rule_id": "RULE-OTC-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-048",
+    "ground_truth_category": "OTC_MEDICINE",
+    "expected_outcome": "ALLOW",
+    "expected_reason_codes": ["CATEGORY_RULE_ALLOW"],
+    "expected_applied_rule_id": "RULE-OTC-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-049",
+    "ground_truth_category": "OTC_MEDICINE",
+    "expected_outcome": "ALLOW",
+    "expected_reason_codes": ["CATEGORY_RULE_ALLOW"],
+    "expected_applied_rule_id": "RULE-OTC-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-050",
+    "ground_truth_category": "OTC_MEDICINE",
+    "expected_outcome": "ALLOW",
+    "expected_reason_codes": ["CATEGORY_RULE_ALLOW"],
+    "expected_applied_rule_id": "RULE-OTC-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-051",
+    "ground_truth_category": "OTC_MEDICINE",
+    "expected_outcome": "ALLOW",
+    "expected_reason_codes": ["CATEGORY_RULE_ALLOW"],
+    "expected_applied_rule_id": "RULE-OTC-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-052",
+    "ground_truth_category": "OTC_MEDICINE",
+    "expected_outcome": "ALLOW",
+    "expected_reason_codes": ["CATEGORY_RULE_ALLOW"],
+    "expected_applied_rule_id": "RULE-OTC-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-053",
+    "ground_truth_category": "OTC_MEDICINE",
+    "expected_outcome": "ALLOW",
+    "expected_reason_codes": ["CATEGORY_RULE_ALLOW"],
+    "expected_applied_rule_id": "RULE-OTC-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-054",
+    "ground_truth_category": "OTC_MEDICINE",
+    "expected_outcome": "ALLOW",
+    "expected_reason_codes": ["CATEGORY_RULE_ALLOW"],
+    "expected_applied_rule_id": "RULE-OTC-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-055",
+    "ground_truth_category": "OTC_MEDICINE",
+    "expected_outcome": "ALLOW",
+    "expected_reason_codes": ["CATEGORY_RULE_ALLOW"],
+    "expected_applied_rule_id": "RULE-OTC-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-056",
+    "ground_truth_category": "HAZARDOUS_CHEMICAL",
+    "expected_outcome": "REVIEW",
+    "expected_reason_codes": ["CATEGORY_RULE_REVIEW", "HAZARDOUS_THRESHOLD_MET"],
+    "expected_applied_rule_id": "RULE-HAZMAT-BULK-BOTTLE"
+  },
+  {
+    "test_case_id": "TC-057",
+    "ground_truth_category": "HAZARDOUS_CHEMICAL",
+    "expected_outcome": "REVIEW",
+    "expected_reason_codes": ["CATEGORY_RULE_REVIEW", "HAZARDOUS_THRESHOLD_MET"],
+    "expected_applied_rule_id": "RULE-HAZMAT-BULK-PACK"
+  },
+  {
+    "test_case_id": "TC-058",
+    "ground_truth_category": "HAZARDOUS_CHEMICAL",
+    "expected_outcome": "REVIEW",
+    "expected_reason_codes": ["CATEGORY_RULE_REVIEW", "HAZARDOUS_THRESHOLD_MET"],
+    "expected_applied_rule_id": "RULE-HAZMAT-BULK-BOTTLE"
+  },
+  {
+    "test_case_id": "TC-059",
+    "ground_truth_category": "HAZARDOUS_CHEMICAL",
+    "expected_outcome": "REVIEW",
+    "expected_reason_codes": ["CATEGORY_RULE_REVIEW", "HAZARDOUS_THRESHOLD_MET"],
+    "expected_applied_rule_id": "RULE-HAZMAT-BULK-BOTTLE"
+  },
+  {
+    "test_case_id": "TC-060",
+    "ground_truth_category": "HAZARDOUS_CHEMICAL",
+    "expected_outcome": "REVIEW",
+    "expected_reason_codes": ["CATEGORY_RULE_REVIEW", "HAZARDOUS_THRESHOLD_MET"],
+    "expected_applied_rule_id": "RULE-HAZMAT-BULK-BOTTLE"
+  },
+  {
+    "test_case_id": "TC-061",
+    "ground_truth_category": "HAZARDOUS_CHEMICAL",
+    "expected_outcome": "REVIEW",
+    "expected_reason_codes": ["CATEGORY_RULE_REVIEW", "HAZARDOUS_THRESHOLD_MET"],
+    "expected_applied_rule_id": "RULE-HAZMAT-BULK-BOTTLE"
+  },
+  {
+    "test_case_id": "TC-062",
+    "ground_truth_category": "HAZARDOUS_CHEMICAL",
+    "expected_outcome": "REVIEW",
+    "expected_reason_codes": ["CATEGORY_RULE_REVIEW", "HAZARDOUS_THRESHOLD_MET"],
+    "expected_applied_rule_id": "RULE-HAZMAT-BULK-BOTTLE"
+  },
+  {
+    "test_case_id": "TC-063",
+    "ground_truth_category": "HAZARDOUS_CHEMICAL",
+    "expected_outcome": "REVIEW",
+    "expected_reason_codes": ["CATEGORY_RULE_REVIEW", "HAZARDOUS_THRESHOLD_MET"],
+    "expected_applied_rule_id": "RULE-HAZMAT-BULK-PACK"
+  },
+  {
+    "test_case_id": "TC-064",
+    "ground_truth_category": "HAZARDOUS_CHEMICAL",
+    "expected_outcome": "REVIEW",
+    "expected_reason_codes": ["CATEGORY_RULE_REVIEW", "HAZARDOUS_THRESHOLD_MET"],
+    "expected_applied_rule_id": "RULE-HAZMAT-BULK-BOTTLE"
+  },
+  {
+    "test_case_id": "TC-065",
+    "ground_truth_category": "HAZARDOUS_CHEMICAL",
+    "expected_outcome": "REVIEW",
+    "expected_reason_codes": ["CATEGORY_RULE_REVIEW", "HAZARDOUS_THRESHOLD_MET"],
+    "expected_applied_rule_id": "RULE-HAZMAT-BULK-PACK"
+  },
+  {
+    "test_case_id": "TC-066",
+    "ground_truth_category": "HAZARDOUS_CHEMICAL",
+    "expected_outcome": "ALLOW",
+    "expected_reason_codes": ["CATEGORY_RULE_ALLOW"],
+    "expected_applied_rule_id": "RULE-HAZMAT-LOW-BOTTLE"
+  },
+  {
+    "test_case_id": "TC-067",
+    "ground_truth_category": "HAZARDOUS_CHEMICAL",
+    "expected_outcome": "ALLOW",
+    "expected_reason_codes": ["CATEGORY_RULE_ALLOW"],
+    "expected_applied_rule_id": "RULE-HAZMAT-LOW-PACK"
+  },
+  {
+    "test_case_id": "TC-068",
+    "ground_truth_category": "HAZARDOUS_CHEMICAL",
+    "expected_outcome": "ALLOW",
+    "expected_reason_codes": ["CATEGORY_RULE_ALLOW"],
+    "expected_applied_rule_id": "RULE-HAZMAT-LOW-BOTTLE"
+  },
+  {
+    "test_case_id": "TC-069",
+    "ground_truth_category": "HAZARDOUS_CHEMICAL",
+    "expected_outcome": "ALLOW",
+    "expected_reason_codes": ["CATEGORY_RULE_ALLOW"],
+    "expected_applied_rule_id": "RULE-HAZMAT-LOW-BOTTLE"
+  },
+  {
+    "test_case_id": "TC-070",
+    "ground_truth_category": "HAZARDOUS_CHEMICAL",
+    "expected_outcome": "ALLOW",
+    "expected_reason_codes": ["CATEGORY_RULE_ALLOW"],
+    "expected_applied_rule_id": "RULE-HAZMAT-LOW-BOTTLE"
+  },
+  {
+    "test_case_id": "TC-071",
+    "ground_truth_category": "HAZARDOUS_CHEMICAL",
+    "expected_outcome": "ALLOW",
+    "expected_reason_codes": ["CATEGORY_RULE_ALLOW"],
+    "expected_applied_rule_id": "RULE-HAZMAT-LOW-BOTTLE"
+  },
+  {
+    "test_case_id": "TC-072",
+    "ground_truth_category": "HAZARDOUS_CHEMICAL",
+    "expected_outcome": "ALLOW",
+    "expected_reason_codes": ["CATEGORY_RULE_ALLOW"],
+    "expected_applied_rule_id": "RULE-HAZMAT-LOW-PACK"
+  },
+  {
+    "test_case_id": "TC-073",
+    "ground_truth_category": "HAZARDOUS_CHEMICAL",
+    "expected_outcome": "ALLOW",
+    "expected_reason_codes": ["CATEGORY_RULE_ALLOW"],
+    "expected_applied_rule_id": "RULE-HAZMAT-LOW-BOTTLE"
+  },
+  {
+    "test_case_id": "TC-074",
+    "ground_truth_category": "HAZARDOUS_CHEMICAL",
+    "expected_outcome": "ALLOW",
+    "expected_reason_codes": ["CATEGORY_RULE_ALLOW"],
+    "expected_applied_rule_id": "RULE-HAZMAT-LOW-PACK"
+  },
+  {
+    "test_case_id": "TC-075",
+    "ground_truth_category": "HAZARDOUS_CHEMICAL",
+    "expected_outcome": "ALLOW",
+    "expected_reason_codes": ["CATEGORY_RULE_ALLOW"],
+    "expected_applied_rule_id": "RULE-HAZMAT-LOW-BOTTLE"
+  },
+  {
+    "test_case_id": "TC-076",
+    "ground_truth_category": "HAZARDOUS_CHEMICAL",
+    "expected_outcome": "REVIEW",
+    "expected_reason_codes": ["MISSING_QUANTITY"],
+    "expected_applied_rule_id": null
+  },
+  {
+    "test_case_id": "TC-077",
+    "ground_truth_category": "HAZARDOUS_CHEMICAL",
+    "expected_outcome": "REVIEW",
+    "expected_reason_codes": ["INVALID_QUANTITY"],
+    "expected_applied_rule_id": null
+  },
+  {
+    "test_case_id": "TC-078",
+    "ground_truth_category": "HAZARDOUS_CHEMICAL",
+    "expected_outcome": "REVIEW",
+    "expected_reason_codes": ["UNSUPPORTED_QUANTITY_UNIT"],
+    "expected_applied_rule_id": null
+  },
+  {
+    "test_case_id": "TC-079",
+    "ground_truth_category": "HAZARDOUS_CHEMICAL",
+    "expected_outcome": "REVIEW",
+    "expected_reason_codes": ["MISSING_QUANTITY"],
+    "expected_applied_rule_id": null
+  },
+  {
+    "test_case_id": "TC-080",
+    "ground_truth_category": "HAZARDOUS_CHEMICAL",
+    "expected_outcome": "REVIEW",
+    "expected_reason_codes": ["INVALID_QUANTITY"],
+    "expected_applied_rule_id": null
+  },
+  {
+    "test_case_id": "TC-081",
+    "ground_truth_category": "SHARP_OBJECT",
+    "expected_outcome": "REVIEW",
+    "expected_reason_codes": ["CATEGORY_RULE_REVIEW"],
+    "expected_applied_rule_id": "RULE-SHARP-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-082",
+    "ground_truth_category": "SHARP_OBJECT",
+    "expected_outcome": "REVIEW",
+    "expected_reason_codes": ["CATEGORY_RULE_REVIEW"],
+    "expected_applied_rule_id": "RULE-SHARP-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-083",
+    "ground_truth_category": "SHARP_OBJECT",
+    "expected_outcome": "REVIEW",
+    "expected_reason_codes": ["CATEGORY_RULE_REVIEW"],
+    "expected_applied_rule_id": "RULE-SHARP-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-084",
+    "ground_truth_category": "SHARP_OBJECT",
+    "expected_outcome": "REVIEW",
+    "expected_reason_codes": ["CATEGORY_RULE_REVIEW"],
+    "expected_applied_rule_id": "RULE-SHARP-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-085",
+    "ground_truth_category": "SHARP_OBJECT",
+    "expected_outcome": "REVIEW",
+    "expected_reason_codes": ["CATEGORY_RULE_REVIEW"],
+    "expected_applied_rule_id": "RULE-SHARP-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-086",
+    "ground_truth_category": "SHARP_OBJECT",
+    "expected_outcome": "REVIEW",
+    "expected_reason_codes": ["CATEGORY_RULE_REVIEW"],
+    "expected_applied_rule_id": "RULE-SHARP-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-087",
+    "ground_truth_category": "SHARP_OBJECT",
+    "expected_outcome": "REVIEW",
+    "expected_reason_codes": ["CATEGORY_RULE_REVIEW"],
+    "expected_applied_rule_id": "RULE-SHARP-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-088",
+    "ground_truth_category": "SHARP_OBJECT",
+    "expected_outcome": "REVIEW",
+    "expected_reason_codes": ["CATEGORY_RULE_REVIEW"],
+    "expected_applied_rule_id": "RULE-SHARP-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-089",
+    "ground_truth_category": "SHARP_OBJECT",
+    "expected_outcome": "REVIEW",
+    "expected_reason_codes": ["CATEGORY_RULE_REVIEW"],
+    "expected_applied_rule_id": "RULE-SHARP-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-090",
+    "ground_truth_category": "SHARP_OBJECT",
+    "expected_outcome": "REVIEW",
+    "expected_reason_codes": ["CATEGORY_RULE_REVIEW"],
+    "expected_applied_rule_id": "RULE-SHARP-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-091",
+    "ground_truth_category": "SHARP_OBJECT",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-OVERRIDE-INSTAMART-SHARP"
+  },
+  {
+    "test_case_id": "TC-092",
+    "ground_truth_category": "SHARP_OBJECT",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-OVERRIDE-INSTAMART-SHARP"
+  },
+  {
+    "test_case_id": "TC-093",
+    "ground_truth_category": "SHARP_OBJECT",
+    "expected_outcome": "ALERT",
+    "expected_reason_codes": ["CATEGORY_RULE_ALERT"],
+    "expected_applied_rule_id": "RULE-OVERRIDE-INSTAMART-SHARP"
+  },
+  {
+    "test_case_id": "TC-094",
+    "ground_truth_category": "OTC_MEDICINE",
+    "expected_outcome": "REVIEW",
+    "expected_reason_codes": ["POLICY_RULE_CONFLICT", "MANUAL_REVIEW_REQUIRED"],
+    "expected_applied_rule_id": null
+  },
+  {
+    "test_case_id": "TC-095",
+    "ground_truth_category": "OTC_MEDICINE",
+    "expected_outcome": "REVIEW",
+    "expected_reason_codes": ["POLICY_RULE_CONFLICT", "MANUAL_REVIEW_REQUIRED"],
+    "expected_applied_rule_id": null
+  },
+  {
+    "test_case_id": "TC-096",
+    "ground_truth_category": "OTC_MEDICINE",
+    "expected_outcome": "REVIEW",
+    "expected_reason_codes": ["POLICY_RULE_CONFLICT", "MANUAL_REVIEW_REQUIRED"],
+    "expected_applied_rule_id": null
+  },
+  {
+    "test_case_id": "TC-097",
+    "ground_truth_category": "OTC_MEDICINE",
+    "expected_outcome": "REVIEW",
+    "expected_reason_codes": ["POLICY_RULE_CONFLICT", "MANUAL_REVIEW_REQUIRED"],
+    "expected_applied_rule_id": null
+  },
+  {
+    "test_case_id": "TC-098",
+    "ground_truth_category": "NORMAL",
+    "expected_outcome": "REVIEW",
+    "expected_reason_codes": ["LOW_CLASSIFIER_CONFIDENCE"],
+    "expected_applied_rule_id": "RULE-OVERRIDE-BLINKIT-NORMAL"
+  },
+  {
+    "test_case_id": "TC-099",
+    "ground_truth_category": "NORMAL",
+    "expected_outcome": "REVIEW",
+    "expected_reason_codes": ["LOW_CLASSIFIER_CONFIDENCE"],
+    "expected_applied_rule_id": "RULE-NORMAL-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-100",
+    "ground_truth_category": "OTC_MEDICINE",
+    "expected_outcome": "REVIEW",
+    "expected_reason_codes": ["LOW_CLASSIFIER_CONFIDENCE"],
+    "expected_applied_rule_id": "RULE-OTC-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-101",
+    "ground_truth_category": "NORMAL",
+    "expected_outcome": "REVIEW",
+    "expected_reason_codes": ["MISSING_CLASSIFIER_CONFIDENCE"],
+    "expected_applied_rule_id": "RULE-OVERRIDE-BLINKIT-NORMAL"
+  },
+  {
+    "test_case_id": "TC-102",
+    "ground_truth_category": "NORMAL",
+    "expected_outcome": "REVIEW",
+    "expected_reason_codes": ["MISSING_CLASSIFIER_CONFIDENCE"],
+    "expected_applied_rule_id": "RULE-NORMAL-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-103",
+    "ground_truth_category": "OTC_MEDICINE",
+    "expected_outcome": "REVIEW",
+    "expected_reason_codes": ["MISSING_CLASSIFIER_CONFIDENCE"],
+    "expected_applied_rule_id": "RULE-OTC-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-104",
+    "ground_truth_category": "UNKNOWN",
+    "expected_outcome": "REVIEW",
+    "expected_reason_codes": ["UNKNOWN_CATEGORY", "MANUAL_REVIEW_REQUIRED"],
+    "expected_applied_rule_id": "RULE-UNKNOWN-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-105",
+    "ground_truth_category": "UNKNOWN",
+    "expected_outcome": "REVIEW",
+    "expected_reason_codes": ["UNKNOWN_CATEGORY", "MANUAL_REVIEW_REQUIRED"],
+    "expected_applied_rule_id": "RULE-UNKNOWN-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-106",
+    "ground_truth_category": "UNKNOWN",
+    "expected_outcome": "REVIEW",
+    "expected_reason_codes": ["UNKNOWN_CATEGORY", "MANUAL_REVIEW_REQUIRED"],
+    "expected_applied_rule_id": "RULE-UNKNOWN-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-107",
+    "ground_truth_category": "UNKNOWN",
+    "expected_outcome": "REVIEW",
+    "expected_reason_codes": ["UNKNOWN_CATEGORY", "MANUAL_REVIEW_REQUIRED"],
+    "expected_applied_rule_id": "RULE-UNKNOWN-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-108",
+    "ground_truth_category": "UNKNOWN",
+    "expected_outcome": "REVIEW",
+    "expected_reason_codes": ["UNKNOWN_CATEGORY", "MANUAL_REVIEW_REQUIRED"],
+    "expected_applied_rule_id": "RULE-UNKNOWN-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-109",
+    "ground_truth_category": "NORMAL",
+    "expected_outcome": "ALLOW",
+    "expected_reason_codes": ["CATEGORY_RULE_ALLOW"],
+    "expected_applied_rule_id": "RULE-OVERRIDE-BLINKIT-NORMAL"
+  },
+  {
+    "test_case_id": "TC-110",
+    "ground_truth_category": "NORMAL",
+    "expected_outcome": "ALLOW",
+    "expected_reason_codes": ["CATEGORY_RULE_ALLOW"],
+    "expected_applied_rule_id": "RULE-NORMAL-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-111",
+    "ground_truth_category": "NORMAL",
+    "expected_outcome": "ALLOW",
+    "expected_reason_codes": ["CATEGORY_RULE_ALLOW"],
+    "expected_applied_rule_id": "RULE-OVERRIDE-BLINKIT-NORMAL"
+  },
+  {
+    "test_case_id": "TC-112",
+    "ground_truth_category": "NORMAL",
+    "expected_outcome": "ALLOW",
+    "expected_reason_codes": ["CATEGORY_RULE_ALLOW"],
+    "expected_applied_rule_id": "RULE-NORMAL-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-113",
+    "ground_truth_category": "NORMAL",
+    "expected_outcome": "ALLOW",
+    "expected_reason_codes": ["CATEGORY_RULE_ALLOW"],
+    "expected_applied_rule_id": "RULE-OVERRIDE-BLINKIT-NORMAL"
+  },
+  {
+    "test_case_id": "TC-114",
+    "ground_truth_category": "NORMAL",
+    "expected_outcome": "ALLOW",
+    "expected_reason_codes": ["CATEGORY_RULE_ALLOW"],
+    "expected_applied_rule_id": "RULE-NORMAL-DEFAULT"
+  },
+  {
+    "test_case_id": "TC-115",
+    "ground_truth_category": "NORMAL",
+    "expected_outcome": "ALLOW",
+    "expected_reason_codes": ["CATEGORY_RULE_ALLOW"],
+    "expected_applied_rule_id": "RULE-OVERRIDE-BLINKIT-NORMAL"
+  }
+]

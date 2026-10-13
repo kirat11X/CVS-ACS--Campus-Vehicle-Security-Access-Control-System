@@ -1,0 +1,6 @@
+pytest
+hypothesis
+jsonschema
+ruff
+mypy
+pytest-cov

@@ -1,0 +1,69 @@
+# Track A — Indian ANPR Research & Evaluation Prototype Configuration
+# Offline evaluation and candidate-matching parameters
+
+normalization:
+  strip_separators: true
+  to_uppercase: true
+  min_length: 6
+  max_length: 12
+  validate_indian_format: true
+  allow_bh_series: true
+  allow_vintage: true
+  confusion_generation:
+    enabled: true
+    max_variants: 4
+    penalty_per_substitution: 0.05
+
+candidate_ranking:
+  # When OCR confidence is absent, default to neutral 0.5 without claiming certainty
+  default_confidence: 0.50
+  weights:
+    ocr_confidence: 0.50
+    format_validity: 0.35
+    length_plausibility: 0.15
+  source_reliability:
+    camera_primary: 1.00
+    paddleocr_vl: 1.05
+    fast_plate_ocr: 0.95
+    synthetic_oracle: 1.00
+    fallback: 0.80
+
+registry_matcher:
+  algorithm: "weighted_levenshtein"  # 'weighted_levenshtein' or 'rapidfuzz'
+  min_similarity_threshold: 0.82
+  ambiguity_margin: 0.07             # Mark AMBIGUOUS if score(cand1) - score(cand2) < margin
+  ocr_confusion_penalty: 0.25        # Cost for optical confusions (O/0, I/1, B/8, etc.)
+  non_confusion_penalty: 1.00        # Standard edit distance cost
+  max_qualifying_candidates: 5
+  exact_match_priority: true
+
+baselines:
+  - id: "baseline_0"
+    name: "Normalized Exact Matching Only"
+    description: "Takes first candidate, normalizes text, matches exact registry string. No fuzzy matching."
+  - id: "baseline_1"
+    name: "Best OCR Candidate + Normalized Exact"
+    description: "Ranks multi-OCR candidates by confidence/format, then attempts exact registry match."
+  - id: "baseline_2"
+    name: "Ranked Candidate + Constrained Fuzzy (No Ambiguity Rejection)"
+    description: "Evaluates ranked candidates with weighted fuzzy matching; blindly accepts top candidate above threshold."
+  - id: "baseline_3"
+    name: "Full Track A Pipeline (Fuzzy with Ambiguity Rejection)"
+    description: "Full research pipeline with candidate ranking, weighted fuzzy matching, and ambiguity margin enforcement."
+
+evaluation:
+  dataset_path: "fixtures/labeled_examples.csv"
+  registry_path: "fixtures/synthetic_registry.csv"
+  split:
+    validation_ratio: 0.30
+    test_ratio: 0.70
+    random_seed: 42
+  metrics:
+    - "exact_plate_accuracy"
+    - "character_error_rate"
+    - "false_match_rate"
+    - "no_match_rate"
+    - "ambiguity_rate"
+    - "coverage"
+    - "latency_p50_ms"
+    - "latency_p95_ms"

@@ -1,0 +1,1730 @@
+{
+  "INV-SYN-001": {
+    "schema_version": "1.0.0",
+    "document_id": "INV-SYN-001",
+    "invoice_number": "INV-2026-0001",
+    "invoice_date": "2026-10-01",
+    "supplier_name": "Sharma General Store",
+    "supplier_tax_id": null,
+    "purchase_order_number": null,
+    "currency": "INR",
+    "page_count": 1,
+    "line_items": [
+      {
+        "line_item_id": "item-1",
+        "description": "Amul Butter 500g",
+        "normalized_description": "Amul Butter 500g",
+        "quantity": "1.00",
+        "unit": "PCS",
+        "unit_price": "275.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "275.00",
+        "currency": "INR"
+      }
+    ],
+    "totals": {
+      "subtotal": "275.00",
+      "discount_total": null,
+      "tax_total": null,
+      "shipping_total": null,
+      "grand_total": "275.00",
+      "amount_paid": null,
+      "amount_due": null
+    },
+    "extraction_metadata": {
+      "extractor_name": "ground_truth_oracle",
+      "extractor_version": "1.0.0",
+      "review_status": "HUMAN_VERIFIED",
+      "validation_findings_count": 0
+    }
+  },
+  "INV-SYN-002": {
+    "schema_version": "1.0.0",
+    "document_id": "INV-SYN-002",
+    "invoice_number": "INV-2026-0002",
+    "invoice_date": "2026-10-02",
+    "supplier_name": "Fresh Groceries Direct",
+    "supplier_tax_id": null,
+    "purchase_order_number": null,
+    "currency": "INR",
+    "page_count": 1,
+    "line_items": [
+      {
+        "line_item_id": "item-1",
+        "description": "Whole Wheat Bread",
+        "normalized_description": "Whole Wheat Bread",
+        "quantity": "2.00",
+        "unit": "PACK",
+        "unit_price": "45.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "90.00",
+        "currency": "INR"
+      },
+      {
+        "line_item_id": "item-2",
+        "description": "Toned Milk 1L",
+        "normalized_description": "Toned Milk 1L",
+        "quantity": "3.00",
+        "unit": "LTR",
+        "unit_price": "60.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "180.00",
+        "currency": "INR"
+      },
+      {
+        "line_item_id": "item-3",
+        "description": "Farm Eggs 6pc",
+        "normalized_description": "Farm Eggs 6pc",
+        "quantity": "1.00",
+        "unit": "PACK",
+        "unit_price": "55.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "55.00",
+        "currency": "INR"
+      },
+      {
+        "line_item_id": "item-4",
+        "description": "Britannia Cheese 200g",
+        "normalized_description": "Britannia Cheese 200g",
+        "quantity": "1.00",
+        "unit": "PCS",
+        "unit_price": "125.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "125.00",
+        "currency": "INR"
+      }
+    ],
+    "totals": {
+      "subtotal": "450.00",
+      "discount_total": null,
+      "tax_total": null,
+      "shipping_total": null,
+      "grand_total": "450.00",
+      "amount_paid": null,
+      "amount_due": null
+    },
+    "extraction_metadata": {
+      "extractor_name": "ground_truth_oracle",
+      "extractor_version": "1.0.0",
+      "review_status": "HUMAN_VERIFIED",
+      "validation_findings_count": 0
+    }
+  },
+  "INV-SYN-003": {
+    "schema_version": "1.0.0",
+    "document_id": "INV-SYN-003",
+    "invoice_number": "INV-2026-0003",
+    "invoice_date": "2026-10-03",
+    "supplier_name": "PEC Campus Book Store",
+    "supplier_tax_id": null,
+    "purchase_order_number": null,
+    "currency": "INR",
+    "page_count": 1,
+    "line_items": [
+      {
+        "line_item_id": "item-1",
+        "description": "Classmate Spiral Notebook",
+        "normalized_description": "Classmate Spiral Notebook",
+        "quantity": "5.00",
+        "unit": "PCS",
+        "unit_price": "80.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "400.00",
+        "currency": "INR"
+      },
+      {
+        "line_item_id": "item-2",
+        "description": "Parker Vector Ball Pen",
+        "normalized_description": "Parker Vector Ball Pen",
+        "quantity": "2.00",
+        "unit": "PCS",
+        "unit_price": "250.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "500.00",
+        "currency": "INR"
+      },
+      {
+        "line_item_id": "item-3",
+        "description": "A4 Copier Paper Ream",
+        "normalized_description": "A4 Copier Paper Ream",
+        "quantity": "2.00",
+        "unit": "PACK",
+        "unit_price": "320.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "640.00",
+        "currency": "INR"
+      },
+      {
+        "line_item_id": "item-4",
+        "description": "Camlin Geometry Box",
+        "normalized_description": "Camlin Geometry Box",
+        "quantity": "1.00",
+        "unit": "PCS",
+        "unit_price": "150.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "150.00",
+        "currency": "INR"
+      },
+      {
+        "line_item_id": "item-5",
+        "description": "Highlighter Pack 5s",
+        "normalized_description": "Highlighter Pack 5s",
+        "quantity": "1.00",
+        "unit": "PACK",
+        "unit_price": "110.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "110.00",
+        "currency": "INR"
+      },
+      {
+        "line_item_id": "item-6",
+        "description": "Sticky Notes 3x3",
+        "normalized_description": "Sticky Notes 3x3",
+        "quantity": "4.00",
+        "unit": "PACK",
+        "unit_price": "40.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "160.00",
+        "currency": "INR"
+      }
+    ],
+    "totals": {
+      "subtotal": "1960.00",
+      "discount_total": null,
+      "tax_total": null,
+      "shipping_total": null,
+      "grand_total": "1960.00",
+      "amount_paid": null,
+      "amount_due": null
+    },
+    "extraction_metadata": {
+      "extractor_name": "ground_truth_oracle",
+      "extractor_version": "1.0.0",
+      "review_status": "HUMAN_VERIFIED",
+      "validation_findings_count": 0
+    }
+  },
+  "INV-SYN-004": {
+    "schema_version": "1.0.0",
+    "document_id": "INV-SYN-004",
+    "invoice_number": null,
+    "invoice_date": "2026-10-04",
+    "supplier_name": "City Bakery House",
+    "supplier_tax_id": null,
+    "purchase_order_number": null,
+    "currency": "INR",
+    "page_count": 1,
+    "line_items": [
+      {
+        "line_item_id": "item-1",
+        "description": "Chocolate Truffle Cake 500g",
+        "normalized_description": "Chocolate Truffle Cake 500g",
+        "quantity": "1.00",
+        "unit": "PCS",
+        "unit_price": "450.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "450.00",
+        "currency": "INR"
+      },
+      {
+        "line_item_id": "item-2",
+        "description": "Veg Puff",
+        "normalized_description": "Veg Puff",
+        "quantity": "4.00",
+        "unit": "PCS",
+        "unit_price": "25.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "100.00",
+        "currency": "INR"
+      }
+    ],
+    "totals": {
+      "subtotal": "550.00",
+      "discount_total": null,
+      "tax_total": null,
+      "shipping_total": null,
+      "grand_total": "550.00",
+      "amount_paid": null,
+      "amount_due": null
+    },
+    "extraction_metadata": {
+      "extractor_name": "ground_truth_oracle",
+      "extractor_version": "1.0.0",
+      "review_status": "HUMAN_VERIFIED",
+      "validation_findings_count": 0
+    }
+  },
+  "INV-SYN-005": {
+    "schema_version": "1.0.0",
+    "document_id": "INV-SYN-005",
+    "invoice_number": "INV-2026-0005",
+    "invoice_date": "2026-10-05",
+    "supplier_name": null,
+    "supplier_tax_id": null,
+    "purchase_order_number": null,
+    "currency": "INR",
+    "page_count": 1,
+    "line_items": [
+      {
+        "line_item_id": "item-1",
+        "description": "USB Type-C Fast Cable",
+        "normalized_description": "USB Type-C Fast Cable",
+        "quantity": "1.00",
+        "unit": "PCS",
+        "unit_price": "299.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "299.00",
+        "currency": "INR"
+      },
+      {
+        "line_item_id": "item-2",
+        "description": "Mobile Screen Guard",
+        "normalized_description": "Mobile Screen Guard",
+        "quantity": "1.00",
+        "unit": "PCS",
+        "unit_price": "199.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "199.00",
+        "currency": "INR"
+      }
+    ],
+    "totals": {
+      "subtotal": "498.00",
+      "discount_total": null,
+      "tax_total": null,
+      "shipping_total": null,
+      "grand_total": "498.00",
+      "amount_paid": null,
+      "amount_due": null
+    },
+    "extraction_metadata": {
+      "extractor_name": "ground_truth_oracle",
+      "extractor_version": "1.0.0",
+      "review_status": "HUMAN_VERIFIED",
+      "validation_findings_count": 0
+    }
+  },
+  "INV-SYN-006": {
+    "schema_version": "1.0.0",
+    "document_id": "INV-SYN-006",
+    "invoice_number": "INV-2026-0006",
+    "invoice_date": null,
+    "supplier_name": "Quick Mart Express",
+    "supplier_tax_id": null,
+    "purchase_order_number": null,
+    "currency": "INR",
+    "page_count": 1,
+    "line_items": [
+      {
+        "line_item_id": "item-1",
+        "description": "Instant Coffee 100g",
+        "normalized_description": "Instant Coffee 100g",
+        "quantity": "1.00",
+        "unit": "PCS",
+        "unit_price": "210.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "210.00",
+        "currency": "INR"
+      },
+      {
+        "line_item_id": "item-2",
+        "description": "Sugar 1kg",
+        "normalized_description": "Sugar 1kg",
+        "quantity": "2.00",
+        "unit": "KG",
+        "unit_price": "45.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "90.00",
+        "currency": "INR"
+      }
+    ],
+    "totals": {
+      "subtotal": "300.00",
+      "discount_total": null,
+      "tax_total": null,
+      "shipping_total": null,
+      "grand_total": "300.00",
+      "amount_paid": null,
+      "amount_due": null
+    },
+    "extraction_metadata": {
+      "extractor_name": "ground_truth_oracle",
+      "extractor_version": "1.0.0",
+      "review_status": "HUMAN_VERIFIED",
+      "validation_findings_count": 0
+    }
+  },
+  "INV-SYN-007": {
+    "schema_version": "1.0.0",
+    "document_id": "INV-SYN-007",
+    "invoice_number": "INV-USD-101",
+    "invoice_date": "2026-10-07",
+    "supplier_name": "Global Tech Supplies LLC",
+    "supplier_tax_id": null,
+    "purchase_order_number": null,
+    "currency": "USD",
+    "page_count": 1,
+    "line_items": [
+      {
+        "line_item_id": "item-1",
+        "description": "Logitech Wireless Mouse",
+        "normalized_description": "Logitech Wireless Mouse",
+        "quantity": "2.00",
+        "unit": "PCS",
+        "unit_price": "24.50",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "49.00",
+        "currency": "USD"
+      },
+      {
+        "line_item_id": "item-2",
+        "description": "HDMI 2.1 Cable 2m",
+        "normalized_description": "HDMI 2.1 Cable 2m",
+        "quantity": "1.00",
+        "unit": "PCS",
+        "unit_price": "15.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "15.00",
+        "currency": "USD"
+      }
+    ],
+    "totals": {
+      "subtotal": "64.00",
+      "discount_total": null,
+      "tax_total": null,
+      "shipping_total": null,
+      "grand_total": "64.00",
+      "amount_paid": null,
+      "amount_due": null
+    },
+    "extraction_metadata": {
+      "extractor_name": "ground_truth_oracle",
+      "extractor_version": "1.0.0",
+      "review_status": "HUMAN_VERIFIED",
+      "validation_findings_count": 0
+    }
+  },
+  "INV-SYN-008": {
+    "schema_version": "1.0.0",
+    "document_id": "INV-SYN-008",
+    "invoice_number": "INV-EUR-202",
+    "invoice_date": "2026-10-08",
+    "supplier_name": "Euro Lab Instruments",
+    "supplier_tax_id": null,
+    "purchase_order_number": null,
+    "currency": "EUR",
+    "page_count": 1,
+    "line_items": [
+      {
+        "line_item_id": "item-1",
+        "description": "Glass Beaker 500ml",
+        "normalized_description": "Glass Beaker 500ml",
+        "quantity": "4.00",
+        "unit": "PCS",
+        "unit_price": "12.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "48.00",
+        "currency": "EUR"
+      },
+      {
+        "line_item_id": "item-2",
+        "description": "Graduated Pipette 10ml",
+        "normalized_description": "Graduated Pipette 10ml",
+        "quantity": "2.00",
+        "unit": "PCS",
+        "unit_price": "16.50",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "33.00",
+        "currency": "EUR"
+      }
+    ],
+    "totals": {
+      "subtotal": "81.00",
+      "discount_total": null,
+      "tax_total": null,
+      "shipping_total": null,
+      "grand_total": "81.00",
+      "amount_paid": null,
+      "amount_due": null
+    },
+    "extraction_metadata": {
+      "extractor_name": "ground_truth_oracle",
+      "extractor_version": "1.0.0",
+      "review_status": "HUMAN_VERIFIED",
+      "validation_findings_count": 0
+    }
+  },
+  "INV-SYN-009": {
+    "schema_version": "1.0.0",
+    "document_id": "INV-SYN-009",
+    "invoice_number": "INV-GBP-303",
+    "invoice_date": "2026-10-09",
+    "supplier_name": "Oxford Academic Books Ltd",
+    "supplier_tax_id": null,
+    "purchase_order_number": null,
+    "currency": "GBP",
+    "page_count": 1,
+    "line_items": [
+      {
+        "line_item_id": "item-1",
+        "description": "Computer Architecture Textbook",
+        "normalized_description": "Computer Architecture Textbook",
+        "quantity": "1.00",
+        "unit": "PCS",
+        "unit_price": "55.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "55.00",
+        "currency": "GBP"
+      },
+      {
+        "line_item_id": "item-2",
+        "description": "Discrete Mathematics 4th Ed",
+        "normalized_description": "Discrete Mathematics 4th Ed",
+        "quantity": "1.00",
+        "unit": "PCS",
+        "unit_price": "45.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "45.00",
+        "currency": "GBP"
+      }
+    ],
+    "totals": {
+      "subtotal": "100.00",
+      "discount_total": null,
+      "tax_total": null,
+      "shipping_total": null,
+      "grand_total": "100.00",
+      "amount_paid": null,
+      "amount_due": null
+    },
+    "extraction_metadata": {
+      "extractor_name": "ground_truth_oracle",
+      "extractor_version": "1.0.0",
+      "review_status": "HUMAN_VERIFIED",
+      "validation_findings_count": 0
+    }
+  },
+  "INV-SYN-010": {
+    "schema_version": "1.0.0",
+    "document_id": "INV-SYN-010",
+    "invoice_number": "INV-2026-0010",
+    "invoice_date": "2026-10-10",
+    "supplier_name": "Sector 11 Pharmacy",
+    "supplier_tax_id": null,
+    "purchase_order_number": null,
+    "currency": "INR",
+    "page_count": 1,
+    "line_items": [
+      {
+        "line_item_id": "item-1",
+        "description": "Paracetamol 650mg 15s",
+        "normalized_description": "Paracetamol 650mg 15s",
+        "quantity": "2.00",
+        "unit": "PACK",
+        "unit_price": "30.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "60.00",
+        "currency": "INR"
+      },
+      {
+        "line_item_id": "item-2",
+        "description": "Vitamin C 500mg 30s",
+        "normalized_description": "Vitamin C 500mg 30s",
+        "quantity": "1.00",
+        "unit": "PACK",
+        "unit_price": "140.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "140.00",
+        "currency": "INR"
+      }
+    ],
+    "totals": {
+      "subtotal": "200.00",
+      "discount_total": null,
+      "tax_total": "0.00",
+      "shipping_total": null,
+      "grand_total": "200.00",
+      "amount_paid": null,
+      "amount_due": null
+    },
+    "extraction_metadata": {
+      "extractor_name": "ground_truth_oracle",
+      "extractor_version": "1.0.0",
+      "review_status": "HUMAN_VERIFIED",
+      "validation_findings_count": 0
+    }
+  },
+  "INV-SYN-011": {
+    "schema_version": "1.0.0",
+    "document_id": "INV-SYN-011",
+    "invoice_number": "INV-2026-0011",
+    "invoice_date": "2026-10-11",
+    "supplier_name": "Punjab Hardware Traders",
+    "supplier_tax_id": null,
+    "purchase_order_number": null,
+    "currency": "INR",
+    "page_count": 1,
+    "line_items": [
+      {
+        "line_item_id": "item-1",
+        "description": "Brass Padlock 50mm",
+        "normalized_description": "Brass Padlock 50mm",
+        "quantity": "2.00",
+        "unit": "PCS",
+        "unit_price": "200.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "400.00",
+        "currency": "INR"
+      },
+      {
+        "line_item_id": "item-2",
+        "description": "Steel Screws 100pk",
+        "normalized_description": "Steel Screws 100pk",
+        "quantity": "1.00",
+        "unit": "PACK",
+        "unit_price": "100.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "100.00",
+        "currency": "INR"
+      }
+    ],
+    "totals": {
+      "subtotal": "500.00",
+      "discount_total": null,
+      "tax_total": "90.00",
+      "shipping_total": null,
+      "grand_total": "590.00",
+      "amount_paid": null,
+      "amount_due": null
+    },
+    "extraction_metadata": {
+      "extractor_name": "ground_truth_oracle",
+      "extractor_version": "1.0.0",
+      "review_status": "HUMAN_VERIFIED",
+      "validation_findings_count": 0
+    }
+  },
+  "INV-SYN-012": {
+    "schema_version": "1.0.0",
+    "document_id": "INV-SYN-012",
+    "invoice_number": "INV-2026-0012",
+    "invoice_date": "2026-10-12",
+    "supplier_name": "Metro Departmental",
+    "supplier_tax_id": null,
+    "purchase_order_number": null,
+    "currency": "INR",
+    "page_count": 1,
+    "line_items": [
+      {
+        "line_item_id": "item-1",
+        "description": "Basmati Rice 5kg",
+        "normalized_description": "Basmati Rice 5kg",
+        "quantity": "1.00",
+        "unit": "PACK",
+        "unit_price": "400.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "400.00",
+        "currency": "INR"
+      },
+      {
+        "line_item_id": "item-2",
+        "description": "Stainless Steel Thermos 1L",
+        "normalized_description": "Stainless Steel Thermos 1L",
+        "quantity": "1.00",
+        "unit": "PCS",
+        "unit_price": "600.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "600.00",
+        "currency": "INR"
+      }
+    ],
+    "totals": {
+      "subtotal": "1000.00",
+      "discount_total": null,
+      "tax_total": "128.00",
+      "shipping_total": null,
+      "grand_total": "1128.00",
+      "amount_paid": null,
+      "amount_due": null
+    },
+    "extraction_metadata": {
+      "extractor_name": "ground_truth_oracle",
+      "extractor_version": "1.0.0",
+      "review_status": "HUMAN_VERIFIED",
+      "validation_findings_count": 0
+    }
+  },
+  "INV-SYN-013": {
+    "schema_version": "1.0.0",
+    "document_id": "INV-SYN-013",
+    "invoice_number": "INV-2026-0013",
+    "invoice_date": "2026-10-13",
+    "supplier_name": "Fast Retail Mart",
+    "supplier_tax_id": null,
+    "purchase_order_number": null,
+    "currency": "INR",
+    "page_count": 1,
+    "line_items": [
+      {
+        "line_item_id": "item-1",
+        "description": "Green Tea Box 100g",
+        "normalized_description": "Green Tea Box 100g",
+        "quantity": "2.00",
+        "unit": "BOX",
+        "unit_price": "150.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "300.00",
+        "currency": "INR"
+      }
+    ],
+    "totals": {
+      "subtotal": "300.00",
+      "discount_total": "30.00",
+      "tax_total": null,
+      "shipping_total": null,
+      "grand_total": "270.00",
+      "amount_paid": null,
+      "amount_due": null
+    },
+    "extraction_metadata": {
+      "extractor_name": "ground_truth_oracle",
+      "extractor_version": "1.0.0",
+      "review_status": "HUMAN_VERIFIED",
+      "validation_findings_count": 0
+    }
+  },
+  "INV-SYN-014": {
+    "schema_version": "1.0.0",
+    "document_id": "INV-SYN-014",
+    "invoice_number": "INV-2026-0014",
+    "invoice_date": "2026-10-14",
+    "supplier_name": "Central Food Plaza",
+    "supplier_tax_id": null,
+    "purchase_order_number": null,
+    "currency": "INR",
+    "page_count": 1,
+    "line_items": [
+      {
+        "line_item_id": "item-1",
+        "description": "Veg Biryani Combo",
+        "normalized_description": "Veg Biryani Combo",
+        "quantity": "3.00",
+        "unit": "PACK",
+        "unit_price": "200.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "600.00",
+        "currency": "INR"
+      },
+      {
+        "line_item_id": "item-2",
+        "description": "Paneer Butter Masala",
+        "normalized_description": "Paneer Butter Masala",
+        "quantity": "1.00",
+        "unit": "PACK",
+        "unit_price": "250.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "250.00",
+        "currency": "INR"
+      }
+    ],
+    "totals": {
+      "subtotal": "850.00",
+      "discount_total": "100.00",
+      "tax_total": null,
+      "shipping_total": null,
+      "grand_total": "750.00",
+      "amount_paid": null,
+      "amount_due": null
+    },
+    "extraction_metadata": {
+      "extractor_name": "ground_truth_oracle",
+      "extractor_version": "1.0.0",
+      "review_status": "HUMAN_VERIFIED",
+      "validation_findings_count": 0
+    }
+  },
+  "INV-SYN-015": {
+    "schema_version": "1.0.0",
+    "document_id": "INV-SYN-015",
+    "invoice_number": "INV-2026-0015",
+    "invoice_date": "2026-10-15",
+    "supplier_name": "Quick Eats Kitchen",
+    "supplier_tax_id": null,
+    "purchase_order_number": null,
+    "currency": "INR",
+    "page_count": 1,
+    "line_items": [
+      {
+        "line_item_id": "item-1",
+        "description": "Chicken Burger",
+        "normalized_description": "Chicken Burger",
+        "quantity": "2.00",
+        "unit": "PCS",
+        "unit_price": "120.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "240.00",
+        "currency": "INR"
+      },
+      {
+        "line_item_id": "item-2",
+        "description": "French Fries Large",
+        "normalized_description": "French Fries Large",
+        "quantity": "1.00",
+        "unit": "PCS",
+        "unit_price": "90.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "90.00",
+        "currency": "INR"
+      }
+    ],
+    "totals": {
+      "subtotal": "330.00",
+      "discount_total": null,
+      "tax_total": null,
+      "shipping_total": "40.00",
+      "grand_total": "370.00",
+      "amount_paid": null,
+      "amount_due": null
+    },
+    "extraction_metadata": {
+      "extractor_name": "ground_truth_oracle",
+      "extractor_version": "1.0.0",
+      "review_status": "HUMAN_VERIFIED",
+      "validation_findings_count": 0
+    }
+  },
+  "INV-SYN-016": {
+    "schema_version": "1.0.0",
+    "document_id": "INV-SYN-016",
+    "invoice_number": "INV-2026-0016",
+    "invoice_date": "2026-10-16",
+    "supplier_name": "Industrial Chemical Corp",
+    "supplier_tax_id": null,
+    "purchase_order_number": null,
+    "currency": "INR",
+    "page_count": 1,
+    "line_items": [
+      {
+        "line_item_id": "item-1",
+        "description": "Distilled Water 5L",
+        "normalized_description": "Distilled Water 5L",
+        "quantity": "3.00",
+        "unit": "CAN",
+        "unit_price": "33.33",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "99.99",
+        "currency": "INR"
+      }
+    ],
+    "totals": {
+      "subtotal": "99.99",
+      "discount_total": null,
+      "tax_total": "5.00",
+      "shipping_total": null,
+      "grand_total": "105.00",
+      "amount_paid": null,
+      "amount_due": null
+    },
+    "extraction_metadata": {
+      "extractor_name": "ground_truth_oracle",
+      "extractor_version": "1.0.0",
+      "review_status": "HUMAN_VERIFIED",
+      "validation_findings_count": 0
+    }
+  },
+  "INV-SYN-017": {
+    "schema_version": "1.0.0",
+    "document_id": "INV-SYN-017",
+    "invoice_number": "INV-2026-0017",
+    "invoice_date": "2026-10-17",
+    "supplier_name": "Continental Supplies GmbH",
+    "supplier_tax_id": null,
+    "purchase_order_number": null,
+    "currency": "EUR",
+    "page_count": 1,
+    "line_items": [
+      {
+        "line_item_id": "item-1",
+        "description": "Filter Papers Box",
+        "normalized_description": "Filter Papers Box",
+        "quantity": "2.00",
+        "unit": "BOX",
+        "unit_price": "10.50",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "21.00",
+        "currency": "EUR"
+      },
+      {
+        "line_item_id": "item-2",
+        "description": "Glass Funnel 75mm",
+        "normalized_description": "Glass Funnel 75mm",
+        "quantity": "1.00",
+        "unit": "PCS",
+        "unit_price": "14.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "14.00",
+        "currency": "EUR"
+      }
+    ],
+    "totals": {
+      "subtotal": "35.00",
+      "discount_total": null,
+      "tax_total": null,
+      "shipping_total": null,
+      "grand_total": "35.00",
+      "amount_paid": null,
+      "amount_due": null
+    },
+    "extraction_metadata": {
+      "extractor_name": "ground_truth_oracle",
+      "extractor_version": "1.0.0",
+      "review_status": "HUMAN_VERIFIED",
+      "validation_findings_count": 0
+    }
+  },
+  "INV-SYN-018": {
+    "schema_version": "1.0.0",
+    "document_id": "INV-SYN-018",
+    "invoice_number": "INV-2026-0018",
+    "invoice_date": "2026-10-18",
+    "supplier_name": "PEC Stationery Mart",
+    "supplier_tax_id": null,
+    "purchase_order_number": null,
+    "currency": "INR",
+    "page_count": 1,
+    "line_items": [
+      {
+        "line_item_id": "item-1",
+        "description": "A4 Paper Ream",
+        "normalized_description": "A4 Paper Ream",
+        "quantity": "2.00",
+        "unit": "PACK",
+        "unit_price": "300.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "600.00",
+        "currency": "INR"
+      },
+      {
+        "line_item_id": "item-2",
+        "description": "A4 Paper Ream",
+        "normalized_description": "A4 Paper Ream",
+        "quantity": "3.00",
+        "unit": "PACK",
+        "unit_price": "300.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "900.00",
+        "currency": "INR"
+      }
+    ],
+    "totals": {
+      "subtotal": "1500.00",
+      "discount_total": null,
+      "tax_total": null,
+      "shipping_total": null,
+      "grand_total": "1500.00",
+      "amount_paid": null,
+      "amount_due": null
+    },
+    "extraction_metadata": {
+      "extractor_name": "ground_truth_oracle",
+      "extractor_version": "1.0.0",
+      "review_status": "HUMAN_VERIFIED",
+      "validation_findings_count": 0
+    }
+  },
+  "INV-SYN-019": {
+    "schema_version": "1.0.0",
+    "document_id": "INV-SYN-019",
+    "invoice_number": "INV-2026-0019",
+    "invoice_date": "2026-10-19",
+    "supplier_name": "Cyber Computer Solutions",
+    "supplier_tax_id": null,
+    "purchase_order_number": null,
+    "currency": "INR",
+    "page_count": 1,
+    "line_items": [
+      {
+        "line_item_id": "item-1",
+        "description": "Logitech B100 Optical USB Mouse with Ergonomic Design and 800 DPI",
+        "normalized_description": "Logitech B100 Optical USB Mouse with Ergonomic Design and 800 DPI",
+        "quantity": "2.00",
+        "unit": "PCS",
+        "unit_price": "350.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "700.00",
+        "currency": "INR"
+      },
+      {
+        "line_item_id": "item-2",
+        "description": "SanDisk Ultra Dual Drive 64GB Type-C USB 3.1 Flash Drive",
+        "normalized_description": "SanDisk Ultra Dual Drive 64GB Type-C USB 3.1 Flash Drive",
+        "quantity": "1.00",
+        "unit": "PCS",
+        "unit_price": "650.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "650.00",
+        "currency": "INR"
+      }
+    ],
+    "totals": {
+      "subtotal": "1350.00",
+      "discount_total": null,
+      "tax_total": null,
+      "shipping_total": null,
+      "grand_total": "1350.00",
+      "amount_paid": null,
+      "amount_due": null
+    },
+    "extraction_metadata": {
+      "extractor_name": "ground_truth_oracle",
+      "extractor_version": "1.0.0",
+      "review_status": "HUMAN_VERIFIED",
+      "validation_findings_count": 0
+    }
+  },
+  "INV-SYN-020": {
+    "schema_version": "1.0.0",
+    "document_id": "INV-SYN-020",
+    "invoice_number": "INV-2026-0020",
+    "invoice_date": "2026-10-20",
+    "supplier_name": "City Wholesale Mart",
+    "supplier_tax_id": null,
+    "purchase_order_number": null,
+    "currency": "INR",
+    "page_count": 1,
+    "line_items": [
+      {
+        "line_item_id": "item-1",
+        "description": "Office Chair Heavy Duty",
+        "normalized_description": "Office Chair Heavy Duty",
+        "quantity": "2.00",
+        "unit": "PCS",
+        "unit_price": "2500.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "5000.00",
+        "currency": "INR"
+      },
+      {
+        "line_item_id": "item-2",
+        "description": "Returned Defective Desk Lamp",
+        "normalized_description": "Returned Defective Desk Lamp",
+        "quantity": "-1.00",
+        "unit": "PCS",
+        "unit_price": "600.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "-600.00",
+        "currency": "INR"
+      }
+    ],
+    "totals": {
+      "subtotal": "4400.00",
+      "discount_total": null,
+      "tax_total": null,
+      "shipping_total": null,
+      "grand_total": "4400.00",
+      "amount_paid": null,
+      "amount_due": null
+    },
+    "extraction_metadata": {
+      "extractor_name": "ground_truth_oracle",
+      "extractor_version": "1.0.0",
+      "review_status": "HUMAN_VERIFIED",
+      "validation_findings_count": 0
+    }
+  },
+  "INV-SYN-021": {
+    "schema_version": "1.0.0",
+    "document_id": "INV-SYN-021",
+    "invoice_number": "INV-2026-0021",
+    "invoice_date": "2026-10-21",
+    "supplier_name": "Shady Corner Store",
+    "supplier_tax_id": null,
+    "purchase_order_number": null,
+    "currency": "INR",
+    "page_count": 1,
+    "line_items": [
+      {
+        "line_item_id": "item-1",
+        "description": "Notebook Premium 200p",
+        "normalized_description": "Notebook Premium 200p",
+        "quantity": "2.00",
+        "unit": "PCS",
+        "unit_price": "50.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "120.00",
+        "currency": "INR"
+      }
+    ],
+    "totals": {
+      "subtotal": "120.00",
+      "discount_total": null,
+      "tax_total": null,
+      "shipping_total": null,
+      "grand_total": "120.00",
+      "amount_paid": null,
+      "amount_due": null
+    },
+    "extraction_metadata": {
+      "extractor_name": "ground_truth_oracle",
+      "extractor_version": "1.0.0",
+      "review_status": "HUMAN_VERIFIED",
+      "validation_findings_count": 0
+    }
+  },
+  "INV-SYN-022": {
+    "schema_version": "1.0.0",
+    "document_id": "INV-SYN-022",
+    "invoice_number": "INV-2026-0022",
+    "invoice_date": "2026-10-22",
+    "supplier_name": "Glitched Billing Services",
+    "supplier_tax_id": null,
+    "purchase_order_number": null,
+    "currency": "INR",
+    "page_count": 1,
+    "line_items": [
+      {
+        "line_item_id": "item-1",
+        "description": "Ball Pen Blue",
+        "normalized_description": "Ball Pen Blue",
+        "quantity": "10.00",
+        "unit": "PCS",
+        "unit_price": "10.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "100.00",
+        "currency": "INR"
+      }
+    ],
+    "totals": {
+      "subtotal": "150.00",
+      "discount_total": null,
+      "tax_total": null,
+      "shipping_total": null,
+      "grand_total": "150.00",
+      "amount_paid": null,
+      "amount_due": null
+    },
+    "extraction_metadata": {
+      "extractor_name": "ground_truth_oracle",
+      "extractor_version": "1.0.0",
+      "review_status": "HUMAN_VERIFIED",
+      "validation_findings_count": 0
+    }
+  },
+  "INV-SYN-023": {
+    "schema_version": "1.0.0",
+    "document_id": "INV-SYN-023",
+    "invoice_number": "INV-2026-0023",
+    "invoice_date": "2026-10-23",
+    "supplier_name": "Village Organic Store",
+    "supplier_tax_id": null,
+    "purchase_order_number": null,
+    "currency": "INR",
+    "page_count": 1,
+    "line_items": [
+      {
+        "line_item_id": "item-1",
+        "description": "Organic Honey Jar 500g",
+        "normalized_description": "Organic Honey Jar 500g",
+        "quantity": "2.00",
+        "unit": "JAR",
+        "unit_price": null,
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "400.00",
+        "currency": "INR"
+      }
+    ],
+    "totals": {
+      "subtotal": "400.00",
+      "discount_total": null,
+      "tax_total": null,
+      "shipping_total": null,
+      "grand_total": "400.00",
+      "amount_paid": null,
+      "amount_due": null
+    },
+    "extraction_metadata": {
+      "extractor_name": "ground_truth_oracle",
+      "extractor_version": "1.0.0",
+      "review_status": "HUMAN_VERIFIED",
+      "validation_findings_count": 0
+    }
+  },
+  "INV-SYN-024": {
+    "schema_version": "1.0.0",
+    "document_id": "INV-SYN-024",
+    "invoice_number": "INV-2026-0024",
+    "invoice_date": "2026-10-24",
+    "supplier_name": "Rain Damaged Invoice Mart",
+    "supplier_tax_id": null,
+    "purchase_order_number": null,
+    "currency": "INR",
+    "page_count": 1,
+    "line_items": [
+      {
+        "line_item_id": "item-1",
+        "description": "Dry Erase Markers 4pk",
+        "normalized_description": "Dry Erase Markers 4pk",
+        "quantity": "3.00",
+        "unit": "PACK",
+        "unit_price": "100.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "300.00",
+        "currency": "INR"
+      }
+    ],
+    "totals": {
+      "subtotal": "300.00",
+      "discount_total": null,
+      "tax_total": null,
+      "shipping_total": null,
+      "grand_total": null,
+      "amount_paid": null,
+      "amount_due": null
+    },
+    "extraction_metadata": {
+      "extractor_name": "ground_truth_oracle",
+      "extractor_version": "1.0.0",
+      "review_status": "HUMAN_VERIFIED",
+      "validation_findings_count": 0
+    }
+  },
+  "INV-SYN-025": {
+    "schema_version": "1.0.0",
+    "document_id": "INV-SYN-025",
+    "invoice_number": "INV-2026-0025",
+    "invoice_date": "2026-10-25",
+    "supplier_name": "PEC Central Stores",
+    "supplier_tax_id": null,
+    "purchase_order_number": null,
+    "currency": "INR",
+    "page_count": 2,
+    "line_items": [
+      {
+        "line_item_id": "item-1",
+        "description": "Soldering Iron 25W",
+        "normalized_description": "Soldering Iron 25W",
+        "quantity": "2.00",
+        "unit": "PCS",
+        "unit_price": "350.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "700.00",
+        "currency": "INR"
+      },
+      {
+        "line_item_id": "item-2",
+        "description": "Digital Multimeter",
+        "normalized_description": "Digital Multimeter",
+        "quantity": "1.00",
+        "unit": "PCS",
+        "unit_price": "850.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "850.00",
+        "currency": "INR"
+      },
+      {
+        "line_item_id": "item-3",
+        "description": "Breadboard GL-12",
+        "normalized_description": "Breadboard GL-12",
+        "quantity": "4.00",
+        "unit": "PCS",
+        "unit_price": "120.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "480.00",
+        "currency": "INR"
+      },
+      {
+        "line_item_id": "item-4",
+        "description": "Jumper Wires 65pk",
+        "normalized_description": "Jumper Wires 65pk",
+        "quantity": "2.00",
+        "unit": "PACK",
+        "unit_price": "90.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "180.00",
+        "currency": "INR"
+      },
+      {
+        "line_item_id": "item-5",
+        "description": "Resistor Kit 500pcs",
+        "normalized_description": "Resistor Kit 500pcs",
+        "quantity": "1.00",
+        "unit": "KIT",
+        "unit_price": "250.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "250.00",
+        "currency": "INR"
+      },
+      {
+        "line_item_id": "item-6",
+        "description": "LED Pack 50pcs",
+        "normalized_description": "LED Pack 50pcs",
+        "quantity": "2.00",
+        "unit": "PACK",
+        "unit_price": "70.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "140.00",
+        "currency": "INR"
+      }
+    ],
+    "totals": {
+      "subtotal": "2600.00",
+      "discount_total": null,
+      "tax_total": "468.00",
+      "shipping_total": null,
+      "grand_total": "3068.00",
+      "amount_paid": null,
+      "amount_due": null
+    },
+    "extraction_metadata": {
+      "extractor_name": "ground_truth_oracle",
+      "extractor_version": "1.0.0",
+      "review_status": "HUMAN_VERIFIED",
+      "validation_findings_count": 0
+    }
+  },
+  "INV-SYN-026": {
+    "schema_version": "1.0.0",
+    "document_id": "INV-SYN-026",
+    "invoice_number": "INV-2026-0026",
+    "invoice_date": "2026-05-04",
+    "supplier_name": "British Indian Trading Co",
+    "supplier_tax_id": null,
+    "purchase_order_number": null,
+    "currency": "INR",
+    "page_count": 1,
+    "line_items": [
+      {
+        "line_item_id": "item-1",
+        "description": "Earl Grey Tea 250g",
+        "normalized_description": "Earl Grey Tea 250g",
+        "quantity": "1.00",
+        "unit": "PACK",
+        "unit_price": "350.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "350.00",
+        "currency": "INR"
+      },
+      {
+        "line_item_id": "item-2",
+        "description": "Digestive Biscuits 400g",
+        "normalized_description": "Digestive Biscuits 400g",
+        "quantity": "2.00",
+        "unit": "PACK",
+        "unit_price": "75.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "150.00",
+        "currency": "INR"
+      }
+    ],
+    "totals": {
+      "subtotal": "500.00",
+      "discount_total": null,
+      "tax_total": null,
+      "shipping_total": null,
+      "grand_total": "500.00",
+      "amount_paid": null,
+      "amount_due": null
+    },
+    "extraction_metadata": {
+      "extractor_name": "ground_truth_oracle",
+      "extractor_version": "1.0.0",
+      "review_status": "HUMAN_VERIFIED",
+      "validation_findings_count": 0
+    }
+  },
+  "INV-SYN-027": {
+    "schema_version": "1.0.0",
+    "document_id": "INV-SYN-027",
+    "invoice_number": "INV-2026-0027",
+    "invoice_date": "2026-10-27",
+    "supplier_name": "Unspecified Currency Merchant",
+    "supplier_tax_id": null,
+    "purchase_order_number": null,
+    "currency": null,
+    "page_count": 1,
+    "line_items": [
+      {
+        "line_item_id": "item-1",
+        "description": "Generic Widget 100",
+        "normalized_description": "Generic Widget 100",
+        "quantity": "2.00",
+        "unit": "PCS",
+        "unit_price": "50.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "100.00",
+        "currency": null
+      }
+    ],
+    "totals": {
+      "subtotal": "100.00",
+      "discount_total": null,
+      "tax_total": null,
+      "shipping_total": null,
+      "grand_total": "100.00",
+      "amount_paid": null,
+      "amount_due": null
+    },
+    "extraction_metadata": {
+      "extractor_name": "ground_truth_oracle",
+      "extractor_version": "1.0.0",
+      "review_status": "HUMAN_VERIFIED",
+      "validation_findings_count": 0
+    }
+  },
+  "INV-SYN-028": {
+    "schema_version": "1.0.0",
+    "document_id": "INV-SYN-028",
+    "invoice_number": "INV-DUPLICATE-99",
+    "invoice_date": "2026-10-28",
+    "supplier_name": "Apex Medical Distributors",
+    "supplier_tax_id": null,
+    "purchase_order_number": null,
+    "currency": "INR",
+    "page_count": 1,
+    "line_items": [
+      {
+        "line_item_id": "item-1",
+        "description": "Surgical Gloves Box 100s",
+        "normalized_description": "Surgical Gloves Box 100s",
+        "quantity": "2.00",
+        "unit": "BOX",
+        "unit_price": "400.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "800.00",
+        "currency": "INR"
+      }
+    ],
+    "totals": {
+      "subtotal": "800.00",
+      "discount_total": null,
+      "tax_total": null,
+      "shipping_total": null,
+      "grand_total": "800.00",
+      "amount_paid": null,
+      "amount_due": null
+    },
+    "extraction_metadata": {
+      "extractor_name": "ground_truth_oracle",
+      "extractor_version": "1.0.0",
+      "review_status": "HUMAN_VERIFIED",
+      "validation_findings_count": 0
+    }
+  },
+  "INV-SYN-029": {
+    "schema_version": "1.0.0",
+    "document_id": "INV-SYN-029",
+    "invoice_number": "INV-DUPLICATE-99",
+    "invoice_date": "2026-10-28",
+    "supplier_name": "Campus Book Depot",
+    "supplier_tax_id": null,
+    "purchase_order_number": null,
+    "currency": "INR",
+    "page_count": 1,
+    "line_items": [
+      {
+        "line_item_id": "item-1",
+        "description": "Engineering Mechanics Book",
+        "normalized_description": "Engineering Mechanics Book",
+        "quantity": "1.00",
+        "unit": "PCS",
+        "unit_price": "650.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "650.00",
+        "currency": "INR"
+      }
+    ],
+    "totals": {
+      "subtotal": "650.00",
+      "discount_total": null,
+      "tax_total": null,
+      "shipping_total": null,
+      "grand_total": "650.00",
+      "amount_paid": null,
+      "amount_due": null
+    },
+    "extraction_metadata": {
+      "extractor_name": "ground_truth_oracle",
+      "extractor_version": "1.0.0",
+      "review_status": "HUMAN_VERIFIED",
+      "validation_findings_count": 0
+    }
+  },
+  "INV-SYN-030": {
+    "schema_version": "1.0.0",
+    "document_id": "INV-SYN-030",
+    "invoice_number": "INV-2026-0030",
+    "invoice_date": "2026-10-30",
+    "supplier_name": "Nutritional Labs",
+    "supplier_tax_id": null,
+    "purchase_order_number": null,
+    "currency": "INR",
+    "page_count": 1,
+    "line_items": [
+      {
+        "line_item_id": "item-1",
+        "description": "Whey Protein 1kg",
+        "normalized_description": "Whey Protein 1kg",
+        "quantity": "1.00",
+        "unit": "PACK",
+        "unit_price": "2400.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "2400.00",
+        "currency": "INR"
+      },
+      {
+        "line_item_id": "item-2",
+        "description": "Free Shaker Bottle Promo",
+        "normalized_description": "Free Shaker Bottle Promo",
+        "quantity": "1.00",
+        "unit": "PCS",
+        "unit_price": "0.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "0.00",
+        "currency": "INR"
+      }
+    ],
+    "totals": {
+      "subtotal": "2400.00",
+      "discount_total": null,
+      "tax_total": null,
+      "shipping_total": null,
+      "grand_total": "2400.00",
+      "amount_paid": null,
+      "amount_due": null
+    },
+    "extraction_metadata": {
+      "extractor_name": "ground_truth_oracle",
+      "extractor_version": "1.0.0",
+      "review_status": "HUMAN_VERIFIED",
+      "validation_findings_count": 0
+    }
+  },
+  "INV-SYN-031": {
+    "schema_version": "1.0.0",
+    "document_id": "INV-SYN-031",
+    "invoice_number": "INV-2026-0031",
+    "invoice_date": "2026-10-31",
+    "supplier_name": "Reliable Furniture House",
+    "supplier_tax_id": null,
+    "purchase_order_number": null,
+    "currency": "INR",
+    "page_count": 1,
+    "line_items": [
+      {
+        "line_item_id": "item-1",
+        "description": "Study Table Wooden",
+        "normalized_description": "Study Table Wooden",
+        "quantity": "1.00",
+        "unit": "PCS",
+        "unit_price": "3500.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "3500.00",
+        "currency": "INR"
+      }
+    ],
+    "totals": {
+      "subtotal": "3500.00",
+      "discount_total": null,
+      "tax_total": null,
+      "shipping_total": null,
+      "grand_total": "3500.00",
+      "amount_paid": "2000.00",
+      "amount_due": "1500.00"
+    },
+    "extraction_metadata": {
+      "extractor_name": "ground_truth_oracle",
+      "extractor_version": "1.0.0",
+      "review_status": "HUMAN_VERIFIED",
+      "validation_findings_count": 0
+    }
+  },
+  "INV-SYN-032": {
+    "schema_version": "1.0.0",
+    "document_id": "INV-SYN-032",
+    "invoice_number": "ZEP-2026-8812",
+    "invoice_date": "2026-10-31",
+    "supplier_name": "Zepto Quick Retail Chandigarh",
+    "supplier_tax_id": null,
+    "purchase_order_number": null,
+    "currency": "INR",
+    "page_count": 1,
+    "line_items": [
+      {
+        "line_item_id": "item-1",
+        "description": "Mother Dairy Milk 500ml",
+        "normalized_description": "Mother Dairy Milk 500ml",
+        "quantity": "2.00",
+        "unit": "PACK",
+        "unit_price": "33.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "66.00",
+        "currency": "INR"
+      },
+      {
+        "line_item_id": "item-2",
+        "description": "Lays Classic Salted 50g",
+        "normalized_description": "Lays Classic Salted 50g",
+        "quantity": "2.00",
+        "unit": "PACK",
+        "unit_price": "20.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "40.00",
+        "currency": "INR"
+      },
+      {
+        "line_item_id": "item-3",
+        "description": "Coca Cola 750ml",
+        "normalized_description": "Coca Cola 750ml",
+        "quantity": "1.00",
+        "unit": "BTL",
+        "unit_price": "45.00",
+        "discount_amount": null,
+        "tax_rate": null,
+        "tax_amount": null,
+        "line_total": "45.00",
+        "currency": "INR"
+      }
+    ],
+    "totals": {
+      "subtotal": "151.00",
+      "discount_total": "10.00",
+      "tax_total": null,
+      "shipping_total": "25.00",
+      "grand_total": "171.00",
+      "amount_paid": null,
+      "amount_due": null
+    },
+    "extraction_metadata": {
+      "extractor_name": "ground_truth_oracle",
+      "extractor_version": "1.0.0",
+      "review_status": "HUMAN_VERIFIED",
+      "validation_findings_count": 0
+    }
+  }
+}

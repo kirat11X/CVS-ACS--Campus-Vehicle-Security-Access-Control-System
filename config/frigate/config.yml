@@ -1,0 +1,59 @@
+mqtt:
+  host: mosquitto
+  port: 1883
+  topic_prefix: frigate
+
+detectors:
+  cpu1:
+    type: cpu
+
+lpr:
+  enabled: true
+  device: CPU
+
+cameras:
+  gate_cam:
+    enabled: true
+    ffmpeg:
+      inputs:
+        - path: /media/test_car_video.mp4
+          input_args: -stream_loop -1 -re
+          roles:
+            - detect
+    detect:
+      enabled: true
+      width: 1280
+      height: 720
+      fps: 5
+    objects:
+      track:
+        - car
+        - motorcycle
+        - bus
+        - truck
+        - person
+    lpr:
+      enabled: true
+  phase5_test_cam:
+    enabled: true
+    ffmpeg:
+      inputs:
+        - path: /media/phase5_test_video.mp4
+          input_args: -stream_loop -1 -re
+          roles:
+            - detect
+    detect:
+      enabled: true
+      width: 1280
+      height: 720
+      fps: 5
+    objects:
+      track:
+        - car
+        - motorcycle
+        - bus
+        - truck
+        - person
+    lpr:
+      enabled: true
+version: 0.18-0

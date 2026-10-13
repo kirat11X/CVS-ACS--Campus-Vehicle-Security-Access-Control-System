@@ -1,0 +1,62 @@
+{
+  "provenance_label": "IN-02 Kaggle CC0 plate crops, NO text ground truth; proxy signals only, NOT accuracy and NOT PEC gate performance",
+  "n_crops": 1840,
+  "models": {
+    "lprnet_indian": {
+      "indian_format_valid_rate": 0.9217,
+      "valid_state_code_rate": 0.8989,
+      "empty_rate": 0.0,
+      "mean_len": 9.56,
+      "mean_char_conf": null
+    },
+    "cct_s_v2_global": {
+      "indian_format_valid_rate": 0.6946,
+      "valid_state_code_rate": 0.663,
+      "empty_rate": 0.0011,
+      "mean_len": 9.03,
+      "mean_char_conf": 0.8988
+    },
+    "mobilevit_v2_european": {
+      "indian_format_valid_rate": 0.6125,
+      "valid_state_code_rate": 0.4783,
+      "empty_rate": 0.0,
+      "mean_len": 7.85,
+      "mean_char_conf": 0.5143
+    }
+  },
+  "pairwise_exact_agreement": {
+    "lprnet_indian|cct_s_v2_global": 0.487,
+    "lprnet_indian|mobilevit_v2_european": 0.0109,
+    "cct_s_v2_global|mobilevit_v2_european": 0.0391
+  },
+  "elapsed_s": 47.4,
+  "informal_visual_check": {
+    "note": "assistant read 24 contact-sheet crops by eye; 1 illegible excluded; NOT ground truth",
+    "n": 23,
+    "correct": {
+      "lprnet_indian": 21,
+      "cct_s_v2_global": 12,
+      "mobilevit_v2_european": 0
+    },
+    "exact_95ci_clopper_pearson": {
+      "lprnet_indian": [
+        0.72,
+        0.989
+      ],
+      "cct_s_v2_global": [
+        0.306,
+        0.732
+      ],
+      "mobilevit_v2_european": [
+        0.0,
+        0.148
+      ]
+    },
+    "hallucination": "lprnet_indian emitted MH09BB4445 for an illegible crop"
+  },
+  "caveats": [
+    "LPRNet weights: Indian_LPR repo has no LICENSE (all rights reserved) -> local research evaluation only, not redistributable or deployable without author permission",
+    "Possible train/test overlap: Indian_LPR README recommends this same Kaggle set; LPRNet may have seen IN-02 crops",
+    "LPRNet exposes no confidence; outputs plate-shaped strings even on unreadable input"
+  ]
+}

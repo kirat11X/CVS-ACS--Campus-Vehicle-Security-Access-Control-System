@@ -1,0 +1,194 @@
+{
+  "observations": [
+    {
+      "id": "obs-01",
+      "plate": "PB65AB0902",
+      "confidence": 0.94,
+      "vehicleType": "CAR",
+      "direction": "UNKNOWN",
+      "observedAt": "2026-10-08T12:00:00Z",
+      "gateId": "GATE_1"
+    },
+    {
+      "id": "obs-02",
+      "plate": null,
+      "confidence": null,
+      "vehicleType": "MOTORCYCLE",
+      "direction": "UNKNOWN",
+      "observedAt": "2026-10-08T12:02:00Z",
+      "gateId": "GATE_1"
+    },
+    {
+      "id": "obs-03",
+      "plate": "CH01AB2222",
+      "confidence": 0.87,
+      "vehicleType": "CAR",
+      "direction": "UNKNOWN",
+      "observedAt": "2026-10-08T12:05:00Z",
+      "gateId": "GATE_2"
+    },
+    {
+      "id": "obs-04",
+      "plate": "PB65DL6666",
+      "confidence": 0.95,
+      "vehicleType": "MOTORCYCLE",
+      "direction": "UNKNOWN",
+      "observedAt": "2026-10-08T12:10:00Z",
+      "gateId": "GATE_3"
+    },
+    {
+      "id": "obs-05",
+      "plate": "DL99ZZ9999",
+      "confidence": 0.92,
+      "vehicleType": "CAR",
+      "direction": "UNKNOWN",
+      "observedAt": "2026-10-08T12:15:00Z",
+      "gateId": "GATE_1"
+    }
+  ],
+  "screening": [
+    {
+      "item": "Cough Syrup 100ml",
+      "category": "OTC_MEDICINE",
+      "confidence": 0.91,
+      "rule": "OTC default allow + log",
+      "reasonCode": "OTC_LOGGED",
+      "outcome": "ALLOW"
+    },
+    {
+      "item": "Harpic Power Plus 500ml x3",
+      "category": "HAZARDOUS_CHEMICAL",
+      "confidence": 0.88,
+      "rule": "Quantity >= 3",
+      "reasonCode": "HAZCHEM_QTY_REVIEW",
+      "outcome": "REVIEW"
+    },
+    {
+      "item": "Gold Flake Kings 20s",
+      "category": "TOBACCO_NICOTINE",
+      "confidence": 0.97,
+      "rule": "Tobacco/Nicotine any qty",
+      "reasonCode": "TOBACCO_FLAG",
+      "outcome": "ALERT"
+    },
+    {
+      "item": "Kingfisher Premium 500ml",
+      "category": "ALCOHOL",
+      "confidence": 0.95,
+      "rule": "Alcohol any qty",
+      "reasonCode": "ALCOHOL_FLAG",
+      "outcome": "ALERT"
+    },
+    {
+      "item": "Maggi 2-Min Noodles",
+      "category": "NORMAL",
+      "confidence": 0.99,
+      "rule": "Normal item",
+      "reasonCode": "NORMAL_ITEM",
+      "outcome": "ALLOW"
+    }
+  ],
+  "gates": [
+    {
+      "id": "GATE_1",
+      "name": "Main North Gate",
+      "location": "North Perimeter Main Entrance",
+      "status": "ACTIVE",
+      "cameraId": "gate_cam"
+    },
+    {
+      "id": "GATE_2",
+      "name": "South Gate",
+      "location": "Sector South",
+      "status": "ACTIVE",
+      "cameraId": "gate_2_cam"
+    },
+    {
+      "id": "GATE_3",
+      "name": "Hostel East Gate",
+      "location": "Hostel Sector",
+      "status": "ACTIVE",
+      "cameraId": "gate_3_cam"
+    }
+  ],
+  "policyRules": [
+    {
+      "id": "pr-1",
+      "category": "TOBACCO_NICOTINE",
+      "action": "ALERT",
+      "condition": "Any quantity",
+      "reasonCode": "TOBACCO_FLAG",
+      "priority": 10,
+      "policyVersion": "draft-1",
+      "active": true
+    },
+    {
+      "id": "pr-2",
+      "category": "ALCOHOL",
+      "action": "ALERT",
+      "condition": "Any quantity",
+      "reasonCode": "ALCOHOL_FLAG",
+      "priority": 10,
+      "policyVersion": "draft-1",
+      "active": true
+    },
+    {
+      "id": "pr-3",
+      "category": "RX_SCHEDULED_DRUG",
+      "action": "ALERT",
+      "condition": "Any quantity",
+      "reasonCode": "RX_FLAG",
+      "priority": 10,
+      "policyVersion": "draft-1",
+      "active": true
+    },
+    {
+      "id": "pr-4",
+      "category": "HAZARDOUS_CHEMICAL",
+      "action": "REVIEW",
+      "condition": "Quantity >= 3",
+      "reasonCode": "HAZCHEM_QTY_REVIEW",
+      "priority": 30,
+      "policyVersion": "draft-1",
+      "active": true
+    },
+    {
+      "id": "pr-5",
+      "category": "OTC_MEDICINE",
+      "action": "ALLOW",
+      "condition": "Any quantity (logged)",
+      "reasonCode": "OTC_LOGGED",
+      "priority": 90,
+      "policyVersion": "draft-1",
+      "active": true
+    },
+    {
+      "id": "pr-6",
+      "category": "SHARP_OBJECT",
+      "action": "REVIEW",
+      "condition": "Any quantity",
+      "reasonCode": "SHARP_REVIEW",
+      "priority": 40,
+      "policyVersion": "draft-1",
+      "active": true
+    },
+    {
+      "id": "pr-7",
+      "category": "NORMAL",
+      "action": "ALLOW",
+      "condition": "Any quantity",
+      "reasonCode": "NORMAL_ITEM",
+      "priority": 100,
+      "policyVersion": "draft-1",
+      "active": true
+    }
+  ],
+  "metrics": {
+    "track": "B",
+    "model": "Qwen3-VL-2B-Instruct",
+    "dataset": "CORD-v2",
+    "status": "static staging sample",
+    "line_item_f1": 0.0,
+    "note": "No model was run. This is a placeholder for future evaluation results."
+  }
+}

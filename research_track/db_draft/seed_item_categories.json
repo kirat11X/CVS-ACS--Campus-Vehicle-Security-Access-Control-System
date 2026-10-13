@@ -1,0 +1,9 @@
+[
+  {"code":"TOBACCO_NICOTINE","display_name":"Tobacco / nicotine","description":"Tobacco, nicotine and vaping products","default_action":"ALERT","severity":"HIGH","active":true},
+  {"code":"ALCOHOL","display_name":"Alcohol","description":"Alcoholic beverages","default_action":"ALERT","severity":"HIGH","active":true},
+  {"code":"RX_SCHEDULED_DRUG","display_name":"Prescription / scheduled drug","description":"Regulated medicines requiring review","default_action":"ALERT","severity":"CRITICAL","active":true},
+  {"code":"OTC_MEDICINE","display_name":"Over-the-counter medicine","description":"Non-prescription medicines","default_action":"ALLOW","severity":"LOW","active":true},
+  {"code":"HAZARDOUS_CHEMICAL","display_name":"Hazardous chemical","description":"Flammable, corrosive or toxic household chemical","default_action":"REVIEW","severity":"MEDIUM","active":true},
+  {"code":"SHARP_OBJECT","display_name":"Sharp object","description":"Bladed or piercing item","default_action":"REVIEW","severity":"MEDIUM","active":true},
+  {"code":"NORMAL","display_name":"Normal item","description":"Ordinary grocery or household item","default_action":"ALLOW","severity":"NONE","active":true}
+]

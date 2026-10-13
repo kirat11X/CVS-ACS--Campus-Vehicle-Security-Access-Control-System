@@ -1,0 +1,9 @@
+{
+  "provenance": "SYNTHETIC FIXTURES ONLY - not evidence of real-world performance",
+  "dataset": "115 synthetic screening cases and 320 taxonomy rows",
+  "status": "POLICY_CONTRACT_TESTS_ONLY_MODEL_BASELINE_DEFERRED",
+  "review_tests_passed": 10,
+  "model_baseline": null,
+  "defer_reason": "Available RAM was approximately 3 GB; no model loading performed.",
+  "required_next_step": "Run independent decision-table oracle and grouped template/brand-family evaluation before any fine-tune decision."
+}

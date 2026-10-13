@@ -1,0 +1,31 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Environment and secrets
+.env
+*.local
+
+# Volumes & persistent service data
+postgres_data/
+frigate_db/
+frigate_storage/
+n8n_data/
+mosquitto_data/
+mosquitto_log/
+
+# Media recordings & clips
+media/clips/
+media/recordings/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store

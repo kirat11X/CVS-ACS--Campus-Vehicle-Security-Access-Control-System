@@ -1,0 +1,19 @@
+{
+  "provenance": "SYNTHETIC FIXTURES ONLY - not evidence of real-world performance",
+  "dataset": "32 synthetic inputs with 32 independent ground-truth documents",
+  "status": "EXECUTED_CPU_BASELINE",
+  "schema_valid_rate": 1.0,
+  "arithmetic_pass_rate": 0.875,
+  "complete_invoice_exact_match_rate": 0.875,
+  "invoice_number_exact_rate": 1.0,
+  "supplier_exact_rate": 1.0,
+  "date_exact_rate": 1.0,
+  "grand_total_exact_rate": 1.0,
+  "line_item_precision": 1.0,
+  "line_item_recall": 1.0,
+  "line_item_f1": 1.0,
+  "missing_field_accuracy": 1.0,
+  "total_false_extractions": 0,
+  "latency_ms_p50": 0.7,
+  "latency_ms_p95": 1.3
+}

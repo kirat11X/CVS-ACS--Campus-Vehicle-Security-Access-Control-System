@@ -1,0 +1,225 @@
+# Research Track Asset Manifest
+# Format: id, kind, source_url, license, local_path, size_bytes, sha256 (files < 1GB), status, notes
+
+assets:
+  # ==========================================
+  # Track A: ANPR Models & Detection Backbones
+  # ==========================================
+  - id: yolo-v9-t-384-license-plates-end2end
+    kind: model
+    source_url: https://github.com/ankandrew/open-image-models/releases/download/assets/yolo-v9-t-384-license-plates-end2end.onnx
+    license: Apache-2.0
+    local_path: /home/kirat/ml-assets/campus/models/open-image-models/yolo-v9-t-384-license-plates-end2end.onnx
+    size_bytes: 7771218
+    sha256: 888397b96d761c89db40bc9c305838e8652660f5e282c2cadebbe8d2951a77a8
+    status: downloaded
+    notes: 384x384 YOLOv9 ONNX end-to-end license plate detector for real-time edge evaluation.
+
+  - id: yolo-v9-t-640-license-plates-end2end
+    kind: model
+    source_url: https://github.com/ankandrew/open-image-models/releases/download/assets/yolo-v9-t-640-license-plates-end2end.onnx
+    license: Apache-2.0
+    local_path: /home/kirat/ml-assets/campus/models/open-image-models/yolo-v9-t-640-license-plates-end2end.onnx
+    size_bytes: 7835770
+    sha256: c3c1026ca7d0585dd88084d68182dd897113712fa734ae1557ca70174440c076
+    status: downloaded
+    notes: 640x640 YOLOv9 ONNX tiny plate detector for high-resolution perimeter frames.
+
+  - id: yolo-v9-s-608-license-plates-end2end
+    kind: model
+    source_url: https://github.com/ankandrew/open-image-models/releases/download/assets/yolo-v9-s-608-license-plates-end2end.onnx
+    license: Apache-2.0
+    local_path: /home/kirat/ml-assets/campus/models/open-image-models/yolo-v9-s-608-license-plates-end2end.onnx
+    size_bytes: 28612350
+    sha256: 2b878b38d9aa07b6ddc3ea75c4ffcb39869bc5c218e0a14002f60ab2f7b0be9a
+    status: downloaded
+    notes: 608x608 YOLOv9 ONNX small plate detector for distant vehicle perimeter detections.
+
+  - id: fast-plate-ocr-mobilevit-v2
+    kind: model
+    source_url: https://github.com/ankandrew/fast-plate-ocr/releases/download/arg-plates/european_mobile_vit_v2_ocr.onnx
+    license: Apache-2.0
+    local_path: /home/kirat/ml-assets/campus/models/fast-plate-ocr/european_mobile_vit_v2_ocr.onnx
+    size_bytes: 4985005
+    sha256: 5f388f57ddec318d38d17e420d292f5a049595bec93f111838903f6617f6943f
+    status: downloaded
+    notes: Pretrained MobileViT-v2 OCR ONNX weights used as initialization for Indian HSRP fine-tuning.
+
+  - id: fast-plate-ocr-repo
+    kind: code
+    source_url: https://github.com/ankandrew/fast-plate-ocr
+    license: Apache-2.0
+    local_path: /home/kirat/ml-assets/campus/code/fast-plate-ocr
+    size_bytes: 4210000
+    sha256: null
+    status: downloaded
+    notes: Cloned repository containing fine-tuning workflows (examples/fine_tune_workflow.ipynb) and data loaders.
+
+  - id: PaddleOCR-VL
+    kind: model
+    source_url: https://huggingface.co/PaddlePaddle/PaddleOCR-VL
+    license: Apache-2.0
+    local_path: /home/kirat/ml-assets/campus/models/PaddleOCR-VL
+    size_bytes: 1968725800
+    sha256: null
+    status: downloaded
+    notes: 0.9B vision-language OCR for second-reader resolution on degraded or non-standard vehicle plates. Files > 1GB exempt from sha256.
+
+  - id: paraphrase-multilingual-MiniLM-L12-v2
+    kind: model
+    source_url: https://huggingface.co/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+    license: Apache-2.0
+    local_path: /home/kirat/ml-assets/campus/models/paraphrase-multilingual-MiniLM-L12-v2/model.safetensors
+    size_bytes: 470641600
+    sha256: eaa086f0ffee582aeb45b36e34cdd1fe2d6de2bef61f8a559a1bbc9bd955917b
+    status: downloaded
+    notes: Multilingual sentence transformer for semantic embedding search against registered vehicle identities.
+
+  # ===============================================
+  # Track B: Multimodal VLM & Invoice Parsing Models
+  # ===============================================
+  - id: Qwen3-VL-2B-Instruct
+    kind: model
+    source_url: https://huggingface.co/Qwen/Qwen3-VL-2B-Instruct
+    license: Apache-2.0
+    local_path: /home/kirat/ml-assets/campus/models/Qwen3-VL-2B-Instruct
+    size_bytes: 4270000000
+    sha256: null
+    status: downloaded
+    notes: 2B parameter multimodal vision-language base model for invoice line-item extraction. Files > 1GB exempt from sha256.
+
+  - id: Qwen3-VL-2B-Instruct-receipt-lora
+    kind: model
+    source_url: https://huggingface.co/systemk-ai/Qwen3-VL-2B-Instruct-receipt-lora
+    license: Apache-2.0
+    local_path: /home/kirat/ml-assets/campus/models/Qwen3-VL-2B-Instruct-receipt-lora/adapter_model.safetensors
+    size_bytes: 11944752
+    sha256: 08dbd3d5d093f90a2973778c20cdbfa1b3c788f64442b73ddb63092d938284f5
+    status: downloaded
+    notes: Parameter-efficient LoRA adapter trained on receipts and invoices for key-value extraction.
+
+  - id: chai1me-qwen2vl-receipt-lora
+    kind: model_card
+    source_url: https://huggingface.co/chai1me/qwen2vl-receipt-lora
+    license: Apache-2.0
+    local_path: /home/kirat/ml-assets/campus/models/chai1me-qwen2vl-receipt-lora
+    size_bytes: 18400
+    sha256: null
+    status: downloaded
+    notes: Architecture reference card and adapter configuration (no weights per specification).
+
+  - id: saliousk-qwen2vl-cord-lora
+    kind: model_card
+    source_url: https://huggingface.co/saliousk/qwen2vl-cord-lora
+    license: Apache-2.0
+    local_path: /home/kirat/ml-assets/campus/models/saliousk-qwen2vl-cord-lora
+    size_bytes: 22100
+    sha256: null
+    status: downloaded
+    notes: Architecture reference card and adapter configuration for CORD-v2 receipt evaluation (no weights per specification).
+
+  - id: Qwen2.5-VL-3B-Instruct
+    kind: model
+    source_url: https://huggingface.co/Qwen/Qwen2.5-VL-3B-Instruct
+    license: Qwen Research License (Non-commercial / Research-only evaluation)
+    local_path: /home/kirat/ml-assets/campus/models/Qwen2.5-VL-3B-Instruct
+    size_bytes: 7520000000
+    sha256: null
+    status: skipped
+    notes: Tier 2 candidate (7.5 GB). Skipped to avoid saturating disk space and network bandwidth within the 30 GB asset cap.
+
+  # ===============================================
+  # Track C: LLM Categorization & Screening Models
+  # ===============================================
+  - id: Qwen3-1.7B
+    kind: model
+    source_url: https://huggingface.co/Qwen/Qwen3-1.7B
+    license: Apache-2.0
+    local_path: /home/kirat/ml-assets/campus/models/Qwen3-1.7B
+    size_bytes: 4080000000
+    sha256: null
+    status: downloaded
+    notes: 1.7B language model for zero-shot and LoRA item classification into security categories. Files > 1GB exempt from sha256.
+
+  # ===============================================
+  # Datasets (Public, Benchmark, and Seed)
+  # ===============================================
+  - id: invoices-donut-data-v1
+    kind: dataset
+    source_url: https://huggingface.co/datasets/katanaml-org/invoices-donut-data-v1
+    license: MIT
+    local_path: /home/kirat/ml-assets/campus/datasets/invoices-donut-data-v1
+    size_bytes: 189000000
+    sha256: null
+    status: downloaded
+    notes: Parquet dataset (test, train, validation) with invoice documents and ground-truth line items.
+
+  - id: cord-v2
+    kind: dataset
+    source_url: https://huggingface.co/datasets/naver-clova-ix/cord-v2
+    license: CC-BY-4.0
+    local_path: /home/kirat/ml-assets/campus/datasets/cord-v2
+    size_bytes: 2307000000
+    sha256: null
+    status: downloaded
+    notes: Consolidated Receipt Dataset (CORD-v2) for structured receipt extraction and line-item evaluation.
+
+  - id: item_taxonomy_seed
+    kind: dataset
+    source_url: local_synthetic
+    license: Project Internal (Synthetic)
+    local_path: /home/kirat/coding/honours/research_track/datasets/item_taxonomy_seed/seed_items.csv
+    size_bytes: 14007
+    sha256: 150a1befda33c24f978fb26dc0666389dbdf493516409a7984bff22731b15e5a
+    status: downloaded
+    notes: 300 unique synthetic line items spanning 7 security categories with quick-commerce truncations and Hinglish slang.
+
+  - id: indian-lpr-wild
+    kind: dataset
+    source_url: https://github.com/sanchit2843/Indian_LPR
+    license: Research Only / Non-commercial
+    local_path: /home/kirat/ml-assets/campus/code/Indian_LPR
+    size_bytes: 2500000
+    sha256: null
+    status: manual
+    notes: Code repository cloned. Raw 16,192 image dataset withheld by authors due to Indian road surveillance privacy laws.
+
+  - id: arxiv-2207-06657-dataset
+    kind: dataset
+    source_url: https://arxiv.org/abs/2207.06657
+    license: CC-BY-4.0 (Paper) / Research Only (Dataset)
+    local_path: null
+    size_bytes: null
+    sha256: null
+    status: manual
+    notes: E2E Indian ANPR paper (~1.5k evaluation samples). Authors did not include permanent public download URL in publication. Requires author correspondence.
+
+  - id: kaggle-indian-license-plates-with-labels
+    kind: dataset
+    source_url: https://www.kaggle.com/datasets/kedarsai/indian-license-plates-with-labels
+    license: Community Data License (Attribution)
+    local_path: /home/kirat/ml-assets/campus/datasets/kaggle-indian-license-plates
+    size_bytes: null
+    sha256: null
+    status: manual
+    notes: MANUAL: Requires ~/.kaggle/kaggle.json credentials. Download via: kaggle datasets download -d kedarsai/indian-license-plates-with-labels -p ~/ml-assets/campus/datasets/kaggle-indian-license-plates --unzip
+
+  - id: ieee-dataport-indian-lpr
+    kind: dataset
+    source_url: https://ieeedataport.org/
+    license: IEEE DataPort Terms (Non-commercial / Academic)
+    local_path: /home/kirat/ml-assets/campus/datasets/ieee-dataport-indian-lpr
+    size_bytes: null
+    sha256: null
+    status: manual
+    notes: MANUAL: Requires IEEE account login. 1) Sign in at ieeedataport.org. 2) Search 'Indian License Plate Recognition Dataset'. 3) Accept data agreement and download ZIP. 4) Unpack into ~/ml-assets/campus/datasets/ieee-dataport-indian-lpr.
+
+  - id: ieee-dataport-ind-vnp
+    kind: dataset
+    source_url: https://ieeedataport.org/
+    license: IEEE DataPort Terms (Non-commercial / Academic)
+    local_path: /home/kirat/ml-assets/campus/datasets/ieee-dataport-ind-vnp
+    size_bytes: null
+    sha256: null
+    status: manual
+    notes: MANUAL: Requires IEEE account login. 1) Sign in at ieeedataport.org. 2) Search 'IND-VNP'. 3) Download archive. 4) Unpack into ~/ml-assets/campus/datasets/ieee-dataport-ind-vnp.

@@ -1,0 +1,257 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pec.edu/schemas/track_b/invoice_schema.v1.json",
+  "title": "InvoiceDocumentSchema",
+  "description": "Strict versioned schema representing parsed invoice metadata, line items, and financial totals with decimal-safe monetary strings.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "document_id",
+    "invoice_number",
+    "invoice_date",
+    "supplier_name",
+    "currency",
+    "line_items",
+    "totals",
+    "extraction_metadata"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0.0",
+      "description": "Semantic schema version identifier"
+    },
+    "document_id": {
+      "type": "string",
+      "description": "Unique identifier of the invoice source document or image"
+    },
+    "invoice_number": {
+      "type": ["string", "null"],
+      "description": "Invoice number or billing identifier as stated on document, null if unreadable"
+    },
+    "invoice_date": {
+      "type": ["string", "null"],
+      "format": "date",
+      "description": "Normalized ISO 8601 date string (YYYY-MM-DD), null if missing"
+    },
+    "supplier_name": {
+      "type": ["string", "null"],
+      "description": "Legal or trade name of the issuing vendor, null if missing"
+    },
+    "supplier_tax_id": {
+      "type": ["string", "null"],
+      "description": "Tax registration identifier (e.g. GSTIN, VAT, EIN), optional"
+    },
+    "purchase_order_number": {
+      "type": ["string", "null"],
+      "description": "Associated purchase order reference number, optional"
+    },
+    "currency": {
+      "type": ["string", "null"],
+      "pattern": "^[A-Z]{3}$",
+      "description": "3-letter ISO 4217 currency code (e.g. INR, USD, EUR), null if ambiguous"
+    },
+    "page_count": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "description": "Total number of pages in the source invoice document, when known"
+    },
+    "line_items": {
+      "type": "array",
+      "description": "Ordered collection of extracted product/service line items",
+      "items": {
+        "$ref": "#/$defs/LineItem"
+      }
+    },
+    "totals": {
+      "$ref": "#/$defs/InvoiceTotals"
+    },
+    "extraction_metadata": {
+      "$ref": "#/$defs/ExtractionMetadata"
+    }
+  },
+  "$defs": {
+    "DecimalString": {
+      "type": ["string", "null"],
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+      "description": "Decimal-safe string representation of a numerical value to avoid binary floating-point drift"
+    },
+    "LineItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "line_item_id",
+        "description",
+        "quantity",
+        "unit_price",
+        "line_total"
+      ],
+      "properties": {
+        "line_item_id": {
+          "type": "string",
+          "description": "Unique identifier of the line item within the document (e.g. item-1)"
+        },
+        "description": {
+          "type": "string",
+          "description": "Raw extracted description of the purchased good or service"
+        },
+        "normalized_description": {
+          "type": ["string", "null"],
+          "description": "Cleaned, whitespace-normalized description"
+        },
+        "quantity": {
+          "$ref": "#/$defs/DecimalString",
+          "description": "Extracted numerical quantity"
+        },
+        "unit": {
+          "type": ["string", "null"],
+          "description": "Unit of measure (e.g. PCS, KG, LTR), null if unstated"
+        },
+        "unit_price": {
+          "$ref": "#/$defs/DecimalString",
+          "description": "Price per unit before discounts/taxes"
+        },
+        "discount_amount": {
+          "$ref": "#/$defs/DecimalString",
+          "description": "Item-level discount amount, null if none"
+        },
+        "tax_rate": {
+          "$ref": "#/$defs/DecimalString",
+          "description": "Item-level tax percentage (e.g. '18.0' for 18%), null if unstated"
+        },
+        "tax_amount": {
+          "$ref": "#/$defs/DecimalString",
+          "description": "Calculated or stated item tax amount, null if unstated"
+        },
+        "line_total": {
+          "$ref": "#/$defs/DecimalString",
+          "description": "Net or gross total charged for this line item"
+        },
+        "currency": {
+          "type": ["string", "null"],
+          "pattern": "^[A-Z]{3}$"
+        },
+        "source_page": {
+          "type": ["integer", "null"],
+          "minimum": 1,
+          "description": "Page index on which this item appears"
+        },
+        "evidence": {
+          "type": ["object", "null"],
+          "properties": {
+            "page": { "type": "integer" },
+            "bounding_box": {
+              "type": "array",
+              "items": { "type": "number" },
+              "minItems": 4,
+              "maxItems": 4,
+              "description": "[x_min, y_min, x_max, y_max] normalized coordinates"
+            },
+            "raw_text_snippet": { "type": "string" }
+          }
+        },
+        "field_confidence": {
+          "type": ["object", "null"],
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0.0,
+            "maximum": 1.0
+          },
+          "description": "Extractor confidence score per field (0.0 to 1.0)"
+        },
+        "missing_fields": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "List of expected fields that were absent or unreadable"
+        },
+        "validation_warnings": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Non-blocking validation flags specific to this line item"
+        }
+      }
+    },
+    "InvoiceTotals": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "grand_total"
+      ],
+      "properties": {
+        "subtotal": {
+          "$ref": "#/$defs/DecimalString",
+          "description": "Net total before invoice-level taxes and shipping"
+        },
+        "discount_total": {
+          "$ref": "#/$defs/DecimalString",
+          "description": "Invoice-level discount amount"
+        },
+        "tax_total": {
+          "$ref": "#/$defs/DecimalString",
+          "description": "Sum of all taxes charged on the invoice"
+        },
+        "shipping_total": {
+          "$ref": "#/$defs/DecimalString",
+          "description": "Delivery, logistics, or convenience fees"
+        },
+        "grand_total": {
+          "$ref": "#/$defs/DecimalString",
+          "description": "Final total payable amount"
+        },
+        "amount_paid": {
+          "$ref": "#/$defs/DecimalString",
+          "description": "Amount already paid by customer, optional"
+        },
+        "amount_due": {
+          "$ref": "#/$defs/DecimalString",
+          "description": "Remaining balance due, optional"
+        }
+      }
+    },
+    "ExtractionMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "extractor_name",
+        "extractor_version",
+        "review_status"
+      ],
+      "properties": {
+        "extractor_name": {
+          "type": "string",
+          "description": "Name of the model or algorithm (e.g. deterministic_baseline, qwen3_vl_2b)"
+        },
+        "extractor_version": {
+          "type": "string",
+          "description": "Version or commit tag of the extractor component"
+        },
+        "extraction_timestamp": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "description": "ISO 8601 UTC timestamp of extraction execution"
+        },
+        "provenance": {
+          "type": "object",
+          "description": "Auditable field origin metadata mapping field name to source token/line"
+        },
+        "review_status": {
+          "type": "string",
+          "enum": [
+            "AUTOMATED_RAW",
+            "RECONCILED_CLEAN",
+            "FLAGGED_FOR_HUMAN_REVIEW",
+            "HUMAN_VERIFIED",
+            "REJECTED"
+          ],
+          "description": "Current lifecycle state in access control / audit queue"
+        },
+        "validation_findings_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total number of deterministic validation findings attached"
+        }
+      }
+    }
+  }
+}

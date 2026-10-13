@@ -1,0 +1,11 @@
+# Indian plates for fast-plate-ocr. Mirrors cct_s_v2_global_plate_config.yaml (64x128 RGB) so the backbone
+# transfers, but with 11 slots (old Delhi format DL10CAB1234) and no region head (labels carry no region).
+# Two-line plates are labelled top row first.
+max_plate_slots: 11
+alphabet: '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_'
+pad_char: '_'
+img_height: 64
+img_width: 128
+keep_aspect_ratio: false
+interpolation: linear
+image_color_mode: rgb

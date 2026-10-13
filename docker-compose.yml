@@ -1,0 +1,66 @@
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: campus_mosquitto
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./config/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro,z
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: campus_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: campus_security
+      POSTGRES_USER: campus_admin
+      POSTGRES_PASSWORD: campus_dev_pass
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U campus_admin -d campus_security"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  frigate:
+    image: ghcr.io/blakeblackshear/frigate:stable
+    container_name: campus_frigate
+    privileged: true
+    restart: unless-stopped
+    shm_size: "256mb"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ./config/frigate/config.yml:/config/config.yml:z
+      - ./media:/media:z
+      - frigate_storage:/media/frigate
+    ports:
+      - "5000:5000"
+      - "8554:8554"
+    devices:
+      - /dev/dri:/dev/dri
+    environment:
+      FRIGATE_RTSP_PASSWORD: campus_pass
+    depends_on:
+      - mosquitto
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    container_name: campus_n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      N8N_SECURE_COOKIE: "false"
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      WEBHOOK_URL: "http://localhost:5678/"
+    volumes:
+      - n8n_data:/home/node/.n8n
+
+volumes:
+  postgres_data:
+  frigate_storage:
+  n8n_data:

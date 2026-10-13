@@ -1,0 +1,40 @@
+# Python / test caches
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+htmlcov/
+.mutmut-cache/
+
+# Frontend dependencies (>5 MB, review finding I-S2-002)
+frontend/node_modules/
+node_modules/
+
+# Heavy assets live in ~/ml-assets/campus, never here
+*.onnx
+*.pt
+*.pth
+*.safetensors
+*.keras
+*.ckpt
+*.bin
+*.gguf
+*.zip
+*.tar
+*.tar.gz
+
+# Run outputs, checkpoints and logs
+runs/
+checkpoints/
+*.log
+nohup.out
+
+# Credentials and local env
+.env
+*.local
+kaggle.json
+
+# Datasets and raw images (provenance is tracked in MANIFEST*.yaml instead)
+datasets/**/images/
+datasets/**/*.jpg
+datasets/**/*.png

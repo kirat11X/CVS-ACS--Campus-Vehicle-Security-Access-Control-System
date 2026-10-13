@@ -1,0 +1,27 @@
+# Research Prototype Review Progress
+
+- 2026-10-09: Phase 0 started.
+- External snapshot created at `/home/kirat/ml-assets/campus/backups/research_track_pre_review_20261009_045300.tar.gz`.
+- Resource check: approximately 3 GB available RAM and 86 GB free disk. Model-loading and heavy baseline work are deferred until resources are sufficient.
+- Git boundary anomaly: `git rev-parse --show-toplevel` resolves to `/home/kirat`, so repository status includes unrelated home-directory paths. No cleanup or revert performed.
+- Static discovery confirmed no `research_track/review/` harness exists yet.
+- Review harness created with network and forbidden-import guards; focused isolation test passes (`1 passed`).
+- Installed the permitted review tools into `~/ml-assets/campus/.venv-ml` after bootstrapping its missing pip.
+- Fixed and focused-validated Track A config factory keyword drift.
+- Track A synthetic evaluator executed across 60 cases for baselines 0-3; these are provisional until split/oracle validation.
+- Fixed and focused-validated Track B schema rejection serialization and replaced shallow validation with strict JSON Schema validation.
+- Track B synthetic evaluator executed across 32 documents: schema-valid 100%, arithmetic pass 87.5%, complete exact 87.5%, line-item F1 100%.
+- Replaced Track B greedy line-item alignment with deterministic optimal one-to-one assignment; focused tests and the corpus regression pass.
+- Fixed and focused-validated Track C wall-clock event IDs, required explicit evaluation timestamps, removed lexical wall-clock output, and escalated uncertain ALLOW results.
+- Review suite passes: 10 tests passed; full-tree coverage is 46%, below the requested 90% target.
+- Final Python compilation passed for the reviewed source, tests, and preparation artifacts.
+- Generated Python/pytest caches were removed.
+- Final scoped Git status is the pre-existing untracked `coding/honours/research_track/` path because the Git root is `/home/kirat`; no unrelated home-directory changes were reverted.
+- G3 remains stopped: no approval token, no training, no GPU, no AWS, and no production service access.
+- Acquisition follow-up: verified official DataCluster, CCPD, and UFPR sources; Kaggle CLI/credentials absent, so Indian sample and UFPR remain MANUAL. Staged only the 64,811,344-byte CCPD official source/metadata checkout; no image archive downloaded.
+- Added Track A preparation scripts for grouped OCR crops, explicit vehicle-class manifests, and G3-gated fast-plate-ocr training. Crop-manifest smoke test passed and the training gate correctly stopped.
+- User supplied Kaggle access; official Kaggle CLI downloaded IN-02 (`65813703` byte archive, SHA-256 `259a4ecf...a7a1499`) into external assets. Extracted payload contains 181 images and YOLO plate boxes, but no OCR text labels.
+- Added and validated a separate YOLO plate-detector preparation/launcher. Approved local RTX 4050 smoke run completed: YOLO11n, 3 epochs, 145 train / 36 validation images, mAP50 `0.622`, mAP50-95 `0.467`, checkpoint outside repository under `~/ml-assets/campus/runs/track_a/20261009_detector_smoke/`.
+- OCR fine-tuning remains blocked; no invented text labels were created and no vehicle-class labels were inferred from plates.
+- Roboflow Universe search found CC BY candidate projects, but direct export endpoints returned HTTP 403 without a Roboflow API key; no bypass was attempted and candidates remain manual/API-key required.
+- Extended Track A plate-detector training completed: YOLO11n, 50 epochs, same 145/36 split, best precision `0.96273`, recall `0.82018`, mAP50 `0.89699`, mAP50-95 `0.68563`; checkpoint under `~/ml-assets/campus/runs/track_a/20261009_detector_full/`.

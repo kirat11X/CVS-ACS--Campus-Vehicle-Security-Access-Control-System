@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pec.edu/schemas/track_c/classification_input.schema.json",
+  "title": "ClassificationInputSchema",
+  "description": "Standardized input representation for an invoice line item submitted to an ML or heuristic item classifier.",
+  "type": "object",
+  "required": [
+    "line_item_id",
+    "raw_item_description"
+  ],
+  "properties": {
+    "line_item_id": {
+      "type": "string",
+      "description": "Unique identifier of the line item within the invoice or request context"
+    },
+    "raw_item_description": {
+      "type": "string",
+      "description": "Unmodified text description of the product as extracted from document"
+    },
+    "normalized_description": {
+      "type": ["string", "null"],
+      "description": "Optional cleaned/normalized description string"
+    },
+    "quantity": {
+      "type": ["number", "null"],
+      "description": "Numerical quantity purchased, if available"
+    },
+    "unit": {
+      "type": ["string", "null"],
+      "description": "Unit of measure (e.g. PCS, PACK, KG, LTR), if available"
+    },
+    "platform": {
+      "type": ["string", "null"],
+      "description": "Delivery platform identifier (e.g. ZOMATO, SWIGGY_INSTAMART, BLINKIT, ZEPTO), if known"
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Optional supplementary context (e.g. supplier_name, category_hint)"
+    }
+  }
+}

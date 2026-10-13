@@ -1,0 +1,12 @@
+track: C
+status: PREPARED_NOT_APPROVED
+base_model: /home/kirat/ml-assets/campus/models/Qwen3-1.7B
+method: PEFT_LORA_UNVERIFIED
+input_data: SYNTHETIC_TAXONOMY_PLUS_CONSENTED_LABELS_REQUIRED
+split: grouped_by_template_brand_family
+training: DEFERRED
+notes:
+  - The classifier proposes categories; deterministic policy remains authoritative.
+  - UNKNOWN and missing confidence must remain safety-preserving.
+  - Synthetic-only results are not domain evidence.
+  - Hyperparameters are unverified starting points.

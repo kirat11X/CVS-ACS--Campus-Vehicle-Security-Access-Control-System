@@ -1,0 +1,56 @@
+[
+  {
+    "document_id": "ADV-001",
+    "description": "Grand total appears normal (500.00), but sum of line items is 400.00 (missing 100.00 unaccounted item).",
+    "category": "plausible_total_tampered_lines",
+    "raw_text": "Invoice #: ADV-FAKE-01\nDate: 2026-10-31\nSupplier: Fraudulent Billing Enterprise\nCurrency: INR\n\nItem | Qty | Unit | Unit Price | Total\nOffice Paper Pack | 2 | PACK | 100.00 | 200.00\nPens Box | 1 | BOX | 200.00 | 200.00\n\nSubtotal: 500.00\nTotal: 500.00",
+    "expected_violation": "VAL_SUBTOTAL_MISMATCH",
+    "expected_severity": "ERROR",
+    "requires_human_review": true
+  },
+  {
+    "document_id": "ADV-002",
+    "description": "Line arithmetic deliberately fabricated: 5 x 10.00 is reported as 100.00.",
+    "category": "line_price_fabrication",
+    "raw_text": "Invoice #: ADV-FAKE-02\nDate: 2026-10-31\nSupplier: Swindlers Stationers\nCurrency: INR\n\nItem | Qty | Unit | Unit Price | Total\nNotebook 100p | 5 | PCS | 10.00 | 100.00\n\nSubtotal: 100.00\nTotal: 100.00",
+    "expected_violation": "VAL_LINE_ARITHMETIC_MISMATCH",
+    "expected_severity": "ERROR",
+    "requires_human_review": true
+  },
+  {
+    "document_id": "ADV-003",
+    "description": "Tax arithmetic inverted: tax rate 18% is subtracted rather than added to subtotal.",
+    "category": "inverted_tax_arithmetic",
+    "raw_text": "Invoice #: ADV-FAKE-03\nDate: 2026-10-31\nSupplier: Inverted Taxes Ltd\nCurrency: INR\n\nItem | Qty | Unit | Unit Price | Total\nCatering Services Combo | 1 | PACK | 1000.00 | 1000.00\n\nSubtotal: 1000.00\nTax: -180.00\nTotal: 820.00",
+    "expected_violation": "VAL_GRAND_TOTAL_MISMATCH",
+    "expected_severity": "CRITICAL",
+    "requires_human_review": true
+  },
+  {
+    "document_id": "ADV-004",
+    "description": "Ghost item omitted from totals: table has 3 items (sum 1500), but subtotal only includes first 2 items (1000).",
+    "category": "ghost_line_item",
+    "raw_text": "Invoice #: ADV-FAKE-04\nDate: 2026-10-31\nSupplier: Ghost Items Supplier\nCurrency: INR\n\nItem | Qty | Unit | Unit Price | Total\nHardware Tool Set | 1 | SET | 500.00 | 500.00\nDrill Bit 10mm | 1 | PCS | 500.00 | 500.00\nAngle Grinder Cordless | 1 | PCS | 500.00 | 500.00\n\nSubtotal: 1000.00\nTotal: 1000.00",
+    "expected_violation": "VAL_SUBTOTAL_MISMATCH",
+    "expected_severity": "ERROR",
+    "requires_human_review": true
+  },
+  {
+    "document_id": "ADV-005",
+    "description": "Malformed JSON model output with truncated payload and invalid tokens.",
+    "category": "malformed_model_output",
+    "raw_text": "{\n  \"schema_version\": \"1.0.0\",\n  \"document_id\": \"ADV-005\",\n  \"invoice_number\": \"INV-MALFORMED\",\n  \"line_items\": [\n    {\"description\": \"Incomplete Item\", \"quantity\":\n",
+    "expected_violation": "VAL_SCHEMA_VIOLATION",
+    "expected_severity": "CRITICAL",
+    "requires_human_review": true
+  },
+  {
+    "document_id": "ADV-006",
+    "description": "Schema constraint violation: missing mandatory line_item_id and grand_total is null.",
+    "category": "schema_type_violation",
+    "raw_text": "{\n  \"schema_version\": \"1.0.0\",\n  \"document_id\": \"ADV-006\",\n  \"invoice_number\": \"INV-BAD-SCHEMA\",\n  \"invoice_date\": \"2026-10-31\",\n  \"supplier_name\": \"Bad Schema Bot\",\n  \"currency\": \"INR\",\n  \"line_items\": [\n    {\"description\": \"Item without ID or total\", \"quantity\": \"1\"}\n  ],\n  \"totals\": {},\n  \"extraction_metadata\": {\"extractor_name\": \"bot\", \"extractor_version\": \"1.0\", \"review_status\": \"AUTOMATED_RAW\"}\n}",
+    "expected_violation": "VAL_SCHEMA_VIOLATION",
+    "expected_severity": "CRITICAL",
+    "requires_human_review": true
+  }
+]

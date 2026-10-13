@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pec.edu/schemas/track_c/screening_result.schema.json",
+  "title": "ScreeningResultSchema",
+  "description": "Schema representing the definitive, explainable outcome of the deterministic policy engine.",
+  "type": "object",
+  "required": [
+    "screening_event_id",
+    "line_item_id",
+    "outcome",
+    "reason_codes",
+    "matched_rule_ids",
+    "policy_version",
+    "evaluation_timestamp",
+    "explanation",
+    "requires_human_review",
+    "classification_summary"
+  ],
+  "properties": {
+    "screening_event_id": {
+      "type": "string",
+      "description": "Unique identifier of this screening evaluation event"
+    },
+    "line_item_id": {
+      "type": "string",
+      "description": "Associated invoice line item identifier"
+    },
+    "outcome": {
+      "type": "string",
+      "enum": ["ALLOW", "REVIEW", "ALERT"],
+      "description": "Definitive screening decision produced by deterministic rules"
+    },
+    "reason_codes": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "description": "Stable machine-readable audit codes (e.g. CATEGORY_RULE_ALERT, LOW_CLASSIFIER_CONFIDENCE)"
+    },
+    "matched_rule_ids": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "List of rule IDs that matched during evaluation"
+    },
+    "policy_version": {
+      "type": "string",
+      "description": "Active policy version used for evaluation"
+    },
+    "evaluation_timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "explanation": {
+      "type": "string",
+      "description": "Human-readable plain English explanation of the decision outcome"
+    },
+    "requires_human_review": {
+      "type": "boolean",
+      "description": "True if outcome is REVIEW or ALERT or contains cautionary flags"
+    },
+    "classification_summary": {
+      "type": "object",
+      "required": ["predicted_category", "classifier_name"],
+      "properties": {
+        "predicted_category": { "type": "string" },
+        "confidence": { "type": ["number", "null"] },
+        "classifier_name": { "type": "string" }
+      }
+    },
+    "audit_trace": {
+      "type": "object",
+      "description": "Detailed trace of rules considered, rejected, or conflicting during evaluation"
+    }
+  }
+}

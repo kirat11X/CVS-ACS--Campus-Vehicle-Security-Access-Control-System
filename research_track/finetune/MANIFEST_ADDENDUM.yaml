@@ -1,0 +1,101 @@
+# MANIFEST addendum: G3 fine-tune pass (APPROVE_FINETUNE:A,C:local:0), 2026-10-09
+# Format matches MANIFEST.yaml. Network use in Phase 2 was HF Hub metadata/README reads only (~25 KB).
+# Total new dataset/model downloads in this pass: 0 GB of the 30 GB allowance.
+
+corrections:
+  - id: fast-plate-ocr-repo
+    field: license
+    manifest_value: Apache-2.0
+    verified_value: MIT
+    evidence: "~/ml-assets/campus/code/fast-plate-ocr/pyproject.toml: license = \"MIT\" (git 9ce7a5b6)"
+  - id: fast-plate-ocr-mobilevit-v2
+    field: notes
+    manifest_value: "used as initialization for Indian HSRP fine-tuning"
+    verified_value: "baseline-only; legacy inference model, no Keras architecture/weights available for fine-tuning"
+    evidence: "docs/inference/model_zoo.md 'Legacy Models' notice; train/model/model_schema.py supports model: cct only"
+  - id: indian-lpr-wild
+    field: license
+    manifest_value: "Research Only / Non-commercial"
+    verified_value: "none published (repo has no LICENSE file); dataset itself not released"
+    evidence: "README: \"We can't make dataset public because of legalities involved in making Indian Road data public\""
+  - id: item_taxonomy_seed
+    field: notes
+    manifest_value: "300 unique synthetic line items spanning 7 security categories"
+    verified_value: "300 rows, 7 classes, 0 UNKNOWN; track_c/fixtures/item_taxonomy_seed.csv = same 300 + 20 UNKNOWN (320)"
+    evidence: "PREREQ_REPORT.md section 4"
+
+assets:
+  - id: indian-lpr-wild-images
+    kind: dataset
+    source_url: https://github.com/sanchit2843/Indian_LPR
+    license: unpublished
+    local_path: null
+    size_bytes: 0
+    sha256: null
+    status: manual
+    notes: >-
+      Not downloadable: no link exists and the authors withhold the data. MANUAL: email the
+      corresponding author (address in the repo README Acknowledgement section) requesting an
+      academic data-sharing agreement; store any received data under
+      ~/ml-assets/campus/datasets/indian-lpr-wild/ and record the agreement terms here.
+
+  - id: kaggle-indian-license-plates-with-labels
+    kind: dataset
+    source_url: https://www.kaggle.com/datasets/kedarsai/indian-license-plates-with-labels
+    license: "unverified (read on the Kaggle page before use)"
+    local_path: /home/kirat/ml-assets/campus/datasets/kaggle-indian-license-plates
+    size_bytes: null
+    sha256: null
+    status: manual
+    notes: >-
+      ~/.kaggle/kaggle.json is absent, so it was not downloaded. Steps: kaggle.com > Settings > Create New Token;
+      save to ~/.kaggle/kaggle.json; chmod 600; then
+      ~/ml-assets/campus/.venv-ml/bin/kaggle datasets download -d kedarsai/indian-license-plates-with-labels
+      -p ~/ml-assets/campus/datasets/kaggle-indian-license-plates --unzip ; record the license shown on the page.
+
+  - id: ieee-dataport-indian-lpr / ieee-dataport-ind-vnp
+    kind: dataset
+    source_url: https://ieee-dataport.org/
+    license: IEEE DataPort terms
+    local_path: null
+    status: manual
+    notes: Login-gated; steps unchanged from MANIFEST.yaml. Not attempted.
+
+
+  - id: fast-plate-ocr-cct-s-v2-global
+    kind: model
+    source_url: https://github.com/ankandrew/fast-plate-ocr/releases/download/arg-plates/cct_s_v2_global.onnx
+    license: MIT
+    local_path: /home/kirat/ml-assets/campus/models/fast-plate-ocr/global-v2/
+    size_bytes: 5292197   # onnx 5262230 + plate config 1725 + val results 24242
+    sha256:
+      cct_s_v2_global.onnx: 384bbbd2cea3ef54761d3df70822ef3a349ee1a112aeafddbe0e3ba06bc6e47b
+      cct_s_v2_global_plate_config.yaml: 0335c74a305173bb6f393efed0fde03cadeaa0b649ed8e19f431016d8232d0a6
+      cct_s_v2_global_val_results.json: cc9ea0f5bfd7ad56fada2e7b6f5de95e03b997f1f04f2eba90eca680fd1b5c27
+    status: downloaded
+    notes: "2026-10-09 09:43. 10 slots, 0-9A-Z; India not among its training regions (zero-shot). Zero-shot reader + fine-tune init candidate."
+
+# HF Hub search (one pass, 9 queries) - candidates evaluated and REJECTED for Track A training:
+rejected_candidates:
+  - id: thundarstrom/indian-anpr-ocr-corpus           # also -benchmark, synthetic-indian-anpr-ocr, indian-license-plate-detection
+    license_claimed: cc-by-4.0
+    reason: "Repo contains only README.md + .gitattributes (0 data files); all four repos were created within the same minute (2026-08-19 18:38 UTC); the card describes Kaggle-derived subsets with no source licenses. Placeholder card, unverifiable provenance."
+  - id: sonnetechnology/license-plate-text-recognition-full
+    license_claimed: cc-by-4.0
+    reason: "Labels are microsoft/trocr-large-printed machine outputs (not human ground truth); source keremberke/license-plate-object-detection is not Indian-specific."
+  - id: zenitsu09/indian-number-plate             # byte-identical card/size to Gamester03/indian-number-plate
+    license_claimed: none
+    reason: "No license declared (1,709 rows with plate_text); not license-clear."
+  - id: adityamangal98/HR-LR-images-of-the-Indian-License-plates
+    license_claimed: none
+    reason: "No license, no README/card."
+  - id: Dataclusterlabspvtltd/indian-number-plates-dataset
+    license_claimed: cc-by-nc-nd-4.0
+    reason: "Commercial vendor sample (<100 images), NoDerivatives; unsuitable for training."
+  - id: AnirudhLanka2002/TR_OCR_Training_License_Plate
+    license_claimed: mit
+    reason: "~100 crops, empty card, no provenance for the images; MIT claim on rehosted photos is unverifiable."
+
+optional_steps:
+  track_c_product_corpus: "SKIPPED: Phase 2 gate stopped before the optional Track C corpus search (Open Food Facts is ODbL 1.0 share-alike; would require attribution + share-alike of any derived database)."
+  track_a_synthetic_renderer: "SKIPPED: synthetic data is augmentation-only and cannot close the real-data gap."

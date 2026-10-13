@@ -1,0 +1,194 @@
+[
+  {
+    "document_id": "INV-SYN-001",
+    "category": "single_line",
+    "page_count": 1,
+    "raw_text": "Invoice Number: INV-2026-0001\nDate: 2026-10-01\nSupplier: Sharma General Store\nCurrency: INR\n\nItem | Qty | Unit | Unit Price | Total\nAmul Butter 500g | 1 | PCS | 275.00 | 275.00\n\nSubtotal: 275.00\nTotal: 275.00"
+  },
+  {
+    "document_id": "INV-SYN-002",
+    "category": "multi_line",
+    "page_count": 1,
+    "raw_text": "Invoice #: INV-2026-0002\nDate: 02/10/2026\nSupplier: Fresh Groceries Direct\nCurrency: INR\n\nItem | Qty | Unit | Unit Price | Total\nWhole Wheat Bread | 2 | PACK | 45.00 | 90.00\nToned Milk 1L | 3 | LTR | 60.00 | 180.00\nFarm Eggs 6pc | 1 | PACK | 55.00 | 55.00\nBritannia Cheese 200g | 1 | PCS | 125.00 | 125.00\n\nSubtotal: 450.00\nTotal: 450.00"
+  },
+  {
+    "document_id": "INV-SYN-003",
+    "category": "multi_line_large",
+    "page_count": 1,
+    "raw_text": "Invoice #: INV-2026-0003\nDate: 2026-10-03\nVendor: PEC Campus Book Store\nCurrency: INR\n\nItem | Qty | Unit | Unit Price | Total\nClassmate Spiral Notebook | 5 | PCS | 80.00 | 400.00\nParker Vector Ball Pen | 2 | PCS | 250.00 | 500.00\nA4 Copier Paper Ream | 2 | PACK | 320.00 | 640.00\nCamlin Geometry Box | 1 | PCS | 150.00 | 150.00\nHighlighter Pack 5s | 1 | PACK | 110.00 | 110.00\nSticky Notes 3x3 | 4 | PACK | 40.00 | 160.00\n\nSubtotal: 1960.00\nTotal: 1960.00"
+  },
+  {
+    "document_id": "INV-SYN-004",
+    "category": "missing_invoice_number",
+    "page_count": 1,
+    "raw_text": "Date: 2026-10-04\nSupplier: City Bakery House\nCurrency: INR\n\nItem | Qty | Unit | Unit Price | Total\nChocolate Truffle Cake 500g | 1 | PCS | 450.00 | 450.00\nVeg Puff | 4 | PCS | 25.00 | 100.00\n\nSubtotal: 550.00\nTotal: 550.00"
+  },
+  {
+    "document_id": "INV-SYN-005",
+    "category": "missing_supplier",
+    "page_count": 1,
+    "raw_text": "Invoice #: INV-2026-0005\nDate: 2026-10-05\nCurrency: INR\n\nItem | Qty | Unit | Unit Price | Total\nUSB Type-C Fast Cable | 1 | PCS | 299.00 | 299.00\nMobile Screen Guard | 1 | PCS | 199.00 | 199.00\n\nSubtotal: 498.00\nTotal: 498.00"
+  },
+  {
+    "document_id": "INV-SYN-006",
+    "category": "missing_date",
+    "page_count": 1,
+    "raw_text": "Invoice #: INV-2026-0006\nSupplier: Quick Mart Express\nCurrency: INR\n\nItem | Qty | Unit | Unit Price | Total\nInstant Coffee 100g | 1 | PCS | 210.00 | 210.00\nSugar 1kg | 2 | KG | 45.00 | 90.00\n\nSubtotal: 300.00\nTotal: 300.00"
+  },
+  {
+    "document_id": "INV-SYN-007",
+    "category": "currency_usd",
+    "page_count": 1,
+    "raw_text": "Invoice Number: INV-USD-101\nDate: 2026-10-07\nSupplier: Global Tech Supplies LLC\nCurrency: USD\n\nItem | Qty | Unit | Unit Price | Total\nLogitech Wireless Mouse | 2 | PCS | 24.50 | 49.00\nHDMI 2.1 Cable 2m | 1 | PCS | 15.00 | 15.00\n\nSubtotal: 64.00\nTotal: 64.00"
+  },
+  {
+    "document_id": "INV-SYN-008",
+    "category": "currency_eur",
+    "page_count": 1,
+    "raw_text": "Invoice Number: INV-EUR-202\nDate: 2026-10-08\nSupplier: Euro Lab Instruments\nCurrency: EUR\n\nItem | Qty | Unit | Unit Price | Total\nGlass Beaker 500ml | 4 | PCS | 12.00 | 48.00\nGraduated Pipette 10ml | 2 | PCS | 16.50 | 33.00\n\nSubtotal: 81.00\nTotal: 81.00"
+  },
+  {
+    "document_id": "INV-SYN-009",
+    "category": "currency_gbp",
+    "page_count": 1,
+    "raw_text": "Invoice Number: INV-GBP-303\nDate: 2026-10-09\nSupplier: Oxford Academic Books Ltd\nCurrency: GBP\n\nItem | Qty | Unit | Unit Price | Total\nComputer Architecture Textbook | 1 | PCS | 55.00 | 55.00\nDiscrete Mathematics 4th Ed | 1 | PCS | 45.00 | 45.00\n\nSubtotal: 100.00\nTotal: 100.00"
+  },
+  {
+    "document_id": "INV-SYN-010",
+    "category": "tax_inclusive",
+    "page_count": 1,
+    "raw_text": "Invoice #: INV-2026-0010\nDate: 2026-10-10\nSupplier: Sector 11 Pharmacy\nCurrency: INR\n\nItem | Qty | Unit | Unit Price | Total\nParacetamol 650mg 15s | 2 | PACK | 30.00 | 60.00\nVitamin C 500mg 30s | 1 | PACK | 140.00 | 140.00\n\nSubtotal: 200.00\nTax: 0.00\nTotal: 200.00"
+  },
+  {
+    "document_id": "INV-SYN-011",
+    "category": "tax_exclusive",
+    "page_count": 1,
+    "raw_text": "Invoice #: INV-2026-0011\nDate: 2026-10-11\nSupplier: Punjab Hardware Traders\nCurrency: INR\n\nItem | Qty | Unit | Unit Price | Total\nBrass Padlock 50mm | 2 | PCS | 200.00 | 400.00\nSteel Screws 100pk | 1 | PACK | 100.00 | 100.00\n\nSubtotal: 500.00\nTax: 90.00\nTotal: 590.00"
+  },
+  {
+    "document_id": "INV-SYN-012",
+    "category": "tax_multiple_rates",
+    "page_count": 1,
+    "raw_text": "Invoice #: INV-2026-0012\nDate: 2026-10-12\nSupplier: Metro Departmental\nCurrency: INR\n\nItem | Qty | Unit | Unit Price | Total\nBasmati Rice 5kg | 1 | PACK | 400.00 | 400.00\nStainless Steel Thermos 1L | 1 | PCS | 600.00 | 600.00\n\nSubtotal: 1000.00\nTax: 128.00\nTotal: 1128.00"
+  },
+  {
+    "document_id": "INV-SYN-013",
+    "category": "discount_item_level",
+    "page_count": 1,
+    "raw_text": "Invoice #: INV-2026-0013\nDate: 2026-10-13\nSupplier: Fast Retail Mart\nCurrency: INR\n\nItem | Qty | Unit | Unit Price | Total\nGreen Tea Box 100g | 2 | BOX | 150.00 | 300.00\n\nSubtotal: 300.00\nDiscount: 30.00\nTotal: 270.00"
+  },
+  {
+    "document_id": "INV-SYN-014",
+    "category": "discount_invoice_level",
+    "page_count": 1,
+    "raw_text": "Invoice #: INV-2026-0014\nDate: 2026-10-14\nSupplier: Central Food Plaza\nCurrency: INR\n\nItem | Qty | Unit | Unit Price | Total\nVeg Biryani Combo | 3 | PACK | 200.00 | 600.00\nPaneer Butter Masala | 1 | PACK | 250.00 | 250.00\n\nSubtotal: 850.00\nDiscount: 100.00\nTotal: 750.00"
+  },
+  {
+    "document_id": "INV-SYN-015",
+    "category": "shipping_delivery_fee",
+    "page_count": 1,
+    "raw_text": "Invoice #: INV-2026-0015\nDate: 2026-10-15\nSupplier: Quick Eats Kitchen\nCurrency: INR\n\nItem | Qty | Unit | Unit Price | Total\nChicken Burger | 2 | PCS | 120.00 | 240.00\nFrench Fries Large | 1 | PCS | 90.00 | 90.00\n\nSubtotal: 330.00\nDelivery: 40.00\nTotal: 370.00"
+  },
+  {
+    "document_id": "INV-SYN-016",
+    "category": "rounding_difference_cent",
+    "page_count": 1,
+    "raw_text": "Invoice #: INV-2026-0016\nDate: 2026-10-16\nSupplier: Industrial Chemical Corp\nCurrency: INR\n\nItem | Qty | Unit | Unit Price | Total\nDistilled Water 5L | 3 | CAN | 33.33 | 99.99\n\nSubtotal: 99.99\nTax: 5.00\nTotal: 105.00"
+  },
+  {
+    "document_id": "INV-SYN-017",
+    "category": "comma_decimal_separator",
+    "page_count": 1,
+    "raw_text": "Invoice #: INV-2026-0017\nDate: 2026-10-17\nSupplier: Continental Supplies GmbH\nCurrency: EUR\n\nItem | Qty | Unit | Unit Price | Total\nFilter Papers Box | 2 | BOX | 10.50 | 21.00\nGlass Funnel 75mm | 1 | PCS | 14.00 | 14.00\n\nSubtotal: 35.00\nTotal: 35.00"
+  },
+  {
+    "document_id": "INV-SYN-018",
+    "category": "duplicate_item_descriptions",
+    "page_count": 1,
+    "raw_text": "Invoice #: INV-2026-0018\nDate: 2026-10-18\nSupplier: PEC Stationery Mart\nCurrency: INR\n\nItem | Qty | Unit | Unit Price | Total\nA4 Paper Ream | 2 | PACK | 300.00 | 600.00\nA4 Paper Ream | 3 | PACK | 300.00 | 900.00\n\nSubtotal: 1500.00\nTotal: 1500.00"
+  },
+  {
+    "document_id": "INV-SYN-019",
+    "category": "wrapped_line_description",
+    "page_count": 1,
+    "raw_text": "Invoice #: INV-2026-0019\nDate: 2026-10-19\nSupplier: Cyber Computer Solutions\nCurrency: INR\n\nItem | Qty | Unit | Unit Price | Total\nLogitech B100 Optical USB Mouse | 2 | PCS | 350.00 | 700.00\nwith Ergonomic Design and 800 DPI\nSanDisk Ultra Dual Drive 64GB | 1 | PCS | 650.00 | 650.00\nType-C USB 3.1 Flash Drive\n\nSubtotal: 1350.00\nTotal: 1350.00"
+  },
+  {
+    "document_id": "INV-SYN-020",
+    "category": "negative_quantity_return",
+    "page_count": 1,
+    "raw_text": "Invoice #: INV-2026-0020\nDate: 2026-10-20\nSupplier: City Wholesale Mart\nCurrency: INR\n\nItem | Qty | Unit | Unit Price | Total\nOffice Chair Heavy Duty | 2 | PCS | 2500.00 | 5000.00\nReturned Defective Desk Lamp | -1 | PCS | 600.00 | -600.00\n\nSubtotal: 4400.00\nTotal: 4400.00"
+  },
+  {
+    "document_id": "INV-SYN-021",
+    "category": "arithmetic_inconsistency_line",
+    "page_count": 1,
+    "raw_text": "Invoice #: INV-2026-0021\nDate: 2026-10-21\nSupplier: Shady Corner Store\nCurrency: INR\n\nItem | Qty | Unit | Unit Price | Total\nNotebook Premium 200p | 2 | PCS | 50.00 | 120.00\n\nSubtotal: 120.00\nTotal: 120.00"
+  },
+  {
+    "document_id": "INV-SYN-022",
+    "category": "arithmetic_inconsistency_total",
+    "page_count": 1,
+    "raw_text": "Invoice #: INV-2026-0022\nDate: 2026-10-22\nSupplier: Glitched Billing Services\nCurrency: INR\n\nItem | Qty | Unit | Unit Price | Total\nBall Pen Blue | 10 | PCS | 10.00 | 100.00\n\nSubtotal: 150.00\nTotal: 150.00"
+  },
+  {
+    "document_id": "INV-SYN-023",
+    "category": "missing_unit_price",
+    "page_count": 1,
+    "raw_text": "Invoice #: INV-2026-0023\nDate: 2026-10-23\nSupplier: Village Organic Store\nCurrency: INR\n\nItem | Qty | Unit | Unit Price | Total\nOrganic Honey Jar 500g | 2 | JAR | | 400.00\n\nSubtotal: 400.00\nTotal: 400.00"
+  },
+  {
+    "document_id": "INV-SYN-024",
+    "category": "unreadable_totals",
+    "page_count": 1,
+    "raw_text": "Invoice #: INV-2026-0024\nDate: 2026-10-24\nSupplier: Rain Damaged Invoice Mart\nCurrency: INR\n\nItem | Qty | Unit | Unit Price | Total\nDry Erase Markers 4pk | 3 | PACK | 100.00 | 300.00\n\nSubtotal: 300.00"
+  },
+  {
+    "document_id": "INV-SYN-025",
+    "category": "multi_page_invoice",
+    "page_count": 2,
+    "raw_text": "Invoice #: INV-2026-0025\nDate: 2026-10-25\nSupplier: PEC Central Stores\nCurrency: INR\n\nItem | Qty | Unit | Unit Price | Total\nSoldering Iron 25W | 2 | PCS | 350.00 | 700.00\nDigital Multimeter | 1 | PCS | 850.00 | 850.00\nBreadboard GL-12 | 4 | PCS | 120.00 | 480.00\nJumper Wires 65pk | 2 | PACK | 90.00 | 180.00\nResistor Kit 500pcs | 1 | KIT | 250.00 | 250.00\nLED Pack 50pcs | 2 | PACK | 70.00 | 140.00\n\nSubtotal: 2600.00\nTax: 468.00\nTotal: 3068.00"
+  },
+  {
+    "document_id": "INV-SYN-026",
+    "category": "ambiguous_date_day_first",
+    "page_count": 1,
+    "raw_text": "Invoice #: INV-2026-0026\nDate: 04/05/2026\nSupplier: British Indian Trading Co\nCurrency: INR\n\nItem | Qty | Unit | Unit Price | Total\nEarl Grey Tea 250g | 1 | PACK | 350.00 | 350.00\nDigestive Biscuits 400g | 2 | PACK | 75.00 | 150.00\n\nSubtotal: 500.00\nTotal: 500.00"
+  },
+  {
+    "document_id": "INV-SYN-027",
+    "category": "ambiguous_currency",
+    "page_count": 1,
+    "raw_text": "Invoice #: INV-2026-0027\nDate: 2026-10-27\nSupplier: Unspecified Currency Merchant\n\nItem | Qty | Unit | Unit Price | Total\nGeneric Widget 100 | 2 | PCS | 50.00 | 100.00\n\nSubtotal: 100.00\nTotal: 100.00"
+  },
+  {
+    "document_id": "INV-SYN-028",
+    "category": "duplicate_invoice_number_a",
+    "page_count": 1,
+    "raw_text": "Invoice #: INV-DUPLICATE-99\nDate: 2026-10-28\nSupplier: Apex Medical Distributors\nCurrency: INR\n\nItem | Qty | Unit | Unit Price | Total\nSurgical Gloves Box 100s | 2 | BOX | 400.00 | 800.00\n\nSubtotal: 800.00\nTotal: 800.00"
+  },
+  {
+    "document_id": "INV-SYN-029",
+    "category": "duplicate_invoice_number_b",
+    "page_count": 1,
+    "raw_text": "Invoice #: INV-DUPLICATE-99\nDate: 2026-10-28\nSupplier: Campus Book Depot\nCurrency: INR\n\nItem | Qty | Unit | Unit Price | Total\nEngineering Mechanics Book | 1 | PCS | 650.00 | 650.00\n\nSubtotal: 650.00\nTotal: 650.00"
+  },
+  {
+    "document_id": "INV-SYN-030",
+    "category": "zero_quantity_free_sample",
+    "page_count": 1,
+    "raw_text": "Invoice #: INV-2026-0030\nDate: 2026-10-30\nSupplier: Nutritional Labs\nCurrency: INR\n\nItem | Qty | Unit | Unit Price | Total\nWhey Protein 1kg | 1 | PACK | 2400.00 | 2400.00\nFree Shaker Bottle Promo | 1 | PCS | 0.00 | 0.00\n\nSubtotal: 2400.00\nTotal: 2400.00"
+  },
+  {
+    "document_id": "INV-SYN-031",
+    "category": "partial_payment_balance_due",
+    "page_count": 1,
+    "raw_text": "Invoice #: INV-2026-0031\nDate: 2026-10-31\nSupplier: Reliable Furniture House\nCurrency: INR\n\nItem | Qty | Unit | Unit Price | Total\nStudy Table Wooden | 1 | PCS | 3500.00 | 3500.00\n\nSubtotal: 3500.00\nTotal: 3500.00\nPaid: 2000.00\nDue: 1500.00"
+  },
+  {
+    "document_id": "INV-SYN-032",
+    "category": "complex_quick_commerce",
+    "page_count": 1,
+    "raw_text": "Invoice #: ZEP-2026-8812\nDate: 2026-10-31\nSupplier: Zepto Quick Retail Chandigarh\nCurrency: INR\n\nItem | Qty | Unit | Unit Price | Total\nMother Dairy Milk 500ml | 2 | PACK | 33.00 | 66.00\nLays Classic Salted 50g | 2 | PACK | 20.00 | 40.00\nCoca Cola 750ml | 1 | BTL | 45.00 | 45.00\n\nSubtotal: 151.00\nDelivery: 25.00\nHandling: 5.00\nDiscount: 10.00\nTotal: 171.00"
+  }
+]

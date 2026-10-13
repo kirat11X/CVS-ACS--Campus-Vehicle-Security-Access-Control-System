@@ -1,0 +1,11 @@
+{
+  "provenance": "SYNTHETIC FIXTURES ONLY - not evidence of real-world performance",
+  "dataset": "60 labeled examples; 50 synthetic registry records",
+  "status": "PROVISIONAL_FULL_CORPUS_RUN_PENDING_HELD_OUT_SPLIT",
+  "baselines": {
+    "baseline_0": {"exact_plate_accuracy": 0.55, "mean_cer": 0.0478, "registry_match_accuracy": 0.4667, "false_match_rate_matched": 0.0, "false_match_rate_total": 0.0, "coverage": 0.3833},
+    "baseline_1": {"exact_plate_accuracy": 0.6333, "mean_cer": 0.0391, "registry_match_accuracy": 0.55, "false_match_rate_matched": 0.0, "false_match_rate_total": 0.0, "coverage": 0.4667},
+    "baseline_2": {"exact_plate_accuracy": 0.6333, "mean_cer": 0.0391, "registry_match_accuracy": 0.9167, "false_match_rate_matched": 0.0909, "false_match_rate_total": 0.0833, "coverage": 0.9167},
+    "baseline_3": {"exact_plate_accuracy": 0.6333, "mean_cer": 0.0391, "registry_match_accuracy": 1.0, "false_match_rate_matched": 0.0, "false_match_rate_total": 0.0, "coverage": 0.8333, "ambiguity_rate": 0.0833}
+  }
+}

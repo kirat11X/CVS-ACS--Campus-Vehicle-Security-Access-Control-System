@@ -1,0 +1,351 @@
+{
+ "provenance_label": "synthetic LLM-authored items; measures fit to that distribution, not real invoice accuracy",
+ "scope": "classifier metrics only; no ALLOW/REVIEW/ALERT policy outcomes are computed or reported",
+ "track": "C",
+ "run_id": "full_c_v1",
+ "base_model": "Qwen/Qwen3-1.7B (Apache-2.0), 4-bit NF4 QLoRA r=16 alpha=32 all linear proj",
+ "split": "grouped by brand/template family (split_v1, 191 families), train/val/test = 188/69/63",
+ "split_sha256": {
+  "test": "35e097c16e4ce4795840359f183d0ee96c6f41e606697eebc600d9546133f924",
+  "val": "ec35e3fca5c072d129c9e8b7b44ffacc7cc1819fc98261dc21cedde1c9bd1f38"
+ },
+ "test_evaluated_once": true,
+ "bootstrap": {
+  "n": 2000,
+  "method": "percentile, item-level resampling, paired across models"
+ },
+ "training": {
+  "wall_time_s": 251.4,
+  "peak_vram_reserved_gib": 3.77,
+  "epochs_done": 5.0,
+  "best_eval_loss": 0.22180409729480743,
+  "config_sha256": "861191bc86ab6e2d13e34160e8fe364efd2ae327abfb45f160ab12e622ffd660"
+ },
+ "hyperparameters": "UNVERIFIED starting points; lr chosen on val by 3-epoch probe {5e-5,1e-4,2e-4}",
+ "test": {
+  "lexical": {
+   "accuracy": 0.3651,
+   "accuracy_ci95": [
+    0.2381,
+    0.4762
+   ],
+   "macro_f1": 0.4447,
+   "macro_f1_ci95": [
+    0.284,
+    0.5487
+   ],
+   "unknown_rate": 0.6984,
+   "invalid_output_rate": null,
+   "gold_unknown_pred_normal": 0
+  },
+  "minilm_knn": {
+   "accuracy": 0.5397,
+   "accuracy_ci95": [
+    0.4127,
+    0.6667
+   ],
+   "macro_f1": 0.4063,
+   "macro_f1_ci95": [
+    0.2798,
+    0.5009
+   ],
+   "unknown_rate": 0.0159,
+   "invalid_output_rate": null,
+   "gold_unknown_pred_normal": 3
+  },
+  "qwen_zs": {
+   "accuracy": 0.3333,
+   "accuracy_ci95": [
+    0.2222,
+    0.4444
+   ],
+   "macro_f1": 0.4321,
+   "macro_f1_ci95": [
+    0.2904,
+    0.5222
+   ],
+   "unknown_rate": 0.6508,
+   "invalid_output_rate": 0.1428571428571429,
+   "gold_unknown_pred_normal": 0
+  },
+  "qwen_lora": {
+   "accuracy": 0.8413,
+   "accuracy_ci95": [
+    0.746,
+    0.9206
+   ],
+   "macro_f1": 0.8178,
+   "macro_f1_ci95": [
+    0.6557,
+    0.9043
+   ],
+   "unknown_rate": 0.0476,
+   "invalid_output_rate": 0.0,
+   "gold_unknown_pred_normal": 1
+  }
+ },
+ "val": {
+  "lexical": {
+   "accuracy": 0.4493,
+   "accuracy_ci95": [
+    0.3333,
+    0.5652
+   ],
+   "macro_f1": 0.5471,
+   "macro_f1_ci95": [
+    0.3754,
+    0.6477
+   ],
+   "unknown_rate": 0.6087,
+   "invalid_output_rate": null,
+   "gold_unknown_pred_normal": 0
+  },
+  "minilm_knn": {
+   "accuracy": 0.4493,
+   "accuracy_ci95": [
+    0.3333,
+    0.5656
+   ],
+   "macro_f1": 0.3458,
+   "macro_f1_ci95": [
+    0.2093,
+    0.4383
+   ],
+   "unknown_rate": 0.029,
+   "invalid_output_rate": null,
+   "gold_unknown_pred_normal": 2
+  },
+  "qwen_zs": {
+   "accuracy": 0.2319,
+   "accuracy_ci95": [
+    0.1449,
+    0.3333
+   ],
+   "macro_f1": 0.3149,
+   "macro_f1_ci95": [
+    0.187,
+    0.4134
+   ],
+   "unknown_rate": 0.7391,
+   "invalid_output_rate": 0.21739130434782605,
+   "gold_unknown_pred_normal": 0
+  },
+  "qwen_lora": {
+   "accuracy": 0.7536,
+   "accuracy_ci95": [
+    0.6522,
+    0.8551
+   ],
+   "macro_f1": 0.6665,
+   "macro_f1_ci95": [
+    0.5035,
+    0.7811
+   ],
+   "unknown_rate": 0.087,
+   "invalid_output_rate": 0.01449275362318836,
+   "gold_unknown_pred_normal": 0
+  }
+ },
+ "test_paired_deltas": {
+  "minilm_knn-minus-lexical:accuracy": {
+   "ci95": [
+    0.0,
+    0.3492
+   ],
+   "p_le_0": 0.0355
+  },
+  "minilm_knn-minus-lexical:macro_f1": {
+   "ci95": [
+    -0.1774,
+    0.1244
+   ],
+   "p_le_0": 0.6505
+  },
+  "minilm_knn-minus-qwen_zs:accuracy": {
+   "ci95": [
+    0.0317,
+    0.381
+   ],
+   "p_le_0": 0.0155
+  },
+  "minilm_knn-minus-qwen_zs:macro_f1": {
+   "ci95": [
+    -0.1448,
+    0.1006
+   ],
+   "p_le_0": 0.6235
+  },
+  "qwen_lora-minus-lexical:accuracy": {
+   "ci95": [
+    0.3333,
+    0.619
+   ],
+   "p_le_0": 0.0
+  },
+  "qwen_lora-minus-lexical:macro_f1": {
+   "ci95": [
+    0.2089,
+    0.5462
+   ],
+   "p_le_0": 0.0
+  },
+  "qwen_lora-minus-qwen_zs:accuracy": {
+   "ci95": [
+    0.3651,
+    0.6353
+   ],
+   "p_le_0": 0.0
+  },
+  "qwen_lora-minus-qwen_zs:macro_f1": {
+   "ci95": [
+    0.2232,
+    0.5393
+   ],
+   "p_le_0": 0.0
+  }
+ },
+ "test_qwen_lora_per_class": {
+  "TOBACCO_NICOTINE": {
+   "precision": 1.0,
+   "recall": 0.6,
+   "f1": 0.75,
+   "support": 5
+  },
+  "ALCOHOL": {
+   "precision": 0.8571428571428571,
+   "recall": 1.0,
+   "f1": 0.9230769230769231,
+   "support": 6
+  },
+  "RX_SCHEDULED_DRUG": {
+   "precision": 0.5555555555555556,
+   "recall": 1.0,
+   "f1": 0.7142857142857143,
+   "support": 5
+  },
+  "OTC_MEDICINE": {
+   "precision": 0.5,
+   "recall": 0.5,
+   "f1": 0.5,
+   "support": 6
+  },
+  "HAZARDOUS_CHEMICAL": {
+   "precision": 1.0,
+   "recall": 0.8,
+   "f1": 0.8888888888888888,
+   "support": 5
+  },
+  "SHARP_OBJECT": {
+   "precision": 1.0,
+   "recall": 1.0,
+   "f1": 1.0,
+   "support": 4
+  },
+  "NORMAL": {
+   "precision": 0.9259259259259259,
+   "recall": 0.8928571428571429,
+   "f1": 0.9090909090909091,
+   "support": 28
+  },
+  "UNKNOWN": {
+   "precision": 1.0,
+   "recall": 0.75,
+   "f1": 0.8571428571428571,
+   "support": 4
+  }
+ },
+ "test_qwen_lora_confusion": {
+  "labels": [
+   "TOBACCO_NICOTINE",
+   "ALCOHOL",
+   "RX_SCHEDULED_DRUG",
+   "OTC_MEDICINE",
+   "HAZARDOUS_CHEMICAL",
+   "SHARP_OBJECT",
+   "NORMAL",
+   "UNKNOWN"
+  ],
+  "rows_gold_cols_pred": [
+   [
+    3,
+    0,
+    2,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   [
+    0,
+    6,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   [
+    0,
+    0,
+    5,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   [
+    0,
+    0,
+    2,
+    3,
+    0,
+    0,
+    1,
+    0
+   ],
+   [
+    0,
+    0,
+    0,
+    1,
+    4,
+    0,
+    0,
+    0
+   ],
+   [
+    0,
+    0,
+    0,
+    0,
+    0,
+    4,
+    0,
+    0
+   ],
+   [
+    0,
+    1,
+    0,
+    2,
+    0,
+    0,
+    25,
+    0
+   ],
+   [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    3
+   ]
+  ]
+ }
+}

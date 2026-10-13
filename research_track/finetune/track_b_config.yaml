@@ -1,0 +1,12 @@
+track: B
+status: PREPARED_NOT_APPROVED
+base_model: /home/kirat/ml-assets/campus/models/Qwen3-VL-2B-Instruct
+adapter: /home/kirat/ml-assets/campus/models/Qwen3-VL-2B-Instruct-receipt-lora
+input_data: CONSENTED_TARGET_DOMAIN_INVOICES_REQUIRED
+split: document_level_70_15_15
+method: TRL_PEFT_QLORA_UNVERIFIED
+training: DEFERRED
+notes:
+  - CORD-v2 and katanaml invoices teach output structure, not Indian quick-commerce accuracy.
+  - Keep raw, normalized, and human-corrected fields separate.
+  - Hyperparameters and library compatibility require a dry-run check.

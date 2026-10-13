@@ -1,0 +1,10 @@
+track: A
+status: PREPARED_NOT_APPROVED
+base_model: /home/kirat/ml-assets/campus/models/fast-plate-ocr/european_mobile_vit_v2_ocr.onnx
+input_data: AUTHORIZED_INDIAN_LPR_DATA_REQUIRED
+split: grouped_by_plate_string
+training: DEFERRED
+notes:
+  - Verify alphabet, slot count, and head compatibility before any run.
+  - Reinitialize the head if Indian plate format is incompatible.
+  - Hyperparameters are unverified starting points.

@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pec.edu/schemas/track_c/policy_rule.schema.json",
+  "title": "PolicyRuleSchema",
+  "description": "Schema representing a single deterministic campus screening policy rule.",
+  "type": "object",
+  "required": [
+    "rule_id",
+    "category_code",
+    "action",
+    "priority",
+    "policy_version",
+    "active"
+  ],
+  "properties": {
+    "rule_id": {
+      "type": "string",
+      "description": "Unique identifier for this policy rule (e.g. RULE-TOBACCO-01)"
+    },
+    "category_code": {
+      "type": "string",
+      "enum": [
+        "TOBACCO_NICOTINE",
+        "ALCOHOL",
+        "RX_SCHEDULED_DRUG",
+        "OTC_MEDICINE",
+        "HAZARDOUS_CHEMICAL",
+        "SHARP_OBJECT",
+        "NORMAL",
+        "UNKNOWN"
+      ]
+    },
+    "action": {
+      "type": "string",
+      "enum": ["ALLOW", "REVIEW", "ALERT"],
+      "description": "Screening outcome mandated when this rule matches"
+    },
+    "min_quantity": {
+      "type": ["number", "null"],
+      "description": "Minimum inclusive quantity threshold, if rule is quantity-dependent"
+    },
+    "max_quantity": {
+      "type": ["number", "null"],
+      "description": "Maximum inclusive quantity threshold, if rule is quantity-dependent"
+    },
+    "quantity_unit": {
+      "type": ["string", "null"],
+      "description": "Required unit of measure for quantity threshold matching (e.g. PACK, KG), if applicable"
+    },
+    "platform": {
+      "type": ["string", "null"],
+      "description": "Specific delivery platform (e.g. ZOMATO, BLINKIT), or null for all platforms"
+    },
+    "priority": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Evaluation priority: lower integer means higher precedence (e.g. 10 > 50 > 100)"
+    },
+    "policy_version": {
+      "type": "string",
+      "description": "Version string of the policy ruleset (e.g. v1.0, draft-1)"
+    },
+    "effective_from": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "ISO 8601 UTC timestamp when rule becomes active"
+    },
+    "effective_to": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "ISO 8601 UTC timestamp when rule expires"
+    },
+    "active": {
+      "type": "boolean",
+      "description": "True if rule is active; soft-deactivation sets to false"
+    },
+    "description": {
+      "type": ["string", "null"],
+      "description": "Human-readable administrative rationale for this rule"
+    }
+  }
+}

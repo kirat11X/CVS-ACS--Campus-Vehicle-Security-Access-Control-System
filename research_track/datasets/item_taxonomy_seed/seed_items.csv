@@ -1,0 +1,301 @@
+item_text,category,style
+Gold Flake Kings (10s),TOBACCO_NICOTINE,normal_grocery
+Classic Milds 20 Pack,TOBACCO_NICOTINE,normal_grocery
+Marlboro Advance Filter,TOBACCO_NICOTINE,normal_grocery
+Chhoti Gold Flake,TOBACCO_NICOTINE,hinglish
+Badi Advance sutta,TOBACCO_NICOTINE,hinglish
+Classic Reg 10 Pk,TOBACCO_NICOTINE,quick_commerce_truncated
+Marl Adv 20s,TOBACCO_NICOTINE,quick_commerce_truncated
+G Flake Lghts 10,TOBACCO_NICOTINE,quick_commerce_truncated
+Ganesh Beedi Bundle,TOBACCO_NICOTINE,normal_grocery
+Mangalore Ganesh Bidi,TOBACCO_NICOTINE,normal_grocery
+bidi packet chota,TOBACCO_NICOTINE,hinglish
+Rajkamal bidi,TOBACCO_NICOTINE,hinglish
+Rajnigandha Pan Masala,TOBACCO_NICOTINE,normal_grocery
+Baba 120 Zarda,TOBACCO_NICOTINE,normal_grocery
+Vimal Elaichi with zarda,TOBACCO_NICOTINE,ambiguous
+Shikhar gutka,TOBACCO_NICOTINE,hinglish
+Vape Pen 5000 puffs,TOBACCO_NICOTINE,normal_grocery
+Elfbar Kiwi Passion,TOBACCO_NICOTINE,normal_grocery
+Vape Pod Refill Mint,TOBACCO_NICOTINE,normal_grocery
+vape flavor dhua,TOBACCO_NICOTINE,hinglish
+Nicotex 2mg Mint,TOBACCO_NICOTINE,normal_grocery
+Nicotex Gum 4mg,TOBACCO_NICOTINE,normal_grocery
+Nicotex 2m,TOBACCO_NICOTINE,quick_commerce_truncated
+Nicotine patch 21mg,TOBACCO_NICOTINE,normal_grocery
+Afzal Hookah Molasses,TOBACCO_NICOTINE,normal_grocery
+Hookah flavor double apple,TOBACCO_NICOTINE,hinglish
+hukka pan flavor,TOBACCO_NICOTINE,hinglish
+Hookh Dbl Appl 50g,TOBACCO_NICOTINE,quick_commerce_truncated
+Cool Lip Snus,TOBACCO_NICOTINE,normal_grocery
+Chaini Khaini Pouch,TOBACCO_NICOTINE,normal_grocery
+Kingfisher Premium Beer 650ml,ALCOHOL,normal_grocery
+Budweiser Magnum Strong 500ml,ALCOHOL,normal_grocery
+Bira 91 White Pint,ALCOHOL,normal_grocery
+KF Strong 650ml,ALCOHOL,quick_commerce_truncated
+Bud Mag 500ml Can,ALCOHOL,quick_commerce_truncated
+Thandi beer bottle,ALCOHOL,hinglish
+Kingfisher chota,ALCOHOL,hinglish
+Royal Stag Deluxe Whisky 750ml,ALCOHOL,normal_grocery
+Blenders Pride Rare Premium 750ml,ALCOHOL,normal_grocery
+Signature Rare Aged 750ml,ALCOHOL,normal_grocery
+RS Whisky qtr,ALCOHOL,quick_commerce_truncated
+BP Prem 750ml,ALCOHOL,quick_commerce_truncated
+desi daru quarter,ALCOHOL,hinglish
+whisky adha,ALCOHOL,hinglish
+Old Monk Rum 750ml,ALCOHOL,normal_grocery
+Bacardi Carta Blanca 750ml,ALCOHOL,normal_grocery
+Captain Morgan Spiced 750ml,ALCOHOL,normal_grocery
+Old Mnk 750,ALCOHOL,quick_commerce_truncated
+rum ka paua,ALCOHOL,hinglish
+Sula Chenin Blanc 750ml,ALCOHOL,normal_grocery
+Jacob's Creek Shiraz 750ml,ALCOHOL,normal_grocery
+Sula Wht 750ml,ALCOHOL,quick_commerce_truncated
+Magic Moments Vodka 750ml,ALCOHOL,normal_grocery
+Smirnoff No 21 750ml,ALCOHOL,normal_grocery
+Absolut Blue 750ml,ALCOHOL,normal_grocery
+MM Vodka Grn Apl,ALCOHOL,quick_commerce_truncated
+vodka santra flavor,ALCOHOL,hinglish
+Breezer Cranberry 275ml,ALCOHOL,normal_grocery
+Brzr Jamaic 275,ALCOHOL,quick_commerce_truncated
+masti drink breezer,ALCOHOL,hinglish
+Corex Cough Syrup,RX_SCHEDULED_DRUG,normal_grocery
+Phensedyl Linctus,RX_SCHEDULED_DRUG,normal_grocery
+Rexcod cough,RX_SCHEDULED_DRUG,quick_commerce_truncated
+khasi ki dawai nasha,RX_SCHEDULED_DRUG,hinglish
+Alprax 0.5mg Tablets,RX_SCHEDULED_DRUG,normal_grocery
+Restyl 0.25mg,RX_SCHEDULED_DRUG,normal_grocery
+Alprx 0.5mg,RX_SCHEDULED_DRUG,quick_commerce_truncated
+neend ki goli,RX_SCHEDULED_DRUG,hinglish
+Tramadol Hydrochloride 50mg,RX_SCHEDULED_DRUG,normal_grocery
+Ultracet Tablet,RX_SCHEDULED_DRUG,normal_grocery
+Ultract Tab 15s,RX_SCHEDULED_DRUG,quick_commerce_truncated
+dard ki heavy goli,RX_SCHEDULED_DRUG,hinglish
+Ritalin 10mg,RX_SCHEDULED_DRUG,normal_grocery
+Inspiral 10mg,RX_SCHEDULED_DRUG,normal_grocery
+Modalert 200mg,RX_SCHEDULED_DRUG,normal_grocery
+focus tablet,RX_SCHEDULED_DRUG,hinglish
+Pregalin 50mg,RX_SCHEDULED_DRUG,normal_grocery
+Lyrica 75mg,RX_SCHEDULED_DRUG,normal_grocery
+Testoviron Depot,RX_SCHEDULED_DRUG,normal_grocery
+Deca Durabolin,RX_SCHEDULED_DRUG,normal_grocery
+body building injection,RX_SCHEDULED_DRUG,hinglish
+Diazepam 5mg,RX_SCHEDULED_DRUG,normal_grocery
+Valium 5mg,RX_SCHEDULED_DRUG,normal_grocery
+Valium 10,RX_SCHEDULED_DRUG,quick_commerce_truncated
+calmpose goli,RX_SCHEDULED_DRUG,hinglish
+Crocin Advance 500mg,OTC_MEDICINE,normal_grocery
+Dolo 650 Tablets,OTC_MEDICINE,normal_grocery
+Croc Adv 15s,OTC_MEDICINE,quick_commerce_truncated
+Dolo 650 15Tb,OTC_MEDICINE,quick_commerce_truncated
+bukhar ki goli,OTC_MEDICINE,hinglish
+Vicks VapoRub 25ml,OTC_MEDICINE,normal_grocery
+Vicks Action 500,OTC_MEDICINE,normal_grocery
+Vicks Inhaler,OTC_MEDICINE,normal_grocery
+Vicks Vpo 25g,OTC_MEDICINE,quick_commerce_truncated
+zukham balm,OTC_MEDICINE,hinglish
+Strepsils Orange 8s,OTC_MEDICINE,normal_grocery
+Koflet Lozenges,OTC_MEDICINE,normal_grocery
+gale ki khich khich goli,OTC_MEDICINE,hinglish
+Burnol Cream 10g,OTC_MEDICINE,normal_grocery
+Soframycin Ointment,OTC_MEDICINE,normal_grocery
+jalne wali cream,OTC_MEDICINE,hinglish
+Digene Tablets Mint,OTC_MEDICINE,normal_grocery
+Eno Lemon Sachet,OTC_MEDICINE,normal_grocery
+Pudin Hara Pearls,OTC_MEDICINE,normal_grocery
+Digene Tbs 15,OTC_MEDICINE,quick_commerce_truncated
+gas ki dawai,OTC_MEDICINE,hinglish
+Volini Spray 40g,OTC_MEDICINE,normal_grocery
+Moov Pain Relief 50g,OTC_MEDICINE,normal_grocery
+Iodex Balm 40g,OTC_MEDICINE,normal_grocery
+Volin Spry 40,OTC_MEDICINE,quick_commerce_truncated
+dard wala spray,OTC_MEDICINE,hinglish
+Hansaplast Washproof,OTC_MEDICINE,normal_grocery
+Band-Aid Standard,OTC_MEDICINE,normal_grocery
+BndAid 100s,OTC_MEDICINE,quick_commerce_truncated
+patti chot ki,OTC_MEDICINE,hinglish
+Harpic Power Plus 500ml,HAZARDOUS_CHEMICAL,normal_grocery
+Kiwi Dranex Drain Cleaner,HAZARDOUS_CHEMICAL,normal_grocery
+Lizol Floor Cleaner 1L,HAZARDOUS_CHEMICAL,normal_grocery
+Hrpc Pwr 500m,HAZARDOUS_CHEMICAL,quick_commerce_truncated
+Dranex 50g,HAZARDOUS_CHEMICAL,quick_commerce_truncated
+safai acid toilet,HAZARDOUS_CHEMICAL,hinglish
+phenyl ki bottle,HAZARDOUS_CHEMICAL,hinglish
+Mortein Mosquito Spray,HAZARDOUS_CHEMICAL,normal_grocery
+HIT Black Aerosol,HAZARDOUS_CHEMICAL,normal_grocery
+Baygon Roach Killer,HAZARDOUS_CHEMICAL,normal_grocery
+Hit Blk 400m,HAZARDOUS_CHEMICAL,quick_commerce_truncated
+macchar maar spray,HAZARDOUS_CHEMICAL,hinglish
+Ratol Rat Poison,HAZARDOUS_CHEMICAL,normal_grocery
+Mortein Rat Kill,HAZARDOUS_CHEMICAL,normal_grocery
+chuhe marne ki dawa,HAZARDOUS_CHEMICAL,hinglish
+Acetone Thinner 100ml,HAZARDOUS_CHEMICAL,normal_grocery
+Paint Thinner Bottle,HAZARDOUS_CHEMICAL,normal_grocery
+thinner bottle,HAZARDOUS_CHEMICAL,hinglish
+Colorbar Nail Polish Remover,HAZARDOUS_CHEMICAL,ambiguous
+Nail P Rmv 50,HAZARDOUS_CHEMICAL,quick_commerce_truncated
+Kerosene Oil 1L,HAZARDOUS_CHEMICAL,normal_grocery
+mitti ka tel,HAZARDOUS_CHEMICAL,hinglish
+Bleaching Powder 500g,HAZARDOUS_CHEMICAL,normal_grocery
+Bleach Pdr 50,HAZARDOUS_CHEMICAL,quick_commerce_truncated
+kapde dhone ka bleach,HAZARDOUS_CHEMICAL,hinglish
+Crystal Stainless Steel Knife,SHARP_OBJECT,normal_grocery
+Gillette Mach3 Razor,SHARP_OBJECT,normal_grocery
+Gillette 7 O'Clock Blades,SHARP_OBJECT,normal_grocery
+Crystl Knf 1pc,SHARP_OBJECT,quick_commerce_truncated
+Gill Blad 10s,SHARP_OBJECT,quick_commerce_truncated
+chaaku kitchen wala,SHARP_OBJECT,hinglish
+blade packet,SHARP_OBJECT,hinglish
+Kangaro Paper Cutter,SHARP_OBJECT,normal_grocery
+Maped Scissors 17cm,SHARP_OBJECT,normal_grocery
+Box Cutter Utility,SHARP_OBJECT,normal_grocery
+Kngro Cuttr 1p,SHARP_OBJECT,quick_commerce_truncated
+kainchi chhoti,SHARP_OBJECT,hinglish
+paper katne wala cutter,SHARP_OBJECT,hinglish
+Victorinox Swiss Army Knife,SHARP_OBJECT,ambiguous
+Meat Cleaver Heavy Duty,SHARP_OBJECT,normal_grocery
+bada chaku,SHARP_OBJECT,hinglish
+Craft Scalpel Set,SHARP_OBJECT,normal_grocery
+Surgical Blades Pack,SHARP_OBJECT,normal_grocery
+Surg Bld 100s,SHARP_OBJECT,quick_commerce_truncated
+shave karne wala ustara,SHARP_OBJECT,hinglish
+Lays Magic Masala 52g,NORMAL,normal_grocery
+Lays Mstrd 52g,NORMAL,quick_commerce_truncated
+Kurkure Masala Munch 70g,NORMAL,normal_grocery
+Kurkure Masala 70g,NORMAL,quick_commerce_truncated
+Bingo Mad Angles Achaari 80g,NORMAL,normal_grocery
+Doritos Cheese 60g,NORMAL,normal_grocery
+Uncle Chipps Spicy 50g,NORMAL,normal_grocery
+Pringles Original 110g,NORMAL,normal_grocery
+Haldiram Bhujia 400g,NORMAL,normal_grocery
+Haldrm Bhujia 4,NORMAL,quick_commerce_truncated
+aloo chips packet,NORMAL,hinglish
+Parle-G Biscuit 800g,NORMAL,normal_grocery
+Britannia Good Day Cashew 600g,NORMAL,normal_grocery
+Oreo Vanilla 120g,NORMAL,normal_grocery
+Sunfeast Dark Fantasy 300g,NORMAL,normal_grocery
+Hide & Seek 120g,NORMAL,normal_grocery
+Brit GDay Cshw,NORMAL,quick_commerce_truncated
+Oreo Van 120,NORMAL,quick_commerce_truncated
+meetha biskoot,NORMAL,hinglish
+Maggi 2-Min Masala Pack,NORMAL,normal_grocery
+Yippee Magic Masala 4-Pack,NORMAL,normal_grocery
+Wai Wai Chicken Noodles,NORMAL,normal_grocery
+Knorr Soupy Noodles,NORMAL,normal_grocery
+Maggi Mas 4pk,NORMAL,quick_commerce_truncated
+Yip Mas 4pk,NORMAL,quick_commerce_truncated
+maggi packet bada,NORMAL,hinglish
+Harvest Gold White Bread,NORMAL,normal_grocery
+Britannia Brown Bread 400g,NORMAL,normal_grocery
+English Oven Sandwich Bread,NORMAL,normal_grocery
+Harv Wht Brd,NORMAL,quick_commerce_truncated
+Brit Brwn Brd,NORMAL,quick_commerce_truncated
+bread ka packet,NORMAL,hinglish
+Amul Taaza Milk 500ml,NORMAL,normal_grocery
+Mother Dairy Full Cream 1L,NORMAL,normal_grocery
+Nandini Toned Milk 500ml,NORMAL,normal_grocery
+Amul Tz 500ml,NORMAL,quick_commerce_truncated
+doodh ki thaili,NORMAL,hinglish
+Amul Butter 500g,NORMAL,normal_grocery
+Amul Cheese Cubes 200g,NORMAL,normal_grocery
+Britannia Cheese Slices 200g,NORMAL,normal_grocery
+Amul Buttr 500,NORMAL,quick_commerce_truncated
+Amul Chz Cbs,NORMAL,quick_commerce_truncated
+makkhan tikki,NORMAL,hinglish
+Coca Cola Can 300ml,NORMAL,normal_grocery
+Pepsi Pet Bottle 750ml,NORMAL,normal_grocery
+Sprite 2L Bottle,NORMAL,normal_grocery
+Thums Up 1.25L,NORMAL,normal_grocery
+Coke Can 300,NORMAL,quick_commerce_truncated
+Sprt 2L,NORMAL,quick_commerce_truncated
+thanda limca,NORMAL,hinglish
+Red Bull Energy Drink 250ml,NORMAL,normal_grocery
+Sting Energy Drink 250ml,NORMAL,normal_grocery
+Monster Energy 500ml,NORMAL,normal_grocery
+RedBll Engy 250,NORMAL,quick_commerce_truncated
+Stng 250ml,NORMAL,quick_commerce_truncated
+energy drink lal wali,NORMAL,hinglish
+Maaza Mango Drink 1.2L,NORMAL,normal_grocery
+Frooti Mango 2L,NORMAL,normal_grocery
+Slice Thick Mango 600ml,NORMAL,normal_grocery
+Maaza Mngo 1.2,NORMAL,quick_commerce_truncated
+Froot 2L,NORMAL,quick_commerce_truncated
+mango juice dabba,NORMAL,hinglish
+Kinley Water Bottle 1L,NORMAL,normal_grocery
+Bisleri Water 5L,NORMAL,normal_grocery
+Aquafina 1L,NORMAL,normal_grocery
+Knl Wtr 1L,NORMAL,quick_commerce_truncated
+Bislr 5L,NORMAL,quick_commerce_truncated
+pani ki bottle,NORMAL,hinglish
+Fresh Robusta Bananas 500g,NORMAL,normal_grocery
+Shimla Apples 1kg,NORMAL,normal_grocery
+Nagpur Oranges 1kg,NORMAL,normal_grocery
+Kiran Watermelon 1pc,NORMAL,normal_grocery
+Rob Bnn 500g,NORMAL,quick_commerce_truncated
+Shml Appl 1k,NORMAL,quick_commerce_truncated
+kele darzan,NORMAL,hinglish
+Potato 1kg,NORMAL,normal_grocery
+Onion 1kg,NORMAL,normal_grocery
+Tomato Hybrid 500g,NORMAL,normal_grocery
+Pot 1k,NORMAL,quick_commerce_truncated
+Onn 1k,NORMAL,quick_commerce_truncated
+aloo pyaz,NORMAL,hinglish
+Aashirvaad Atta 5kg,NORMAL,normal_grocery
+Fortune Sunflower Oil 1L,NORMAL,normal_grocery
+India Gate Basmati 1kg,NORMAL,normal_grocery
+Tata Salt 1kg,NORMAL,normal_grocery
+Madhur Sugar 1kg,NORMAL,normal_grocery
+Ashvd Atta 5,NORMAL,quick_commerce_truncated
+Fort Oil 1L,NORMAL,quick_commerce_truncated
+atta packet,NORMAL,hinglish
+Lifebuoy Soap 4x100g,NORMAL,normal_grocery
+Dove Bathing Bar 3x100g,NORMAL,normal_grocery
+Pears Pure & Gentle 3x125g,NORMAL,normal_grocery
+Lfb Soap 4pk,NORMAL,quick_commerce_truncated
+Dove Bar 3pk,NORMAL,quick_commerce_truncated
+nahane ka sabun,NORMAL,hinglish
+Head & Shoulders Shampoo 340ml,NORMAL,normal_grocery
+Sunsilk Black Shine 340ml,NORMAL,normal_grocery
+Clinic Plus Shampoo 1L,NORMAL,normal_grocery
+H&S Shmp 340,NORMAL,quick_commerce_truncated
+Clnc Pls 1L,NORMAL,quick_commerce_truncated
+baal dhone ka shampoo,NORMAL,hinglish
+Colgate MaxFresh 150g,NORMAL,normal_grocery
+Pepsodent GermiCheck 150g,NORMAL,normal_grocery
+Sensodyne Repair 70g,NORMAL,normal_grocery
+Colg Max 150,NORMAL,quick_commerce_truncated
+Sens Rpr 70g,NORMAL,quick_commerce_truncated
+daant ghisne ka paste,NORMAL,hinglish
+Surf Excel Easy Wash 1kg,NORMAL,normal_grocery
+Tide Plus Jasmine 1kg,NORMAL,normal_grocery
+Ariel Matic Front Load 1kg,NORMAL,normal_grocery
+Srf Excl 1kg,NORMAL,quick_commerce_truncated
+Tide Pls 1kg,NORMAL,quick_commerce_truncated
+kapde dhone ka surf,NORMAL,hinglish
+Vim Dishwash Gel 500ml,NORMAL,normal_grocery
+Pril Tamarind 500ml,NORMAL,normal_grocery
+Vim Gel 500m,NORMAL,quick_commerce_truncated
+bartan dhone ka liquid,NORMAL,hinglish
+Classmate Notebook 140 Pages,NORMAL,normal_grocery
+Reynolds 045 Fine Pen Blue,NORMAL,normal_grocery
+Apsara Platinum Pencils 10s,NORMAL,normal_grocery
+Clsmt NB 140,NORMAL,quick_commerce_truncated
+Reyn 045 Blu,NORMAL,quick_commerce_truncated
+likhne ki copy,NORMAL,hinglish
+Apple iPhone 20W Charger,NORMAL,normal_grocery
+Samsung Type C Cable,NORMAL,normal_grocery
+boAt Bassheads 100,NORMAL,normal_grocery
+iPhn Chrg 20,NORMAL,quick_commerce_truncated
+boAt Bass 10,NORMAL,quick_commerce_truncated
+phone ka charger,NORMAL,hinglish
+Amul TzBar 65g,NORMAL,quick_commerce_truncated
+herbal cough mixture,NORMAL,ambiguous
+lighter,NORMAL,ambiguous
+matchbox bundle,NORMAL,ambiguous
+ice cubes pack,NORMAL,ambiguous
+soda water 750ml,NORMAL,ambiguous
+Cadbury Dairy Milk Silk 150g,NORMAL,normal_grocery
+KitKat Dessert Delight 50g,NORMAL,normal_grocery
+Snickers Peanut 50g,NORMAL,normal_grocery
+Dairy Mlk Slk,NORMAL,quick_commerce_truncated
+Snckrs 50g,NORMAL,quick_commerce_truncated

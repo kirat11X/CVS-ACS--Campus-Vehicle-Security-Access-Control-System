@@ -1,0 +1,17 @@
+{
+  "run_id": "fill-before-approved-run",
+  "track": "A|B|C",
+  "approval_token": "required",
+  "compute": "local|ec2",
+  "seed": null,
+  "config_sha256": null,
+  "data_sha256": null,
+  "library_versions": {},
+  "base_model": null,
+  "train_split": null,
+  "validation_split": null,
+  "test_split": null,
+  "test_evaluated_once": false,
+  "provenance": "synthetic-only or authorized-consented",
+  "status": "NOT_RUN"
+}

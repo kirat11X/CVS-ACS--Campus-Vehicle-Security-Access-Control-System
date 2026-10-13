@@ -424,7 +424,7 @@ def run_tests():
     assert client.post("/observations/manual", headers=auth(guard), json={"gate_id": "GATE_404", "plate": "PB10AA1111", "direction": "EXIT"}).status_code == 404
     assert client.post("/observations/manual", headers=auth(guard), json={"gate_id": "GATE_1", "plate": "- -", "direction": "EXIT"}).status_code == 400
     assert client.post("/observations/manual", headers=auth(guard), json={"gate_id": "GATE_1", "plate": "PB10AA1111"}).status_code == 422
-    r = client.post("/observations", json={"gate_id": "GATE_1", "source": "MANUAL", "raw_plate": "PB10AA1111"})
+    r = client.post("/observations", headers=auth(admin), json={"gate_id": "GATE_1", "source": "MANUAL", "raw_plate": "PB10AA1111"})
     assert r.status_code == 400, "Generic ingestion must not accept MANUAL without created_by"
     snap = client.get(f"/feed/snapshots/{mobs['id']}", headers=auth(guard))
     assert snap.status_code == 404

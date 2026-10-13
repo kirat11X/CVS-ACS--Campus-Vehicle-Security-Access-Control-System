@@ -2,7 +2,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from backend.app.db import SessionLocal
-from backend.app.dependencies import CurrentUser, require_staff
+from backend.app.dependencies import CurrentUser, require_admin, require_staff
 from backend.app.models.gate import Gate
 from backend.app.models.enums import GateStatus
 from backend.app.schemas.gate import GateCreate, GateUpdate, GateResponse
@@ -45,9 +45,9 @@ def get_gate(gate_id: str, db: Session = Depends(get_db)):
     return gate
 
 @router.post("", response_model=GateResponse, status_code=status.HTTP_201_CREATED)
-def create_gate(payload: GateCreate, db: Session = Depends(get_db)):
+def create_gate(payload: GateCreate, db: Session = Depends(get_db), user: CurrentUser = Depends(require_admin)):
     """
-    Register a new campus access gate.
+    Register a new campus access gate (ADMIN only).
     """
     existing = db.query(Gate).filter_by(id=payload.id).first()
     if existing:
@@ -70,9 +70,9 @@ def create_gate(payload: GateCreate, db: Session = Depends(get_db)):
     return gate
 
 @router.put("/{gate_id}", response_model=GateResponse)
-def update_gate(gate_id: str, payload: GateUpdate, db: Session = Depends(get_db)):
+def update_gate(gate_id: str, payload: GateUpdate, db: Session = Depends(get_db), user: CurrentUser = Depends(require_admin)):
     """
-    Update gate operational status, camera mapping, or description.
+    Update gate operational status, camera mapping, or description (ADMIN only).
     """
     gate = db.query(Gate).filter_by(id=gate_id).first()
     if not gate:
@@ -97,9 +97,9 @@ def update_gate(gate_id: str, payload: GateUpdate, db: Session = Depends(get_db)
     return gate
 
 @router.delete("/{gate_id}")
-def deactivate_gate(gate_id: str, db: Session = Depends(get_db)):
+def deactivate_gate(gate_id: str, db: Session = Depends(get_db), user: CurrentUser = Depends(require_admin)):
     """
-    Safe soft-deactivation of a gate.
+    Safe soft-deactivation of a gate (ADMIN only).
     Physical records are never deleted to preserve historical observation and entry logs.
     """
     gate = db.query(Gate).filter_by(id=gate_id).first()

@@ -99,8 +99,22 @@ class FrigateEventParser:
         raw_plate = None
         plate_confidence = None
 
-        # Check sub_label (standard Frigate LPR destination)
         sub_label = data.get("sub_label")
+        if "recognized_license_plate" in data:
+            # Frigate >= 0.16 always sends recognized_license_plate as (plate, score), or None when
+            # nothing was read, and uses sub_label for a known_plates *name* or another enrichment
+            # label - never the plate text - so sub_label is not read as a plate here.
+            sub_label = None
+            rec = data.get("recognized_license_plate")
+            if isinstance(rec, (list, tuple)) and len(rec) > 0:
+                raw_plate = str(rec[0]).strip() if rec[0] else None
+                if len(rec) > 1 and rec[1] is not None:
+                    try:
+                        plate_confidence = round(float(rec[1]), 4)
+                    except (ValueError, TypeError):
+                        pass
+
+        # Check sub_label (plate destination before Frigate 0.16 and for third-party LPR)
         if isinstance(sub_label, str) and sub_label.strip():
             raw_plate = sub_label.strip()
         elif isinstance(sub_label, dict):

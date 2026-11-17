@@ -225,20 +225,64 @@ class DeterministicValidator:
                 expected_total = (qty * u_price) - discount
                 diff = abs(line_total - expected_total)
                 if diff > self.rounding_tolerance:
-                    findings.append(ValidationFinding(
-                        code=ReasonCode.VAL_LINE_ARITHMETIC_MISMATCH,
-                        severity=ValidationSeverity.ERROR,
-                        field_or_line_id=line_id,
-                        expected_value=f"{expected_total:.2f}",
-                        observed_value=f"{line_total:.2f}",
-                        difference=f"{diff:.2f}",
-                        message=(
-                            f"Line '{line_id}' arithmetic mismatch: "
-                            f"{qty} x {u_price:.2f} - {discount:.2f} = {expected_total:.2f}, "
-                            f"but reported line_total is {line_total:.2f} (diff: {diff:.2f})."
-                        ),
-                        requires_human_review=True,
-                    ))
+                    # Sanity check: detect and strip phantom leading '2' or '7' from Rupee (₹) OCR misread
+                    repaired = False
+                    s_lt = f"{line_total:.2f}"
+                    if s_lt[0] in ("2", "7") and len(s_lt) > 4:
+                        try:
+                            cand_lt = Decimal(s_lt[1:])
+                            if abs(cand_lt - expected_total) <= self.rounding_tolerance:
+                                item["line_total"] = str(cand_lt)
+                                line_total = cand_lt
+                                repaired = True
+                                findings.append(ValidationFinding(
+                                    code=ReasonCode.VAL_SUSPICIOUS_ROUNDING,
+                                    severity=ValidationSeverity.INFO,
+                                    field_or_line_id=line_id,
+                                    expected_value=f"{expected_total:.2f}",
+                                    observed_value=s_lt,
+                                    difference=f"{diff:.2f}",
+                                    message=f"Line '{line_id}' phantom Rupee digit '{s_lt[0]}' stripped: {s_lt} -> {cand_lt:.2f}.",
+                                    requires_human_review=False,
+                                ))
+                        except Exception:
+                            pass
+                    if not repaired:
+                        s_up = f"{u_price:.2f}"
+                        if s_up[0] in ("2", "7") and len(s_up) > 4:
+                            try:
+                                cand_up = Decimal(s_up[1:])
+                                if abs((qty * cand_up - discount) - line_total) <= self.rounding_tolerance:
+                                    item["unit_price"] = str(cand_up)
+                                    u_price = cand_up
+                                    repaired = True
+                                    findings.append(ValidationFinding(
+                                        code=ReasonCode.VAL_SUSPICIOUS_ROUNDING,
+                                        severity=ValidationSeverity.INFO,
+                                        field_or_line_id=line_id,
+                                        expected_value=f"{expected_total:.2f}",
+                                        observed_value=s_up,
+                                        difference=f"{diff:.2f}",
+                                        message=f"Line '{line_id}' phantom Rupee digit '{s_up[0]}' stripped: {s_up} -> {cand_up:.2f}.",
+                                        requires_human_review=False,
+                                    ))
+                            except Exception:
+                                pass
+                    if not repaired:
+                        findings.append(ValidationFinding(
+                            code=ReasonCode.VAL_LINE_ARITHMETIC_MISMATCH,
+                            severity=ValidationSeverity.ERROR,
+                            field_or_line_id=line_id,
+                            expected_value=f"{expected_total:.2f}",
+                            observed_value=f"{line_total:.2f}",
+                            difference=f"{diff:.2f}",
+                            message=(
+                                f"Line '{line_id}' arithmetic mismatch: "
+                                f"{qty} x {u_price:.2f} - {discount:.2f} = {expected_total:.2f}, "
+                                f"but reported line_total is {line_total:.2f} (diff: {diff:.2f})."
+                            ),
+                            requires_human_review=True,
+                        ))
 
             # Tax check if tax_rate and tax_amount provided
             if tax_rate is not None and tax_amt is not None and line_total is not None:
@@ -332,19 +376,47 @@ class DeterministicValidator:
                         diff_with_order_discount,
                     )
                     if min_subtotal_diff > self.rounding_tolerance:
-                        findings.append(ValidationFinding(
-                            code=ReasonCode.VAL_SUBTOTAL_MISMATCH,
-                            severity=ValidationSeverity.ERROR,
-                            field_or_line_id="totals.subtotal",
-                            expected_value=f"{sum_line_totals:.2f}",
-                            observed_value=f"{subtotal:.2f}",
-                            difference=f"{diff_direct:.2f}",
-                            message=(
-                                f"Sum of {len(line_items)} line totals ({sum_line_totals:.2f}) "
-                                f"does not match reported subtotal ({subtotal:.2f}, diff: {diff_direct:.2f})."
-                            ),
-                            requires_human_review=True,
-                        ))
+                        # Sanity check: detect phantom leading '2' or '7' on one line
+                        sub_repaired = False
+                        for idx, it in enumerate(line_items):
+                            raw_lt = self._to_decimal(it.get("line_total"))
+                            if raw_lt is not None:
+                                s_lt = f"{raw_lt:.2f}"
+                                if s_lt[0] in ("2", "7") and len(s_lt) > 4:
+                                    try:
+                                        cand_lt = Decimal(s_lt[1:])
+                                        new_sum = sum_line_totals - raw_lt + cand_lt
+                                        if abs(new_sum - subtotal) <= self.rounding_tolerance:
+                                            it["line_total"] = str(cand_lt)
+                                            sub_repaired = True
+                                            sum_line_totals = new_sum
+                                            findings.append(ValidationFinding(
+                                                code=ReasonCode.VAL_SUSPICIOUS_ROUNDING,
+                                                severity=ValidationSeverity.INFO,
+                                                field_or_line_id=f"line-{idx+1}.line_total",
+                                                expected_value=f"{cand_lt:.2f}",
+                                                observed_value=s_lt,
+                                                difference=f"{abs(raw_lt - cand_lt):.2f}",
+                                                message=f"Subtotal reconciled: stripped phantom Rupee digit '{s_lt[0]}' from line {idx+1} ({s_lt} -> {cand_lt:.2f}).",
+                                                requires_human_review=False,
+                                            ))
+                                            break
+                                    except Exception:
+                                        pass
+                        if not sub_repaired:
+                            findings.append(ValidationFinding(
+                                code=ReasonCode.VAL_SUBTOTAL_MISMATCH,
+                                severity=ValidationSeverity.ERROR,
+                                field_or_line_id="totals.subtotal",
+                                expected_value=f"{sum_line_totals:.2f}",
+                                observed_value=f"{subtotal:.2f}",
+                                difference=f"{diff_direct:.2f}",
+                                message=(
+                                    f"Sum of {len(line_items)} line totals ({sum_line_totals:.2f}) "
+                                    f"does not match reported subtotal ({subtotal:.2f}, diff: {diff_direct:.2f})."
+                                ),
+                                requires_human_review=True,
+                            ))
 
             # 2. Sum of line taxes vs reported tax_total
             valid_line_taxes = [self._to_decimal(it.get("tax_amount")) for it in line_items if it.get("tax_amount") is not None]

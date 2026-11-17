@@ -149,7 +149,8 @@ def read_image(image_path: Path) -> OcrResult:
 
 # ---------------------------------------------------------------- parser
 
-_AMOUNT = r"(?:rs\.?\s*|inr\s*|₹\s*)?(?:\d{1,3}(?:,\d{3})+|\d+)[.,]\d{2}"
+_CURRENCY_PREFIX = r"(?:rs\.?\s*|inr\s*|[₹弄Ff¥?]\s*)"
+_AMOUNT = r"(?:" + _CURRENCY_PREFIX + r")?(?:\d{1,3}(?:,\d{3})+|\d+)[.,]\d{2}"
 _ITEM_WITH_QTY = re.compile(
     r"^(?:\d{1,2}[.)]\s+)?(?P<name>.*?[A-Za-z].*?)\s+(?:qty[:\s]*)?(?:x\s*)?(?P<qty>\d{1,3})(?:\s*x)?"
     r"(?:\s+(?P<unit>" + _AMOUNT + r"))?\s+(?P<amount>" + _AMOUNT + r")$",
@@ -168,10 +169,21 @@ _HEADER_ITEM = re.compile(r"\b(?:item|items|description|particulars|product)\b",
 _HEADER_COLS = re.compile(r"\b(?:qty|quantity|amount|amt|price|rate|total)\b", re.IGNORECASE)
 _ORDER_NO = re.compile(r"\border[ \t]*(?:id|no\.?|number)?[ \t]*[:#]?[ \t]*#?[ \t]*([A-Z0-9]{1,6}-?[A-Z0-9-]{2,})", re.IGNORECASE)
 
+def normalize_currency_artifacts(text: str) -> str:
+    """
+    Normalize currency artifacts (弄, F, ¥, ?, Rs., INR) only when directly preceding numeric amounts.
+    Preserves normal text and words like 'Fortune', 'Faasos', or 'Order #F-1234'.
+    """
+    if not text:
+        return ""
+    return re.sub(r"(?i)(^|[\s:|(])(?:rs\.?|inr|[弄F¥?])\s*(?=\d)", r"\1₹", text)
+
 def to_decimal(text: Optional[str]) -> Optional[Decimal]:
     if not text:
         return None
-    clean = re.sub(r"(?i)rs\.?|inr|₹|\s", "", text)
+    # Strip currency symbols and artifacts only when directly preceding digits
+    clean = re.sub(r"(?i)(?:rs\.?|inr|[₹弄Ff¥?])(?=\s*\d)", "", text)
+    clean = re.sub(r"\s", "", clean)
     if re.fullmatch(r"\d+,\d{2}", clean):  # 56,00 decimal comma
         clean = clean.replace(",", ".")
     clean = clean.replace(",", "")
@@ -215,12 +227,13 @@ def _parse_cells(cells: List[str]) -> Optional[dict]:
 
 def parse_item_text(text: str) -> Optional[dict]:
     """'Cola 750 ml  2  80.00' -> name, qty, unit price, amount. None when the row has no amount."""
-    cells = [c.strip() for c in re.split(r"\s{2,}|\t|\|", text) if c.strip()]
+    normalized_text = normalize_currency_artifacts(text)
+    cells = [c.strip() for c in re.split(r"\s{2,}|\t|\|", normalized_text) if c.strip()]
     if len(cells) >= 2:
         item = _parse_cells(cells)
         if item:
             return item
-    t = _single_space(text)
+    t = _single_space(normalized_text)
     m = _ITEM_WITH_QTY.match(t)
     if m:
         qty = int(m.group("qty"))
@@ -232,6 +245,106 @@ def parse_item_text(text: str) -> Optional[dict]:
         return {"name": m.group("name").strip(" .:-|"), "quantity": None, "unit_price": None,
                 "amount": to_decimal(m.group("amount"))}
     return None
+
+def reconcile_phantom_currency_digits(parsed: ParsedInvoice) -> ParsedInvoice:
+    """
+    Arithmetic sanity check to detect and strip phantom leading '2' or '7' digits
+    caused by Rupee (₹) OCR misreads when line arithmetic (qty * unit_price) or
+    subtotal / grand total reconciliation confirms it.
+    """
+    # 1. Line-item arithmetic verification: qty * unit_price == amount
+    for line in parsed.lines:
+        if line.quantity is not None and line.unit_price is not None and line.amount is not None:
+            expected = (Decimal(line.quantity) * line.unit_price).quantize(Decimal("0.01"))
+            if abs(line.amount - expected) > Decimal("0.02"):
+                # Check if amount has a phantom leading 2 or 7 (e.g. ₹20.00 read as 220.00)
+                s_amt = f"{line.amount:.2f}"
+                if s_amt[0] in ("2", "7") and len(s_amt) > 4:
+                    try:
+                        cand_amt = Decimal(s_amt[1:])
+                        if abs(cand_amt - expected) <= Decimal("0.02"):
+                            logger.info("Stripped phantom leading '%s' from line %d amount: %s -> %s",
+                                        s_amt[0], line.line_no, line.amount, cand_amt)
+                            line.amount = cand_amt
+                    except Exception:
+                        pass
+                # Check if unit_price has a phantom leading 2 or 7
+                s_up = f"{line.unit_price:.2f}"
+                if abs(line.amount - expected) > Decimal("0.02") and s_up[0] in ("2", "7") and len(s_up) > 4:
+                    try:
+                        cand_up = Decimal(s_up[1:])
+                        if abs(Decimal(line.quantity) * cand_up - line.amount) <= Decimal("0.02"):
+                            logger.info("Stripped phantom leading '%s' from line %d unit_price: %s -> %s",
+                                        s_up[0], line.line_no, line.unit_price, cand_up)
+                            line.unit_price = cand_up
+                    except Exception:
+                        pass
+
+    # 2. Subtotal and grand total reconciliation
+    target_subtotal = parsed.subtotal
+    if target_subtotal is None and parsed.total is not None:
+        target_subtotal = (
+            parsed.total
+            - (parsed.delivery_fee or Decimal("0.00"))
+            - (parsed.tax or Decimal("0.00"))
+            + (parsed.discount or Decimal("0.00"))
+        )
+
+    if target_subtotal is not None and parsed.lines:
+        amounts = [l.amount for l in parsed.lines if l.amount is not None]
+        if len(amounts) == len(parsed.lines):
+            current_sum = sum(amounts, Decimal("0.00"))
+            if abs(current_sum - target_subtotal) > Decimal("0.02"):
+                # Search for a single line with a phantom leading 2 or 7 that resolves the mismatch
+                repaired = False
+                for line in parsed.lines:
+                    s_amt = f"{line.amount:.2f}"
+                    if s_amt[0] in ("2", "7") and len(s_amt) > 4:
+                        try:
+                            cand_amt = Decimal(s_amt[1:])
+                            new_sum = current_sum - line.amount + cand_amt
+                            if abs(new_sum - target_subtotal) <= Decimal("0.02"):
+                                logger.info("Subtotal reconciled: stripped phantom '%s' from line %s (%s -> %s)",
+                                            s_amt[0], line.item_name, line.amount, cand_amt)
+                                line.amount = cand_amt
+                                current_sum = new_sum
+                                repaired = True
+                                break
+                        except Exception:
+                            pass
+
+                # If no line was repaired, check if subtotal or grand total itself has a phantom leading digit
+                if not repaired:
+                    if parsed.subtotal is not None:
+                        s_sub = f"{parsed.subtotal:.2f}"
+                        if s_sub[0] in ("2", "7") and len(s_sub) > 4:
+                            try:
+                                cand_sub = Decimal(s_sub[1:])
+                                if abs(cand_sub - current_sum) <= Decimal("0.02"):
+                                    logger.info("Subtotal reconciled: stripped phantom '%s' from subtotal (%s -> %s)",
+                                                s_sub[0], parsed.subtotal, cand_sub)
+                                    parsed.subtotal = cand_sub
+                            except Exception:
+                                pass
+                    if parsed.total is not None:
+                        expected_total = (
+                            current_sum
+                            + (parsed.delivery_fee or Decimal("0.00"))
+                            + (parsed.tax or Decimal("0.00"))
+                            - (parsed.discount or Decimal("0.00"))
+                        )
+                        s_tot = f"{parsed.total:.2f}"
+                        if s_tot[0] in ("2", "7") and len(s_tot) > 4:
+                            try:
+                                cand_tot = Decimal(s_tot[1:])
+                                if abs(cand_tot - expected_total) <= Decimal("0.02"):
+                                    logger.info("Total reconciled: stripped phantom '%s' from grand total (%s -> %s)",
+                                                s_tot[0], parsed.total, cand_tot)
+                                    parsed.total = cand_tot
+                            except Exception:
+                                pass
+
+    return parsed
 
 def parse_rows(rows: List[OcrRow]) -> ParsedInvoice:
     """
@@ -288,7 +401,7 @@ def parse_rows(rows: List[OcrRow]) -> ParsedInvoice:
                     unit_price=None, amount=to_decimal(amounts[-1]) if amounts else None,
                     confidence=r.confidence, readable=False, raw_text=text,
                 ))
-    return parsed
+    return reconcile_phantom_currency_digits(parsed)
 
 def parse_text(text: str) -> ParsedInvoice:
     """Parser entry point for plain text (one row per line), e.g. tests or a typed message."""

@@ -43,5 +43,5 @@ The research assets are categorized across the three core operational pipelines:
 | Asset Name | Type | Source URL / Repository | License | Purpose in System |
 | :--- | :--- | :--- | :--- | :--- |
 | **Qwen3-1.7B** | Model (LLM) | [Qwen/Qwen3-1.7B](https://huggingface.co/Qwen/Qwen3-1.7B) | Apache-2.0 | Fast, compact language model for zero-shot and LoRA-based line-item classification into security categories. |
-| **Item Taxonomy Seed Dataset** | Dataset | `research_track/datasets/item_taxonomy_seed/seed_items.csv` | Project Internal (Synthetic) | 300 unique synthetic line items (quick-commerce truncations, Hinglish slang, normal groceries) mapped across 7 institutional security categories. |
+| **Item Taxonomy Seed Dataset** | Dataset | `research_track/datasets/item_taxonomy_seed/seed_items.csv` | Project Internal (Synthetic) | 320 canonical synthetic line items (quick-commerce truncations, Hinglish slang, normal groceries, UNKNOWN) mapped across 8 institutional security categories. |
 | **Screening Policy Schema** | SQL / Models | `research_track/db_draft/` | Project Internal | Staging DDL, Alembic migration draft, and SQLAlchemy 2.0 models decoupling probabilistic classification from deterministic security policy. |

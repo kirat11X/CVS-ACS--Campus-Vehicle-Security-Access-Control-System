@@ -1,8 +1,8 @@
+import { Link } from "react-router";
 import type { LinkedVehicle, OwnerContext, ResidenceInfo } from "../../api/types";
 import { humanize } from "../../lib/format";
-import { navigate } from "../../lib/route";
 
-/** Plate (links to history) with the linked owner, or "Not linked". */
+/** Plate (links to the vehicle page) with the linked owner, or "Not linked". */
 export function SubjectCell({
   plate,
   vehicle,
@@ -18,13 +18,13 @@ export function SubjectCell({
   return (
     <div className="min-w-0">
       {shown ? (
-        <button type="button" className="font-mono text-sm font-semibold text-slate-900 underline-offset-2 hover:underline" onClick={() => navigate("history", shown)}>
+        <Link to={`/vehicles/${encodeURIComponent(shown)}`} className="plate text-sm text-slate-900 underline-offset-2 hover:underline dark:text-white">
           {shown}
-        </button>
+        </Link>
       ) : (
-        <span className="text-sm text-slate-500">No plate read</span>
+        <span className="text-sm text-slate-500 dark:text-slate-400">No plate read</span>
       )}
-      <div className="truncate text-xs text-slate-600">
+      <div className="truncate text-xs text-slate-600 dark:text-slate-400">
         {owner ? (
           <>
             {owner.name} · {owner.institutional_id}

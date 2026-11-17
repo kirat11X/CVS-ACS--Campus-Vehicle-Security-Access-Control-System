@@ -80,6 +80,7 @@ class DirectionInfo(BaseModel):
     method: DirectionMethod
     confidence: Optional[float] = None
     evidence: Dict[str, Any] = {}
+    is_provisional: bool = False
 
 class MovementSummary(BaseModel):
     """Effective movement-log entry for an observation (latest correction applied)."""
@@ -91,6 +92,21 @@ class MovementSummary(BaseModel):
     corrected: bool = False
     created_by: Optional[UserSummary] = None
     note: Optional[str] = None
+
+class RegistryMatch(BaseModel):
+    """
+    Slide-6 view of the read (Phase 7): edit-distance match against the registry.
+    LINKED = one registry plate within one edit (proposed), NEEDS_REVIEW = several close
+    plates, a low-confidence read with candidates, or no plate read; UNLINKED = nothing close.
+    Display only: link_status above stays the authoritative 5C linkage.
+    """
+    outcome: Literal["LINKED", "NEEDS_REVIEW", "UNLINKED"]
+    basis: Literal["EXACT", "ONE_EDIT", "CLOSE_MATCHES", "NO_MATCH", "LOW_CONFIDENCE", "NO_PLATE", "GUARD_CONFIRMED", "GUARD_NONE"]
+    edits: Optional[int] = None
+    explanation: str
+    candidates: List[RegistrySuggestion] = []
+    owner: Optional[OwnerContextResponse] = Field(None, description="Owner of the single matched plate (LINKED only)")
+    residence: Optional[ResidenceInfo] = None
 
 class ResolvedObservation(BaseModel):
     observation: FeedObservation
@@ -105,6 +121,8 @@ class ResolvedObservation(BaseModel):
     direction: Optional[DirectionInfo] = None
     movement: Optional[MovementSummary] = None
     movement_status: Optional[str] = Field(None, description="LOGGED, REPEAT_NOT_LOGGED or DIRECTION_UNKNOWN")
+    registry_match: Optional[RegistryMatch] = None
+    is_provisional: bool = False
 
 class FeedEntry(BaseModel):
     kind: str = Field(..., description="SNAPSHOT or a FeedEventKind value")

@@ -13,7 +13,7 @@ Does not connect to production databases or services.
 from dataclasses import dataclass, field
 from enum import Enum
 import math
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 # Standard optical OCR character confusion pairs with reduced edit penalties
 OCR_CONFUSION_PAIRS: Set[Tuple[str, str]] = {
@@ -307,3 +307,64 @@ class RegistryMatcher:
                 f"(score: {best_score:.4f}, margin: {margin:.4f} > {self.ambiguity_margin:.2f})"
             )
         )
+
+
+class OpticalPlateMatcher(RegistryMatcher):
+    """
+    OpticalPlateMatcher specializes RegistryMatcher for Indian ANPR optical matching.
+
+    Enforces:
+    - Optical OCR character confusion discounting (O/0, I/1, B/8, S/5, Z/2, G/6).
+    - Strict ambiguity margin rejection (Delta >= 0.07).
+    - 0.0% false match rate on near-duplicate plates: whenever two candidates are
+      separated by less than the ambiguity margin, the match status is AMBIGUOUS
+      and matched_record is strictly None.
+    - Flexible input: accepts List[RegistryRecord] or List[str] in registry, and
+      accepts str or NormalizedPlate in match().
+    """
+
+    def __init__(
+        self,
+        registry: Optional[Union[List[RegistryRecord], List[str]]] = None,
+        min_similarity_threshold: float = 0.82,
+        ambiguity_margin: float = 0.07,
+        ocr_confusion_penalty: float = 0.25,
+        algorithm: str = "weighted_levenshtein",
+        max_qualifying_candidates: int = 5,
+    ):
+        records: List[RegistryRecord] = []
+        if registry:
+            for i, item in enumerate(registry):
+                if isinstance(item, RegistryRecord):
+                    records.append(item)
+                elif isinstance(item, str):
+                    clean_str = item.strip().upper()
+                    records.append(RegistryRecord(registry_id=f"REG-{i+1:03d}", plate=clean_str))
+                else:
+                    clean_str = getattr(item, "plate", str(item)).strip().upper()
+                    records.append(RegistryRecord(registry_id=f"REG-{i+1:03d}", plate=clean_str))
+
+        super().__init__(
+            registry=records,
+            min_similarity_threshold=min_similarity_threshold,
+            ambiguity_margin=ambiguity_margin,
+            ocr_confusion_penalty=ocr_confusion_penalty,
+            algorithm=algorithm,
+            max_qualifying_candidates=max_qualifying_candidates,
+        )
+
+    def match(self, observed_plate: Any) -> RegistryMatchResult:
+        """
+        Matches an observed plate (string, NormalizedPlate, or object with clean_text/plate).
+        """
+        if hasattr(observed_plate, "clean_text"):
+            query_str = observed_plate.clean_text
+        elif hasattr(observed_plate, "plate"):
+            query_str = observed_plate.plate
+        elif observed_plate is None:
+            query_str = ""
+        else:
+            query_str = str(observed_plate).strip()
+
+        return super().match(query_str)
+

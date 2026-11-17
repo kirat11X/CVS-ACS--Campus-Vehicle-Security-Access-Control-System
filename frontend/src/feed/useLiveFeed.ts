@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { API_BASE, api, notifyUnauthorized } from "../api/client";
+import { api, apiUrl, notifyUnauthorized } from "../api/client";
 import type { FeedEntry, FeedKind, ResolvedObservation } from "../api/types";
 import { readEventStream } from "./sse";
 
@@ -110,7 +110,7 @@ export function useLiveFeed(token: string) {
         silenceTimer = window.setTimeout(abortStream, STREAM_SILENCE_TIMEOUT_MS);
       };
       try {
-        const res = await fetch(`${API_BASE}/feed/stream?since_id=${cursor ?? 0}`, {
+        const res = await fetch(apiUrl(`/feed/stream?since_id=${cursor ?? 0}`), {
           headers: { Authorization: `Bearer ${token}`, Accept: "text/event-stream" },
           signal: streamController.signal,
           cache: "no-store",

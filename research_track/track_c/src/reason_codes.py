@@ -20,6 +20,19 @@ class ReasonCode(str, Enum):
     CATEGORY_RULE_ALERT = "CATEGORY_RULE_ALERT"
     CATEGORY_RULE_REVIEW = "CATEGORY_RULE_REVIEW"
     CATEGORY_RULE_ALLOW = "CATEGORY_RULE_ALLOW"
+
+    # Standardized domain outcome reason codes
+    ALLOW_PERMITTED_FOOD = "ALLOW_PERMITTED_FOOD"
+    ALLOW_PERMITTED_GOODS = "ALLOW_PERMITTED_GOODS"
+    REVIEW_UNCERTAIN_CLASSIFICATION = "REVIEW_UNCERTAIN_CLASSIFICATION"
+    REVIEW_CONTROLLED_ITEM = "REVIEW_CONTROLLED_ITEM"
+    REVIEW_HAZARDOUS_QUANTITY = "REVIEW_HAZARDOUS_QUANTITY"
+    ALERT_PROHIBITED_CHEMICAL = "ALERT_PROHIBITED_CHEMICAL"
+    ALERT_PROHIBITED_TOBACCO = "ALERT_PROHIBITED_TOBACCO"
+    ALERT_PROHIBITED_ALCOHOL = "ALERT_PROHIBITED_ALCOHOL"
+    ALERT_PROHIBITED_DRUG = "ALERT_PROHIBITED_DRUG"
+    ALERT_PROHIBITED_WEAPON = "ALERT_PROHIBITED_WEAPON"
+
     UNKNOWN_CATEGORY = "UNKNOWN_CATEGORY"
     LOW_CLASSIFIER_CONFIDENCE = "LOW_CLASSIFIER_CONFIDENCE"
     MISSING_CLASSIFIER_CONFIDENCE = "MISSING_CLASSIFIER_CONFIDENCE"
@@ -79,6 +92,76 @@ REASON_CODE_REGISTRY: Dict[ReasonCode, ReasonCodeDetail] = {
         summary="Policy rule permitted item entry",
         description="The item category satisfied all policy criteria for standard gate entry (ALLOW).",
         requires_human_escalation=False,
+    ),
+    ReasonCode.ALLOW_PERMITTED_FOOD: ReasonCodeDetail(
+        code=ReasonCode.ALLOW_PERMITTED_FOOD,
+        category=CodeCategory.RULE_MATCH,
+        summary="Permitted food or beverage delivery allowed",
+        description="Standard permitted groceries, meals, and non-sensitive food items cleared for gate entry.",
+        requires_human_escalation=False,
+    ),
+    ReasonCode.ALLOW_PERMITTED_GOODS: ReasonCodeDetail(
+        code=ReasonCode.ALLOW_PERMITTED_GOODS,
+        category=CodeCategory.RULE_MATCH,
+        summary="Permitted campus goods or stationery allowed",
+        description="Ordinary household sundries, books, and authorized goods cleared for entry.",
+        requires_human_escalation=False,
+    ),
+    ReasonCode.REVIEW_UNCERTAIN_CLASSIFICATION: ReasonCodeDetail(
+        code=ReasonCode.REVIEW_UNCERTAIN_CLASSIFICATION,
+        category=CodeCategory.PERCEPTION_UNCERTAINTY,
+        summary="Uncertain classification requires guard review",
+        description="Classification is uncertain or confidence below safety threshold; degraded ALLOW to REVIEW.",
+        requires_human_escalation=True,
+    ),
+    ReasonCode.REVIEW_CONTROLLED_ITEM: ReasonCodeDetail(
+        code=ReasonCode.REVIEW_CONTROLLED_ITEM,
+        category=CodeCategory.RULE_MATCH,
+        summary="Controlled item requires physical verification",
+        description="Regulated or sharp item requires physical inspection by gate personnel.",
+        requires_human_escalation=True,
+    ),
+    ReasonCode.REVIEW_HAZARDOUS_QUANTITY: ReasonCodeDetail(
+        code=ReasonCode.REVIEW_HAZARDOUS_QUANTITY,
+        category=CodeCategory.THRESHOLD_CONDITION,
+        summary="Hazardous chemical quantity requires inspection",
+        description="Hazardous chemical package count or volume exceeds domestic threshold.",
+        requires_human_escalation=True,
+    ),
+    ReasonCode.ALERT_PROHIBITED_CHEMICAL: ReasonCodeDetail(
+        code=ReasonCode.ALERT_PROHIBITED_CHEMICAL,
+        category=CodeCategory.RULE_MATCH,
+        summary="Prohibited hazardous chemical detected",
+        description="Item identified as a prohibited toxic or explosive substance.",
+        requires_human_escalation=True,
+    ),
+    ReasonCode.ALERT_PROHIBITED_TOBACCO: ReasonCodeDetail(
+        code=ReasonCode.ALERT_PROHIBITED_TOBACCO,
+        category=CodeCategory.RULE_MATCH,
+        summary="Prohibited tobacco or nicotine product detected",
+        description="Cigarettes, vapes, or tobacco products are strictly barred from campus.",
+        requires_human_escalation=True,
+    ),
+    ReasonCode.ALERT_PROHIBITED_ALCOHOL: ReasonCodeDetail(
+        code=ReasonCode.ALERT_PROHIBITED_ALCOHOL,
+        category=CodeCategory.RULE_MATCH,
+        summary="Prohibited alcohol product detected",
+        description="Alcoholic beverages are strictly prohibited on campus premises.",
+        requires_human_escalation=True,
+    ),
+    ReasonCode.ALERT_PROHIBITED_DRUG: ReasonCodeDetail(
+        code=ReasonCode.ALERT_PROHIBITED_DRUG,
+        category=CodeCategory.RULE_MATCH,
+        summary="Prohibited prescription or scheduled drug detected",
+        description="Controlled substances or prescription narcotics without permit detected.",
+        requires_human_escalation=True,
+    ),
+    ReasonCode.ALERT_PROHIBITED_WEAPON: ReasonCodeDetail(
+        code=ReasonCode.ALERT_PROHIBITED_WEAPON,
+        category=CodeCategory.RULE_MATCH,
+        summary="Prohibited weapon or tactical blade detected",
+        description="Weapon, firearm, or unauthorized sharp implement triggered high-priority alert.",
+        requires_human_escalation=True,
     ),
     ReasonCode.UNKNOWN_CATEGORY: ReasonCodeDetail(
         code=ReasonCode.UNKNOWN_CATEGORY,

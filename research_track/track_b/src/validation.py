@@ -267,77 +267,142 @@ class DeterministicValidator:
         totals: Dict[str, Any],
         findings: List[ValidationFinding]
     ) -> None:
-        """Validates invoice-level totals against aggregated line items."""
+        """Validates invoice-level totals against aggregated line items and platform fee breakdowns."""
         subtotal = self._to_decimal(totals.get("subtotal"))
         tax_total = self._to_decimal(totals.get("tax_total"))
         discount_total = self._to_decimal(totals.get("discount_total")) or Decimal("0.00")
-        shipping_total = self._to_decimal(totals.get("shipping_total")) or Decimal("0.00")
-        grand_total = self._to_decimal(totals.get("grand_total"))
-        amount_paid = self._to_decimal(totals.get("amount_paid"))
-        amount_due = self._to_decimal(totals.get("amount_due"))
+        shipping_total = self._to_decimal(totals.get("shipping_total"))
+        delivery_fee = self._to_decimal(totals.get("delivery_fee"))
+        # delivery_term: prefer explicit delivery_fee if provided, else shipping_total
+        delivery_term = (delivery_fee if delivery_fee is not None else shipping_total) or Decimal("0.00")
+
+        packaging_fee = (
+            self._to_decimal(totals.get("packaging_fee"))
+            or self._to_decimal(totals.get("packaging_charge"))
+            or Decimal("0.00")
+        )
+        platform_fee = self._to_decimal(totals.get("platform_fee")) or Decimal("0.00")
+        round_off = self._to_decimal(totals.get("round_off")) or Decimal("0.00")
+
+        # Indian GST breakdown components (CGST, SGST, IGST)
+        cgst = self._to_decimal(totals.get("cgst"))
+        sgst = self._to_decimal(totals.get("sgst"))
+        igst = self._to_decimal(totals.get("igst"))
+        has_gst_components = (cgst is not None or sgst is not None or igst is not None)
+        gst_components_sum = (cgst or Decimal("0.00")) + (sgst or Decimal("0.00")) + (igst or Decimal("0.00"))
+
+        if has_gst_components and tax_total is not None:
+            diff_gst = abs(tax_total - gst_components_sum)
+            if diff_gst > self.tax_tolerance:
+                findings.append(ValidationFinding(
+                    code=ReasonCode.VAL_TAX_TOTAL_MISMATCH,
+                    severity=ValidationSeverity.WARNING,
+                    field_or_line_id="totals.tax_total",
+                    expected_value=f"{gst_components_sum:.2f}",
+                    observed_value=f"{tax_total:.2f}",
+                    difference=f"{diff_gst:.2f}",
+                    message=(
+                        f"Reported tax_total ({tax_total:.2f}) differs from sum of "
+                        f"CGST+SGST+IGST components ({gst_components_sum:.2f}, diff: {diff_gst:.2f})."
+                    ),
+                    requires_human_review=False,
+                ))
+
+        effective_tax_total = tax_total if tax_total is not None else (gst_components_sum if has_gst_components else None)
 
         # 1. Sum of line totals vs Subtotal
+        valid_line_discounts = [self._to_decimal(it.get("discount_amount")) for it in line_items if it.get("discount_amount") is not None]
+        sum_line_discounts = sum(valid_line_discounts, Decimal("0.00"))
+
         if line_items:
             valid_line_totals = [self._to_decimal(it.get("line_total")) for it in line_items]
             if all(v is not None for v in valid_line_totals):
                 sum_line_totals = sum(valid_line_totals, Decimal("0.00"))
                 if subtotal is not None:
-                    diff = abs(sum_line_totals - subtotal)
-                    if diff > self.rounding_tolerance:
+                    diff_direct = abs(sum_line_totals - subtotal)
+                    diff_with_item_discount = abs((sum_line_totals + sum_line_discounts) - subtotal)
+                    diff_with_subtracted_item_discount = abs((sum_line_totals - sum_line_discounts) - subtotal)
+                    diff_with_order_discount = abs((sum_line_totals - discount_total) - subtotal)
+
+                    # Subtotal can be reported net of line totals or gross before item discounts
+                    min_subtotal_diff = min(
+                        diff_direct,
+                        diff_with_item_discount,
+                        diff_with_subtracted_item_discount,
+                        diff_with_order_discount,
+                    )
+                    if min_subtotal_diff > self.rounding_tolerance:
                         findings.append(ValidationFinding(
                             code=ReasonCode.VAL_SUBTOTAL_MISMATCH,
                             severity=ValidationSeverity.ERROR,
                             field_or_line_id="totals.subtotal",
                             expected_value=f"{sum_line_totals:.2f}",
                             observed_value=f"{subtotal:.2f}",
-                            difference=f"{diff:.2f}",
+                            difference=f"{diff_direct:.2f}",
                             message=(
                                 f"Sum of {len(line_items)} line totals ({sum_line_totals:.2f}) "
-                                f"does not match reported subtotal ({subtotal:.2f}, diff: {diff:.2f})."
+                                f"does not match reported subtotal ({subtotal:.2f}, diff: {diff_direct:.2f})."
                             ),
                             requires_human_review=True,
                         ))
 
             # 2. Sum of line taxes vs reported tax_total
             valid_line_taxes = [self._to_decimal(it.get("tax_amount")) for it in line_items if it.get("tax_amount") is not None]
-            if valid_line_taxes and tax_total is not None:
+            if valid_line_taxes and effective_tax_total is not None:
                 sum_line_taxes = sum(valid_line_taxes, Decimal("0.00"))
-                diff_tax = abs(sum_line_taxes - tax_total)
+                diff_tax = abs(sum_line_taxes - effective_tax_total)
                 if diff_tax > self.tax_tolerance:
                     findings.append(ValidationFinding(
                         code=ReasonCode.VAL_TAX_TOTAL_MISMATCH,
                         severity=ValidationSeverity.WARNING,
                         field_or_line_id="totals.tax_total",
                         expected_value=f"{sum_line_taxes:.2f}",
-                        observed_value=f"{tax_total:.2f}",
+                        observed_value=f"{effective_tax_total:.2f}",
                         difference=f"{diff_tax:.2f}",
                         message=(
                             f"Sum of line-item taxes ({sum_line_taxes:.2f}) differs from "
-                            f"reported tax total ({tax_total:.2f}, diff: {diff_tax:.2f})."
+                            f"reported tax total ({effective_tax_total:.2f}, diff: {diff_tax:.2f})."
                         ),
                         requires_human_review=False,
                     ))
 
-        # 3. Subtotal + tax + shipping - discounts vs Grand Total
+        # 3. Subtotal + tax + platform fees (delivery, packaging, platform fee) - discounts + round_off vs Grand Total
+        grand_total = self._to_decimal(totals.get("grand_total"))
+        amount_paid = self._to_decimal(totals.get("amount_paid"))
+        amount_due = self._to_decimal(totals.get("amount_due"))
+
         if grand_total is not None:
-            # If subtotal is present, check grand total formula
             if subtotal is not None:
-                tax_term = tax_total or Decimal("0.00")
-                expected_grand = subtotal + tax_term + shipping_total - discount_total
-                diff_grand = abs(grand_total - expected_grand)
-                if diff_grand > self.rounding_tolerance:
+                tax_term = effective_tax_total or Decimal("0.00")
+                platform_charges = delivery_term + packaging_fee + platform_fee
+
+                # Reconcile grand total under standard combinations:
+                # 1. Standard: subtotal + tax + platform_charges - discount_total + round_off
+                expected_std = subtotal + tax_term + platform_charges - discount_total + round_off
+                diff_std = abs(grand_total - expected_std)
+
+                # 2. Subtotal was already discounted, order discount not applied twice
+                expected_no_discount = subtotal + tax_term + platform_charges + round_off
+                diff_no_discount = abs(grand_total - expected_no_discount)
+
+                # 3. Item discounts deducted instead of order discount
+                expected_item_discount = subtotal + tax_term + platform_charges - sum_line_discounts + round_off
+                diff_item_discount = abs(grand_total - expected_item_discount)
+
+                best_diff = min(diff_std, diff_no_discount, diff_item_discount)
+                if best_diff > self.rounding_tolerance:
                     findings.append(ValidationFinding(
                         code=ReasonCode.VAL_GRAND_TOTAL_MISMATCH,
                         severity=ValidationSeverity.CRITICAL,
                         field_or_line_id="totals.grand_total",
-                        expected_value=f"{expected_grand:.2f}",
+                        expected_value=f"{expected_std:.2f}",
                         observed_value=f"{grand_total:.2f}",
-                        difference=f"{diff_grand:.2f}",
+                        difference=f"{diff_std:.2f}",
                         message=(
                             f"Grand total reconciliation failed: subtotal ({subtotal:.2f}) + "
-                            f"tax ({tax_term:.2f}) + shipping ({shipping_total:.2f}) - "
-                            f"discount ({discount_total:.2f}) = {expected_grand:.2f}, "
-                            f"but reported grand total is {grand_total:.2f} (diff: {diff_grand:.2f})."
+                            f"tax ({tax_term:.2f}) + platform charges ({platform_charges:.2f}) - "
+                            f"discount ({discount_total:.2f}) + round_off ({round_off:.2f}) = {expected_std:.2f}, "
+                            f"but reported grand total is {grand_total:.2f} (diff: {diff_std:.2f})."
                         ),
                         requires_human_review=True,
                     ))

@@ -186,7 +186,7 @@ def run_tests():
     assert client.put("/lanes/gate_2_cam", headers=auth(admin), json={"gate_id": "GATE_3", "lane_role": "ENTRY_LANE"}).status_code == 409
     listed = {l["camera_id"] for l in client.get("/lanes", headers=auth(guard)).json()}
     assert {c for c, _ in lanes} <= listed
-    print(f"  -> 5 lanes declared (ENTRY/EXIT at GATE_2, EXIT + BIDIRECTIONAL zones at GATE_3, zone-less BIDIRECTIONAL at GATE_1)")
+    print("  -> 5 lanes declared (ENTRY/EXIT at GATE_2, EXIT + BIDIRECTIONAL zones at GATE_3, zone-less BIDIRECTIONAL at GATE_1)")
     print("  -> GUARD/SUPERVISOR 403; zones on non-bidirectional 400; single zone 400; unknown gate 404; camera of other gate 409")
     print("  -> PASS Scenario 1: Lane configuration verified.")
 

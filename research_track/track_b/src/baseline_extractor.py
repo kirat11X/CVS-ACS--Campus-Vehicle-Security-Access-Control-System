@@ -88,17 +88,26 @@ class DeterministicBaselineExtractor(InvoiceExtractor):
         line_items: List[Dict[str, Any]] = []
 
         for idx, item in enumerate(raw_items):
-            line_id = f"item-{idx + 1}"
+            line_id = item.get("line_item_id") or f"item-{idx + 1}"
+            source_page = item.get("source_page") or item.get("page_number") or item.get("page") or 1
+            bbox = item.get("bounding_box")
+            raw_text = item.get("raw_text_snippet")
+
             norm_item = self.normalizer.normalize_line_item(
                 raw_description=item.get("description", ""),
                 raw_quantity=item.get("quantity"),
                 raw_unit_price=item.get("unit_price"),
                 raw_unit=item.get("unit"),
                 raw_line_total=item.get("line_total"),
-                raw_discount=item.get("discount"),
+                raw_discount=item.get("discount") or item.get("discount_amount"),
                 raw_tax_rate=item.get("tax_rate"),
                 raw_tax_amount=item.get("tax_amount"),
                 currency=currency_code,
+                page_number=source_page,
+                source_page=source_page,
+                bounding_box=bbox,
+                raw_text_snippet=raw_text,
+                line_item_id=line_id,
             )
 
             # Convert Decimals to DecimalString format for JSON schema compliance
@@ -114,8 +123,10 @@ class DeterministicBaselineExtractor(InvoiceExtractor):
                 "tax_amount": f"{norm_item['tax_amount']:.2f}" if norm_item["tax_amount"] is not None else None,
                 "line_total": f"{norm_item['line_total']:.2f}" if norm_item["line_total"] is not None else None,
                 "currency": currency_code,
-                "source_page": 1,
-                "evidence": None,
+                "source_page": source_page,
+                "page_number": source_page,
+                "bounding_box": bbox,
+                "evidence": norm_item.get("evidence"),
                 "field_confidence": {
                     "description": 1.0,
                     "quantity": 1.0 if norm_item["quantity"] is not None else 0.0,
@@ -136,11 +147,29 @@ class DeterministicBaselineExtractor(InvoiceExtractor):
             r"(?:total\s*)?gst\s*[:=-]\s*([^\n\r;|]+)",
             r"(?:total\s*)?vat\s*[:=-]\s*([^\n\r;|]+)",
         ])
+        cgst_raw = self._extract_label_value(lines, [
+            r"cgst\s*[:=-]\s*([^\n\r;|]+)",
+        ])
+        sgst_raw = self._extract_label_value(lines, [
+            r"sgst\s*[:=-]\s*([^\n\r;|]+)",
+        ])
+        igst_raw = self._extract_label_value(lines, [
+            r"igst\s*[:=-]\s*([^\n\r;|]+)",
+        ])
         discount_total_raw = self._extract_label_value(lines, [
             r"(?:total\s*)?discount\s*[:=-]\s*([^\n\r;|]+)",
         ])
         shipping_raw = self._extract_label_value(lines, [
             r"(?:shipping|delivery|freight)\s*(?:fee|charge)?\s*[:=-]\s*([^\n\r;|]+)",
+        ])
+        packaging_raw = self._extract_label_value(lines, [
+            r"(?:packaging|packing|container)\s*(?:fee|charge)?\s*[:=-]\s*([^\n\r;|]+)",
+        ])
+        platform_fee_raw = self._extract_label_value(lines, [
+            r"(?:platform|convenience)\s*(?:fee|charge)?\s*[:=-]\s*([^\n\r;|]+)",
+        ])
+        round_off_raw = self._extract_label_value(lines, [
+            r"round\s*-?\s*off\s*[:=-]\s*([^\n\r;|]+)",
         ])
         grand_total_raw = self._extract_label_value(lines, [
             r"(?:grand\s*total|total\s*payable|total\s*amount|balance\s*due|final\s*total)\s*[:=-]\s*([^\n\r;|]+)",
@@ -155,8 +184,14 @@ class DeterministicBaselineExtractor(InvoiceExtractor):
 
         subtotal_dec = self.normalizer.parse_decimal_amount(subtotal_raw)
         tax_dec = self.normalizer.parse_decimal_amount(tax_total_raw)
+        cgst_dec = self.normalizer.parse_decimal_amount(cgst_raw)
+        sgst_dec = self.normalizer.parse_decimal_amount(sgst_raw)
+        igst_dec = self.normalizer.parse_decimal_amount(igst_raw)
         discount_dec = self.normalizer.parse_decimal_amount(discount_total_raw)
         shipping_dec = self.normalizer.parse_decimal_amount(shipping_raw)
+        packaging_dec = self.normalizer.parse_decimal_amount(packaging_raw)
+        platform_fee_dec = self.normalizer.parse_decimal_amount(platform_fee_raw)
+        round_off_dec = self.normalizer.parse_decimal_amount(round_off_raw)
         grand_total_dec = self.normalizer.parse_decimal_amount(grand_total_raw)
         paid_dec = self.normalizer.parse_decimal_amount(paid_raw)
         due_dec = self.normalizer.parse_decimal_amount(due_raw)
@@ -165,7 +200,14 @@ class DeterministicBaselineExtractor(InvoiceExtractor):
             "subtotal": f"{subtotal_dec:.2f}" if subtotal_dec is not None else None,
             "discount_total": f"{discount_dec:.2f}" if discount_dec is not None else None,
             "tax_total": f"{tax_dec:.2f}" if tax_dec is not None else None,
+            "cgst": f"{cgst_dec:.2f}" if cgst_dec is not None else None,
+            "sgst": f"{sgst_dec:.2f}" if sgst_dec is not None else None,
+            "igst": f"{igst_dec:.2f}" if igst_dec is not None else None,
             "shipping_total": f"{shipping_dec:.2f}" if shipping_dec is not None else None,
+            "delivery_fee": f"{shipping_dec:.2f}" if shipping_dec is not None else None,
+            "packaging_fee": f"{packaging_dec:.2f}" if packaging_dec is not None else None,
+            "platform_fee": f"{platform_fee_dec:.2f}" if platform_fee_dec is not None else None,
+            "round_off": f"{round_off_dec:.2f}" if round_off_dec is not None else None,
             "grand_total": f"{grand_total_dec:.2f}" if grand_total_dec is not None else None,
             "amount_paid": f"{paid_dec:.2f}" if paid_dec is not None else None,
             "amount_due": f"{due_dec:.2f}" if due_dec is not None else None,

@@ -96,6 +96,13 @@
 ### ⚠️ I. Live Feed Cursor Ordering (Phase 5C)
 * `observation_feed_events.id` is the feed cursor. Every insert takes `pg_advisory_xact_lock(5031602)` first (`services/feed_events.py`), so ids become visible in commit order and `id > since_id` polling can never skip a late-committing row. Always write feed events through `record_feed_event()`, never with a bare `db.add()`.
 
+### ⚠️ J. Mobile App Networking (Phase 16)
+* The web console calls `/api/...`; the Vite dev/preview server (or a reverse proxy) forwards it to `:8000`, so no CORS is involved.
+* The Capacitor app has **no proxy**: it calls the absolute server URL a guard enters on the sign-in screen (stored on the device; or baked in with `VITE_API_BASE_URL`). Its pages load from `https://localhost` (Android) / `capacitor://localhost` (iOS), which are the defaults of `CORS_ALLOW_ORIGINS` in `backend/app/config.py`. Add any other origin that must call the API directly (comma-separated). Credentials stay off; tokens travel in the `Authorization` header.
+* `capacitor.config.ts` sets `server.cleartext` and `android.allowMixedContent` so the app can reach an `http://` LAN backend during development. Use HTTPS in production and turn both off.
+* For phones on the LAN, run uvicorn with `--host 0.0.0.0`. The Android emulator reaches the host's loopback at `http://10.0.2.2:8000`.
+* Building the APK needs JDK 21 (`JAVA_HOME`) and the Android SDK (`ANDROID_HOME` or `android/local.properties`); `/usr/lib/jvm/java-21-openjdk` on this host is an empty directory, a Temurin 21 lives in `~/.local/temurin-21`.
+
 ---
 
 ## 4. Repository Directory Layout
@@ -129,7 +136,7 @@
 │       ├── config.py           # Application settings loaded from .env
 │       ├── db.py               # SQLAlchemy engine, SessionLocal, health check
 │       ├── mqtt.py             # Paho MQTT manager (listen/pub/health probe)
-│       ├── main.py             # FastAPI entrypoint (/health, /vehicles, /gates, /observations, /auth, /owners, /feed, /resolutions)
+│       ├── main.py             # FastAPI entrypoint (/health, /vehicles, /gates, /observations, /auth, /owners, /feed, /resolutions, /dashboard, /users) + CORS
 │       ├── dependencies.py     # get_db, get_current_user (bearer auth), require_roles / require_staff / require_admin
 │       ├── models/             # SQLAlchemy 2.0 ORM Entity Models
 │       │   ├── __init__.py     # Unified export of all models + enums
@@ -138,7 +145,7 @@
 │       │   ├── identity.py     # User, VehicleOwner (with institutional & residence context), Visitor
 │       │   ├── vehicle.py      # Vehicle (raw & normalized plate), DeliveryVehicle
 │       │   ├── gate.py         # Gate, AccessDecision, EntryExitLog, SecurityAlert
-│       │   ├── delivery.py     # DeliveryOrder, Invoice, InvoiceItem
+│       │   ├── delivery.py     # DeliveryOrder, Invoice, InvoiceItem (+ screening columns), DeliveryDecision (append-only)
 │       │   ├── health.py       # HealthCheckRecord (continuous heartbeat model)
 │       │   ├── observation.py  # ObservationEvent, ObservationResolution (append-only), ObservationFeedEvent (feed cursor log)
 │       │   └── movement.py     # CameraLane (declared lane roles), VehicleLinkEvent (append-only)
@@ -148,7 +155,9 @@
 │       │   ├── gate.py         # GateCreate, GateUpdate, GateResponse
 │       │   ├── observation.py   # ObservationCreate, ObservationResponse
 │       │   ├── feed.py          # ResolvedObservation, FeedPage, ManualObservationCreate, ResolutionCreate
-│       │   ├── owner.py         # OwnerCreate
+│       │   ├── owner.py         # OwnerCreate, OwnerUpdate, OwnerDetailResponse
+│       │   ├── dashboard.py     # DashboardSummary (Phase 16)
+│       │   ├── user.py          # UserAccount, UserCreate, UserUpdate, PasswordChange (Phase 16)
 │       │   └── movement.py      # Lanes, movement log, presence, history, vehicle link schemas
 │       ├── services/           # Reusable domain services
 │       │   ├── __init__.py
@@ -165,7 +174,12 @@
 │       │   ├── movement_lookup.py        # Movement chains (root + corrections), effective row
 │       │   ├── movement_service.py       # Movement write path (on_observation, confirm, correct) + presence/logs/history reads
 │       │   ├── vehicle_registration_service.py # Shared POST /vehicles policy + create_vehicle
-│       │   └── vehicle_link_service.py   # POST /vehicles/{plate}/link (owner + vehicle + link event)
+│       │   ├── vehicle_link_service.py   # POST /vehicles/{plate}/link (owner + vehicle + link event)
+│       │   ├── invoice_reader.py         # Phase 7: OCR (RapidOCR / Tesseract) -> rows -> invoice parser
+│       │   ├── delivery_policy.py        # Phase 7: deterministic keyword -> category -> reason code -> verdict table
+│       │   ├── delivery_screening_service.py # Phase 7: upload storage, screening, persistence, decisions, read models
+│       │   ├── registry_match.py         # Phase 7: slide-6 edit-distance registry match (display only)
+│       │   └── alert_service.py          # Phase 7: unified needs-attention list (/alerts) + plate counts
 │       ├── workers/            # Background asynchronous workers
 │       │   ├── __init__.py
 │       │   └── frigate_mqtt_worker.py    # Persistent MQTT subscriber for frigate/events
@@ -174,20 +188,32 @@
 │       │   ├── vehicles.py     # CRUD + identity context endpoints (/vehicles)
 │       │   ├── gates.py        # Gate configuration & observation listing (/gates)
 │       │   ├── observations.py # Sensor telemetry ingestion & query (/observations, /observations/manual)
-│       │   ├── auth.py         # /auth/login, /auth/me
-│       │   ├── owners.py       # GET /owners?q=, POST /owners (ADMIN)
+│       │   ├── auth.py         # /auth/login, /auth/me, POST /auth/password
+│       │   ├── owners.py       # GET /owners (q optional), GET/PUT /owners/{id}, POST /owners (ADMIN)
 │       │   ├── feed.py         # GET /feed, GET /feed/stream (SSE), GET /feed/snapshots/{id}
 │       │   ├── resolutions.py  # POST /resolutions (append-only guard confirmation)
 │       │   ├── lanes.py        # GET /lanes, PUT /lanes/{camera_id} (ADMIN)
 │       │   ├── movements.py    # GET /logs, GET /logs/{id}, POST /logs/confirm, POST /logs/{id}/corrections
-│       │   └── presence.py     # GET /presence, GET /presence/inside
-│       └── whatsapp/           # WhatsApp abstraction layer
+│       │   ├── presence.py     # GET /presence, GET /presence/inside
+│       │   ├── dashboard.py    # GET /dashboard/summary (Phase 16)
+│       │   ├── users.py        # GET/POST /users, PATCH /users/{id} (ADMIN, Phase 16)
+│       │   ├── deliveries.py   # Phase 7: /deliveries list, detail, invoice-image, process, decision
+│       │   ├── intake.py       # Phase 7: public LAN page GET /intake, POST /intake/upload
+│       │   ├── webhooks.py     # Phase 7: GET/POST /webhooks/whatsapp
+│       │   └── system.py       # Phase 7: GET /alerts, GET /system/whatsapp
+│       └── whatsapp/           # WhatsApp abstraction layer (WHATSAPP_PROVIDER = local | mock | meta)
 │           ├── __init__.py
+│           ├── __init__.py     # get_whatsapp_provider()
 │           ├── base.py         # Abstract WhatsAppProvider interface
-│           └── mock.py         # MockWhatsAppProvider for offline dev
+│           ├── mock.py         # MockWhatsAppProvider for offline dev
+│           ├── local.py        # LocalIntakeProvider (default): LAN intake page + stored outbox
+│           └── meta.py         # MetaCloudWhatsAppProvider stub (WHATSAPP_TOKEN / WHATSAPP_PHONE_ID)
 │
-├── frontend/                   # Guard dashboard (React 19 + Vite 6 + Tailwind 3 + TS); dev server proxies /api -> :8000
-│   └── src/                    # api/ (client, types), auth/, feed/ (SSE parser, useLiveFeed), components/
+├── frontend/                   # Web & mobile console (React 19 + Vite 6 + Tailwind 3 + TS, Capacitor 7); see frontend/README.md
+│   ├── src/                    # api/ (client, types, queries), app/ (shell, nav, router), auth/, feed/ (SSE parser, live feed context),
+│   │                           # components/ (ui kit, feed, forms, charts, movement, registry), pages/, lib/
+│   ├── android/                # Capacitor Android project (npm run android:build -> app-debug.apk)
+│   └── capacitor.config.ts     # app id, https scheme, cleartext / mixed content for LAN development
 │
 ├── config/
 │   ├── frigate/
@@ -216,6 +242,9 @@
     ├── test_phase4_frigate_mqtt_worker.py # 20-scenario test suite for Frigate MQTT Ingestion Worker
     ├── test_phase5c_live_feed.py # 16-scenario test suite for live feed, linkage, manual entry & permissions
     ├── test_phase6_movement.py # 14-scenario test suite for direction provenance, movement log, presence & linking
+    ├── test_phase16_console_api.py # 7-scenario test suite for CORS, dashboard summary, accounts, owner edit & plate search
+    ├── test_phase7_delivery_screening.py # 11-scenario suite: policy table, parser/OCR, intake, deliveries, decisions, alerts, WhatsApp
+    ├── seed_demo.py            # Idempotent mid-term demo data (owners, vehicles, accounts, demo invoice, D-20481)
     └── create_user.py          # Create/update ADMIN, SUPERVISOR or GUARD accounts
 ```
 
@@ -258,6 +287,7 @@ The PostgreSQL schema is completely implemented in SQLAlchemy 2.0 ORM and manage
 3. `1c9f9a684531_add_observation_events_and_gate_status.py`: Added `'INACTIVE'` to `gate_status_enum`, created `observation_source_enum`, `observed_vehicle_type_enum`, `observation_direction_enum`, and table `observation_events`.
 4. `d529411fb6a3_add_manual_observations_guard_resolutions_and_feed.py` (Phase 5C): idempotent `ADD VALUE IF NOT EXISTS 'MANUAL'` on `observation_source_enum` (it already existed), `created_by_id` on `observation_events`/`vehicles`/`vehicle_owners`, `observation_events.note`, enums `resolution_outcome_enum` and `feed_event_kind_enum` (created explicitly), tables `observation_resolutions` (with an UPDATE/DELETE-rejecting trigger) and `observation_feed_events`.
 5. `0453af6c03f6_add_movement_logging_lanes_and_link_events.py` (Phase 6): enums `lane_role_enum`, `direction_method_enum`, `log_plate_source_enum`, `link_method_enum` (explicit), `'MOVEMENT_UPDATED'` added to `feed_event_kind_enum`; table `camera_lanes`; table `vehicle_link_events` (append-only trigger); `entry_exit_logs` gains `observation_id` (unique, root rows), `correction_of_id`, `direction_method`, `direction_confidence`, `direction_evidence`, `plate_source`, `created_by_id`, `note`, and `plate`/`normalized_plate`/`confidence`/`decision`/`reason_code` become nullable; trigger `entry_exit_logs_movement_append_only` rejects UPDATE/DELETE of movement rows (`direction_method IS NOT NULL`; legacy rows unaffected). Downgrade discards Phase 6 movement rows.
+6. `c7a3e91d5f20_add_delivery_screening_and_decisions.py` (Phase 7; revises `b5e9171d27fb`, which follows the `4f86b8cd2197` / `4076a5142882` / `6f2f24c93463` fixes): enums `screening_verdict_enum`, `guard_decision_enum`, `delivery_source_enum` (explicit); `invoices` gains `source`, `sender`, `gate_id`, `preview_path`, `ocr_engine`, `delivery_fee`, `computed_total`, `totals_match`, `overall_verdict`, `reply_text`, `created_by_id`; `invoice_items` gains `line_no`, `category`, `reason_code`, `verdict`, `confidence` and `quantity` becomes nullable; table `delivery_decisions` (row trigger rejects UPDATE/DELETE, statement trigger rejects TRUNCATE).
 
 ### Entities:
 1. **`User`** (`users`): System accounts (role: `ADMIN`, `GUARD`, `SUPERVISOR`).
@@ -289,6 +319,7 @@ The PostgreSQL schema is completely implemented in SQLAlchemy 2.0 ORM and manage
 16. **`ObservationFeedEvent`** (`observation_feed_events`, Phase 5C): BIGSERIAL change log (`OBSERVATION_CREATED`, `OBSERVATION_UPDATED`, `RESOLUTION_ADDED`, `REGISTRY_UPDATED`) whose id is the live-feed cursor.
 17. **`CameraLane`** (`camera_lanes`, Phase 6): Administrator-declared `lane_role` per camera (`ENTRY_LANE`, `EXIT_LANE`, `BIDIRECTIONAL` + optional `outside_zone`/`inside_zone`), `gate_id`, `is_active` (retire instead of delete). Also maps extra cameras to a gate.
 18. **`VehicleLinkEvent`** (`vehicle_link_events`, Phase 6): Append-only human assertion that a vehicle belongs to an owner (`method` `GUARD_VERIFIED_ID`/`ADMIN`, `evidence_note`, `linked_by_id`, `linked_at`, `expires_at`). Not proof of identity; no ID images stored.
+19. **`DeliveryDecision`** (`delivery_decisions`, Phase 7): Append-only guard decision on a screened delivery (`decision` `CLEARED`/`HELD`/`ESCALATED`, `note`, `decided_by_id`, `decided_at`, `invoice_id` = the submission decided on). ORM listeners + DB triggers block UPDATE/DELETE/TRUNCATE.
 
 ---
 
@@ -330,16 +361,26 @@ PYTHONPATH=. .venv/bin/python scripts/test_phase5c_live_feed.py
 # 11. Run Phase 6 Movement Logging, Presence & Linking (14/14; starts uvicorn on :8000)
 PYTHONPATH=. .venv/bin/python scripts/test_phase6_movement.py
 
-# 12. Verify Alembic Model/Schema Drift (Must report: "No new upgrade operations detected.")
+# 12. Run Phase 16 Console API (7/7; starts uvicorn on :8000)
+PYTHONPATH=. .venv/bin/python scripts/test_phase16_console_api.py
+
+# 12a. Run Phase 7 Delivery Screening, LAN intake, alerts & WhatsApp provider (11/11; starts uvicorn on :8000)
+PYTHONPATH=. .venv/bin/python scripts/test_phase7_delivery_screening.py
+
+# 12b. Seed the mid-term demo data (idempotent; safe to re-run)
+PYTHONPATH=. .venv/bin/python scripts/seed_demo.py
+
+# 13. Verify Alembic Model/Schema Drift (Must report: "No new upgrade operations detected.")
 .venv/bin/alembic check
 ```
 
-### Running the guard dashboard (Phase 5C)
+### Running the console (web and mobile, Phase 16)
 ```bash
 PYTHONPATH=. .venv/bin/python scripts/create_user.py --username guard1 --full-name "Gate 1 Guard" --email guard1@campus.edu --role GUARD
-PYTHONPATH=. .venv/bin/uvicorn backend.app.main:app --host 127.0.0.1 --port 8000
+PYTHONPATH=. .venv/bin/uvicorn backend.app.main:app --host 127.0.0.1 --port 8000   # --host 0.0.0.0 for phones on the LAN
 cd frontend && npm install && npm run dev     # http://localhost:5173 (proxies /api to BACKEND_URL, default :8000)
 npm run typecheck && npm run build             # verification
+JAVA_HOME=~/.local/temurin-21 ANDROID_HOME=~/Android/Sdk npm run android:build   # debug APK
 ```
 
 ---
@@ -549,6 +590,90 @@ Returns `{direction ENTRY|EXIT|UNKNOWN, method CAMERA_ROLE|ZONE_ORDER|GUARD_CONF
 
 ---
 
+## 11D. Phase 7: Delivery Invoice Screening, LAN Intake & Unified Alerts
+
+Implements slides 6–9 of the mid-term deck. The screening proposes; the guard decides. Nothing is blocked automatically, no `AccessDecision` rows are written, no barrier is controlled.
+
+### Pipeline (`DeliveryScreeningService`)
+```
+invoice photo / PDF (intake page, chat webhook, or console upload)
+  → stored under media/invoices/ (type sniffed from magic bytes; PDF page 1 → PNG with pdftoppm, 150 dpi)
+  → OCR: RapidOCR, Tesseract fallback when RapidOCR fails or yields no item line (services/invoice_reader.py)
+  → rows (fragments grouped by y; column gaps kept as double spaces) → parser: vendor, order number,
+    item table (name / qty / unit / amount by column cell), Subtotal / Delivery / Tax / Discount / TOTAL
+  → policy table per line (services/delivery_policy.py): keyword → category → reason code → verdict
+  → arithmetic: lines + delivery fee + tax − discount = TOTAL (±0.01)
+  → Invoice + InvoiceItem rows (each submission is a new Invoice; the latest is the order's current one)
+  → reply text, e.g. "Order D-20481: 2 of 5 lines need a look. Total matches: 700.00."
+```
+
+| Reason code | Verdict |
+| :--- | :--- |
+| `FOOD_OK`, `BEVERAGE_OK`, `STATIONERY_OK`, `PERSONAL_CARE_OK`, `ELECTRONICS_OK` | ALLOW |
+| `HAZMAT_NEEDS_APPROVAL`, `MEDICINE_NEEDS_APPROVAL`, `UNKNOWN_CATEGORY`, `UNREADABLE_LINE` | REVIEW |
+| `TOBACCO_RESTRICTED`, `ALCOHOL_RESTRICTED`, `WEAPON_RESTRICTED` | ALERT |
+
+* Keyword lists adapted from the Track C lexical baseline (copied, not imported). Conflicting matches resolve to the more severe category; among equals the longest keyword wins (`ice cream` is food). Matching also tries the name with word breaks restored (`NotebookA4ruled`).
+* An ALLOW line read below `SCREENING_LINE_MIN_CONFIDENCE` (0.60) becomes `UNREADABLE_LINE` / REVIEW; restricted lines stay ALERT. Unparseable rows inside the item table become unreadable lines. An unread quantity stays NULL (never defaulted).
+* Overall = worst line verdict, raised to at least REVIEW when: no line was read, the total does not add up or cannot be checked (`totals_match` false / null), or the invoice prints a different order number than the one given.
+* Guard decisions (`POST /deliveries/{order_id}/decision`) are append-only and attach to the current invoice: re-sending an invoice needs a fresh decision; history stays on the order.
+
+### Endpoints
+| Endpoint | Auth | Notes |
+| :--- | :--- | :--- |
+| `GET /intake` | public | Mobile HTML page "Send delivery invoice" (inline CSS, no external assets) |
+| `POST /intake/upload` | public | multipart `order_id`, `file`, `sender_phone?`, `gate_id?`, `platform?`; chat-style HTML result, JSON with `Accept: application/json` (no guard names / raw OCR in the JSON) |
+| `POST /webhooks/whatsapp`, `GET /webhooks/whatsapp` | public | Provider-parsed chat message; inline `media_base64` (local / mock) or Meta media id; arbitrary media URLs are never fetched. GET = Meta `hub.verify_token` handshake. With `WHATSAPP_APP_SECRET` set, Meta signatures are required. |
+| `GET /deliveries?status=&verdict=&q=&limit=` | staff | `status`: `pending` (flagged, undecided), `undecided`, `decided`, `CLEARED`, `HELD`, `ESCALATED` |
+| `GET /deliveries/{order_id}` | staff | Lines with `category_label`, `reason_code`, `verdict`; invoice totals; decision history |
+| `GET /deliveries/{order_id}/invoice-image` | staff | Bearer header like `/feed/snapshots/{id}`; PDFs served as the rendered PNG |
+| `POST /deliveries/process` | staff | Guard upload from the console (`source=CONSOLE`) |
+| `POST /deliveries/{order_id}/decision` | staff | `{decision: CLEARED / HELD / ESCALATED, note?}` |
+| `GET /alerts?limit=` | staff | `PLATE_REVIEW`, `PLATE_UNLINKED` (newest sighting per plate in `ALERTS_LOOKBACK_HOURS`, unresolved), `DELIVERY_ALERT` / `DELIVERY_REVIEW` (undecided lines; totals mismatch); most severe first |
+| `GET /system/whatsapp` | staff | `{provider, available, intake_url, outbox_count}` |
+| `GET /dashboard/summary` | staff | + `delivery_flags`, `unlinked_plates`, `plates_to_review` |
+
+### WhatsApp provider (`backend/app/whatsapp/`)
+`WHATSAPP_PROVIDER` = `local` (default: `LocalIntakeProvider`, replies appended to `media/whatsapp_outbox/outbox.jsonl`), `mock` (in-memory), `meta` (`MetaCloudWhatsAppProvider` stub: Graph API send / media download; reads `WHATSAPP_TOKEN` / `WHATSAPP_PHONE_ID`, falls back to `WHATSAPP_API_TOKEN` / `WHATSAPP_PHONE_NUMBER_ID`; unavailable while unset or `mock…` placeholders; never exercised against Meta). Unknown values log a warning and use `local`. The intake URL shown to riders is `INTAKE_PUBLIC_URL` or `http://<LAN address>:<port>/intake`; run uvicorn with `--host 0.0.0.0`.
+
+### Slide-6 registry match (`registry_match` on feed items)
+Display-only edit-distance view next to the authoritative 5C `link_status` (which is unchanged: a fuzzy match is never applied). One registry plate within one edit → `LINKED` (`ONE_EDIT`, explanation "Matched CH01AB1234 after removing 1 extra character", owner context attached); several → `NEEDS_REVIEW`; none → `UNLINKED`. Low-confidence camera reads with candidates are always `NEEDS_REVIEW`; guard resolutions win (`GUARD_CONFIRMED` / `GUARD_NONE`). Symmetric-deletion index, so no full registry scan per read. Internal movement attribution skips it (`with_registry_match=False`).
+
+### Demo data (`scripts/seed_demo.py`, idempotent)
+Owners `24103999` Demo Student (hosteller), `FAC-CSE-014` Dr. Demo Faculty (CSE Department), `STF-EST-022` Estate Office Staff; vehicles CH01AB1234 → student, HR26DK0042 → staff, PB65XY7788 → faculty, CH01AB1247 → faculty, CH01AB1248 → staff (so a read `CH01AB124` is ambiguous); UP32KL5567 / CH04MN3090 unregistered. `guard1` / `admin` created with `Guard@12345` / `Admin@12345` only when missing (existing passwords are kept unless `--reset-demo-passwords`). Writes `media/demo/invoice_D-20481.png` + `.pdf`, records guard sightings of the slide reads (plates never seen before only) and screens order D-20481 once.
+
+### Limits
+* Linking a STUDENT / FACULTY / STAFF vehicle still needs ADMIN (Phase 5C policy); a GUARD gets 403 from `POST /vehicles/{plate}/link`.
+* The parser targets printed single-column invoices; real Zomato / Swiggy screenshots and phone photos are not yet evaluated. RapidOCR's default `text_score` 0.5 dropped the lone Qty digits, so the engine runs with 0.3 (`RAPIDOCR_TEXT_SCORE`); a quantity that is still missed stays NULL (amounts and verdicts are unaffected).
+* `/intake/upload` and `/webhooks/whatsapp` are unauthenticated by design (riders have no account); keep them on the LAN.
+
+---
+
+## 11C. Phase 16: Web & Mobile Console
+
+One React codebase serves the website, an installable web app (manifest + icons) and the Capacitor Android / iOS app. It shows context only: no barrier control, no access decisions, and the neutral palette from 5C (no red/green pass/stop signals; BLACKLISTED is shown only because an administrator recorded it).
+
+### Backend additions (all covered by `scripts/test_phase16_console_api.py`)
+| Endpoint | Role | Notes |
+| :--- | :--- | :--- |
+| `GET /dashboard/summary?since=` | staff | Observation counts (camera / manual / no plate / unresolved low-confidence), entries & exits, presence, registry totals, activity buckets (hourly ≤ 48 h, else daily; window ≤ 7 days, buckets start at `since`). Movement and presence numbers come from `MovementService.activity_summary`, the same effective view as `/logs` and `/presence/inside`. |
+| `GET /owners` | staff | `q` now optional (still ≥ 2 characters when given) + `person_type`, `residence_type`, `skip`. |
+| `GET /owners/{id}` | staff | UUID or institutional ID; owner + all of their vehicles. |
+| `PUT /owners/{id}` | ADMIN | Omitted fields kept, `null` clears an optional field; identifier immutable (unknown fields → 422). Re-emits the owner's recent sightings on the feed (`REGISTRY_UPDATED`), since residence belongs to the person. |
+| `GET /vehicles?q=` | staff | Format-tolerant plate fragment; list ordered newest first. |
+| `GET/POST /users`, `PATCH /users/{id}` | ADMIN | Accounts are disabled, never deleted. Role / active changes apply immediately (roles are read per request). An admin cannot disable or demote their own account. Hashes never returned. |
+| `POST /auth/password` | any signed-in user | Own password; requires the current one. |
+| CORS | — | `CORS_ALLOW_ORIGINS` (see 3J). |
+
+### Frontend
+* `api/queries.ts` (TanStack Query) caches per page; `feed/LiveFeedContext.tsx` keeps the 5C SSE stream (with polling fallback) connected across pages and counts unresolved low-confidence reads for the nav badge.
+* Responsive shell (`app/AppShell.tsx`): sidebar + `/` plate search on desktop, top bar + bottom tab bar on phones, dark mode, safe-area insets, Android back button closes the top dialog.
+* Hash routing (`app/router.tsx`) works from any static host and inside the app; old `#/history/<plate>` links redirect to `#/vehicles/<plate>`.
+* The overview chart's two series colours were validated for both themes on the card surfaces (colour-vision-deficiency and contrast checks).
+* Session storage: browser tab (`sessionStorage`) on the web; the app's private WebView storage on phones. Either way the token expires after `AUTH_TOKEN_TTL_MINUTES`.
+
+---
+
 ## 12. Implementation Roadmap
 
 Follow this strictly sequential development order:
@@ -561,16 +686,16 @@ Follow this strictly sequential development order:
 * [ ] **Phase 5B:** Real PEC / Frigate Data Evaluation & Metrics Report (`PHASE5_IDENTITY_EVALUATION.md`).
 * [x] **Phase 5C:** Live plate feed with registry linkage & manual entry (`IdentityResolutionService`, `/feed` + SSE, `/observations/manual`, `/resolutions`, auth, guard dashboard slice of Phase 16; 16/16 test suite). Done ahead of 5B at the user's direction; 5B (real PEC data evaluation) remains open and should recalibrate `RESOLUTION_CONFIDENCE_THRESHOLD`.
 * [x] **Phase 6:** Entry/exit movement logging with direction provenance (`camera_lanes`, `DirectionResolver`), append-only corrections, derived presence (`/presence`, `/presence/inside`), `GET /logs`, `GET /vehicles/{plate}/history`, owner linking (`POST /vehicles/{plate}/link`, `vehicle_link_events`), guard console pages; 14/14 test suite. Direction on real PEC footage is not yet validated.
-* [ ] **Phase 7:** Delivery Order Model & Verification State Management.
-* [ ] **Phase 8:** Invoice Processing API (`POST /orders/process-invoice`).
+* [x] **Phase 7:** Delivery invoice screening (§11D): OCR + parser + deterministic policy table, append-only guard decisions, LAN intake page, unified `/alerts`, slide-6 `registry_match`, demo seed; 11/11 test suite. Real invoice photos not yet evaluated.
+* [ ] **Phase 8:** Invoice Processing API — delivered within Phase 7 as `POST /deliveries/process` / `POST /intake/upload`.
 * [ ] **Phase 9:** Delivery Order Matching (`DeliveryVerificationService`).
-* [ ] **Phase 10:** WhatsApp Integration (Keep `MockWhatsAppProvider` operational).
+* [ ] **Phase 10:** WhatsApp Integration — provider abstraction (`local` / `mock` / `meta` stub) and `POST /webhooks/whatsapp` done in Phase 7; `MockWhatsAppProvider` kept; Meta Cloud API untested.
 * [ ] **Phase 11:** Security Review Queue (`GET /security/reviews`, `POST /security/reviews/{id}/approve`, reject).
 * [ ] **Phase 12:** Auditability & Reason Codes.
 * [ ] **Phase 13:** FastAPI OpenAPI Documentation grouping.
 * [ ] **Phase 14:** Automated End-to-End Test Suite across all 13 test scenarios.
 * [ ] **Phase 15:** Simulation Mode (`SIMULATION_MODE=true`).
-* [ ] **Phase 16:** React Admin Dashboard (guard live-feed slice delivered in 5C, Inside Campus / Movement Log / Vehicle History pages in 6, under `frontend/`).
+* [x] **Phase 16:** Web & mobile console under `frontend/` (React + Capacitor): overview, live feed, inside campus, movement log, vehicles, owners, gates & lanes, accounts, system status, settings; backend additions in §11C; 7/7 test suite. Screens for Phases 7–12 (delivery, invoices, review queue) wait for their backend.
 
 ---
 

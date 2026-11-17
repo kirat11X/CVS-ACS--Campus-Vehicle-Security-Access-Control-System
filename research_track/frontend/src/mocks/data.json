@@ -52,7 +52,7 @@
       "category": "OTC_MEDICINE",
       "confidence": 0.91,
       "rule": "OTC default allow + log",
-      "reasonCode": "OTC_LOGGED",
+      "reasonCode": "ALLOW_PERMITTED_GOODS",
       "outcome": "ALLOW"
     },
     {
@@ -60,7 +60,7 @@
       "category": "HAZARDOUS_CHEMICAL",
       "confidence": 0.88,
       "rule": "Quantity >= 3",
-      "reasonCode": "HAZCHEM_QTY_REVIEW",
+      "reasonCode": "ALERT_PROHIBITED_CHEMICAL",
       "outcome": "REVIEW"
     },
     {
@@ -68,7 +68,7 @@
       "category": "TOBACCO_NICOTINE",
       "confidence": 0.97,
       "rule": "Tobacco/Nicotine any qty",
-      "reasonCode": "TOBACCO_FLAG",
+      "reasonCode": "ALERT_PROHIBITED_TOBACCO",
       "outcome": "ALERT"
     },
     {
@@ -76,7 +76,7 @@
       "category": "ALCOHOL",
       "confidence": 0.95,
       "rule": "Alcohol any qty",
-      "reasonCode": "ALCOHOL_FLAG",
+      "reasonCode": "ALERT_PROHIBITED_ALCOHOL",
       "outcome": "ALERT"
     },
     {
@@ -84,8 +84,16 @@
       "category": "NORMAL",
       "confidence": 0.99,
       "rule": "Normal item",
-      "reasonCode": "NORMAL_ITEM",
+      "reasonCode": "ALLOW_PERMITTED_FOOD",
       "outcome": "ALLOW"
+    },
+    {
+      "item": "Unlabeled Package #44",
+      "category": "UNKNOWN",
+      "confidence": null,
+      "rule": "Low/missing confidence escalation",
+      "reasonCode": "REVIEW_UNCERTAIN_CLASSIFICATION",
+      "outcome": "REVIEW"
     }
   ],
   "gates": [

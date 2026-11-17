@@ -115,6 +115,8 @@ class MovementService:
             ObservationDirection(direction), DirectionMethod.GUARD_CONFIRMED, None,
             {"confirmed_by_id": str(user_id), "derived_before_confirmation": derived.as_dict()},
         )
+        if isinstance(obs.metadata_payload, dict):
+            obs.metadata_payload = {**obs.metadata_payload, "is_provisional": False}
         root = self._create_root(db, obs, result, created_by_id=user_id, note=note)
         record_feed_event(db, obs.id, FeedEventKind.MOVEMENT_UPDATED)
         db.commit()
@@ -219,7 +221,7 @@ class MovementService:
 
     @staticmethod
     def _attributed_vehicle_id(db: Session, obs: ObservationEvent) -> Optional[UUID]:
-        resolved = identity_resolution_service.resolve_many(db, [obs], with_suggestions=False, with_movement=False)[0]
+        resolved = identity_resolution_service.resolve_many(db, [obs], with_suggestions=False, with_movement=False, with_registry_match=False)[0]
         return resolved.vehicle.id if resolved.vehicle else None
 
     @staticmethod
@@ -269,7 +271,7 @@ class MovementService:
         )
         resolved = {
             r.observation.id: r
-            for r in identity_resolution_service.resolve_many(db, observations, with_suggestions=False, with_movement=False)
+            for r in identity_resolution_service.resolve_many(db, observations, with_suggestions=False, with_movement=False, with_registry_match=False)
         }
         for m in sensor:
             r = resolved.get(m.observation_id)
@@ -325,6 +327,14 @@ class MovementService:
     def _entry(row: _Row) -> MovementEntry:
         m, attr = row.movement, row.attribution
         eff = m.effective
+        root = m.root
+        decision_val = (
+            eff.decision.value if eff.decision
+            else (root.access_decision.decision.value if root.access_decision else None)
+        )
+        reason_code_val = eff.reason_code or (root.access_decision.reason_code if root.access_decision else None)
+        override_notes = eff.note if m.corrected else None
+
         return MovementEntry(
             id=m.id,
             observation_id=m.observation_id,
@@ -347,6 +357,9 @@ class MovementService:
             recorded_by=_user(m.root.created_by),
             last_corrected_by=_user(eff.created_by) if m.corrected else None,
             note=eff.note,
+            decision=decision_val,
+            reason_code=reason_code_val,
+            guard_override_notes=override_notes,
         )
 
     def _presence(self, subject: str, group: List[_Row], now: datetime) -> PresenceEntry:
@@ -422,6 +435,33 @@ class MovementService:
         )
         return InsideResponse(total=len(items), items=items, unattributed_entries=[self._entry(r) for r in unattributed])
 
+    def inside_campus(self, db: Session, linked: Optional[bool] = None) -> InsideResponse:
+        """Alias for inside() for campus presence lookup."""
+        return self.inside(db, linked)
+
+    def activity_summary(self, db: Session, since: datetime) -> Dict[str, object]:
+        """
+        Overview counts from one pass over the effective movement view, with the same rules as
+        inside() and logs(): latest correction applied, presence from each subject's last movement.
+        """
+        rows = self._index(db)
+        now = datetime.now(timezone.utc)
+        window = [r for r in rows if r.movement.timestamp >= since]
+        inside = [group[-1] for group in self._groups(rows).values() if group[-1].movement.direction == "ENTRY"]
+        cutoff = now - timedelta(hours=PRESENCE_UNATTRIBUTED_LOOKBACK_HOURS)
+        long_stay = timedelta(hours=PRESENCE_LONG_STAY_HOURS)
+        return {
+            "entries": sum(1 for r in window if r.movement.direction == "ENTRY"),
+            "exits": sum(1 for r in window if r.movement.direction == "EXIT"),
+            "inside": len(inside),
+            "inside_linked": sum(1 for r in inside if r.attribution.vehicle is not None),
+            "long_stay": sum(1 for r in inside if now - r.movement.timestamp > long_stay),
+            "unattributed_entries": sum(
+                1 for r in rows if r.subject is None and r.movement.direction == "ENTRY" and r.movement.timestamp >= cutoff
+            ),
+            "movement_times": [(r.movement.timestamp, r.movement.direction) for r in window],
+        }
+
     def logs(self, db: Session, plate: Optional[str] = None, gate_id: Optional[str] = None, direction: Optional[str] = None,
              date_from: Optional[datetime] = None, date_to: Optional[datetime] = None, linked: Optional[bool] = None,
              skip: int = 0, limit: int = 50) -> MovementPage:
@@ -460,6 +500,8 @@ class MovementService:
                     direction_evidence=r.direction_evidence or {}, plate=r.plate, normalized_plate=r.normalized_plate,
                     plate_source=r.plate_source, plate_confidence=r.confidence, recorded_vehicle_id=r.vehicle_id,
                     created_by=_user(r.created_by), created_at=r.created_at, note=r.note,
+                    decision=r.decision.value if r.decision else None,
+                    reason_code=r.reason_code,
                 )
                 for r in movement.rows
             ],
@@ -507,8 +549,40 @@ class MovementService:
                 or (s.resolution is not None and s.resolution.chosen_vehicle_id == vehicle.id)
             ]
 
-        timeline = [TimelineItem(type="MOVEMENT", time=r.movement.timestamp, gate=self._entry(r).gate, movement=self._entry(r)) for r in mine]
-        timeline += [TimelineItem(type="SIGHTING", time=s.observation.observed_at, gate=s.observation.gate, sighting=s) for s in sightings]
+        timeline = []
+        for r in mine:
+            ent = self._entry(r)
+            timeline.append(
+                TimelineItem(
+                    type="MOVEMENT",
+                    time=r.movement.timestamp,
+                    timestamp=r.movement.timestamp,
+                    gate=ent.gate,
+                    direction=ent.direction,
+                    decision=ent.decision,
+                    reason_code=ent.reason_code,
+                    guard_override_notes=ent.guard_override_notes or ent.note,
+                    movement=ent,
+                )
+            )
+
+        for s in sightings:
+            gate_info = s.observation.gate
+            dir_val = s.observation.direction.value if s.observation.direction else "UNKNOWN"
+            res_note = s.resolution.note if s.resolution else None
+            timeline.append(
+                TimelineItem(
+                    type="SIGHTING",
+                    time=s.observation.observed_at,
+                    timestamp=s.observation.observed_at,
+                    gate=gate_info,
+                    direction=dir_val,
+                    decision=None,
+                    reason_code=None,
+                    guard_override_notes=res_note,
+                    sighting=s,
+                )
+            )
         timeline.sort(key=lambda t: t.time, reverse=True)
 
         linked = owner = residence = None

@@ -23,7 +23,12 @@ class VehicleOwner(Base, TimestampMixin):
     __tablename__ = "vehicle_owners"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    identifier = Column(String(50), unique=True, index=True, nullable=False)  # Institutional ID, e.g. STUDENT-2026-123
+    identifier = Column(
+        String(50),
+        unique=True,
+        index=True,
+        nullable=False,
+    )  # Institutional ID: Student (8 digits, e.g. 24103042), Faculty (F + 7 digits, e.g. F1234567), Resident (R + 4-digit house no, e.g. R1042)
     full_name = Column(String(100), nullable=False)
     email = Column(String(120), index=True, nullable=True)
     phone = Column(String(20), index=True, nullable=True)

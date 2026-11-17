@@ -1,0 +1,64 @@
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+exclude = [
+    ".git",
+    ".venv",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    "training",
+    "training_1",
+    "TRAINING_VIDEOS",
+    "data",
+    "media",
+    "runs",
+    "frontend",
+    "alembic",
+    "research_track/frontend",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]
+ignore = [
+    "E501",  # line too long
+    "E402",  # module level import not at top of file
+    "E741",  # ambiguous variable name
+    "E731",  # do not assign a lambda expression
+    "W291",  # trailing whitespace
+    "W293",  # blank line contains whitespace
+    "F401",  # unused import
+    "F403",  # star import used
+    "F405",  # name undefined from star imports
+    "F841",  # unused local variable
+]
+
+[tool.mypy]
+python_version = "3.14"
+mypy_path = "."
+explicit_package_bases = true
+ignore_missing_imports = true
+follow_imports = "silent"
+check_untyped_defs = false
+disallow_untyped_defs = false
+warn_redundant_casts = false
+warn_unused_ignores = false
+disable_error_code = [
+    "var-annotated",
+    "call-overload",
+    "call-arg",
+    "union-attr",
+    "operator",
+    "index",
+    "assignment",
+    "misc",
+    "arg-type",
+    "list-item",
+    "return-value",
+    "type-var",
+    "attr-defined",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["scripts", "research_track/review/tests"]
+addopts = "-ra -q --ignore=scripts/audit_regressions --ignore=scripts/test_audit_regressions.py"

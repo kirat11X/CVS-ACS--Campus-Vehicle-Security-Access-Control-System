@@ -57,7 +57,7 @@ Every subsystem and API endpoint preserves the following foundational invariants
 | **Computer Vision / LPR** | Frigate NVR 0.18.0 | Port `5000` (Web/API), `8554` (RTSP) | Intel VAAPI iGPU hardware acceleration active |
 | **Document OCR** | RapidOCR (PP-OCRv4) + Tesseract 5.5 | Python 3.14 virtualenv | Dual-engine fallback for delivery invoices |
 | **Workflow Automation** | n8n 1.82+ | Port `5678` | External webhook ingestion & WhatsApp routing |
-| **Security Dashboard** | React + Vite + Tailwind CSS | Port `3000` (Phase 16) | Guard contextualization & alert review UI |
+| **Web & Mobile Console** | React 19 + Vite 6 + Tailwind 3; Capacitor 7 (Android / iOS) | Port `5173` (dev), `4173` (preview) | One codebase: website, installable web app and native app ([`frontend/README.md`](frontend/README.md)) |
 
 ---
 
@@ -104,6 +104,17 @@ TESSERACT_ENABLED=true
 PYTHONPATH=. .venv/bin/uvicorn backend.app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
+### 5. Start the Console (web) or build the Mobile App
+```bash
+# Create a sign-in (password prompted)
+PYTHONPATH=. .venv/bin/python scripts/create_user.py --username guard1 --full-name "Gate 1 Guard" --email guard1@campus.edu --role GUARD
+
+cd frontend && npm install
+npm run dev                # http://localhost:5173 (proxies /api to :8000)
+npm run android:build      # debug APK: frontend/android/app/build/outputs/apk/debug/app-debug.apk
+```
+The app has no proxy: on first launch enter the backend address (e.g. `http://192.168.1.20:8000`) on the sign-in screen. Run the backend with `--host 0.0.0.0` so phones on the LAN can reach it.
+
 ---
 
 ## 5. Verification Test Suites
@@ -137,34 +148,83 @@ PYTHONPATH=. .venv/bin/python scripts/test_fastapi.py
 
 # Frigate Live MQTT Telemetry Publishing (PASS)
 .venv/bin/python scripts/test_frigate_mqtt.py
+
+# Phase 16: Console API - CORS, dashboard summary, accounts, owner directory/edit, plate search (7/7 PASS)
+PYTHONPATH=. .venv/bin/python scripts/test_phase16_console_api.py
+
+# Phase 7: Delivery screening - policy table, invoice parser + OCR, LAN intake, deliveries API,
+# append-only guard decisions, unified alerts, slide-6 registry match, WhatsApp provider (11/11 PASS; starts uvicorn on :8000)
+PYTHONPATH=. .venv/bin/python scripts/test_phase7_delivery_screening.py
 ```
 
----
+### Mid-term demo data and the LAN invoice intake (Phase 7)
+```bash
+# Idempotent: creates the demo owners (SID 24103999 student, FAC-CSE-014 faculty, STF-EST-022 staff),
+# their vehicles, guard1 / admin if missing, media/demo/invoice_D-20481.png and screens order D-20481
+PYTHONPATH=. .venv/bin/python scripts/seed_demo.py
 
-## 6. Implementation Roadmap
-
-- [x] **Milestone 0:** Environment inspection, Docker infrastructure, and stack verification.
-- [x] **Phase 1:** Database Models & Alembic Migrations (14 relational tables).
-- [x] **Phase 2:** Vehicle Registry API (`/vehicles`) & Authoritative Identity Context.
-- [x] **Phase 3:** Gate Registry (`/gates`) & Gate Observation Management (`/observations`).
-- [x] **Phase 4:** Frigate MQTT Observation Ingestion Worker.
-- [ ] **Phase 5:** Access Control Engine (Policy rules for guard context & alerts).
-- [ ] **Phase 6:** Entry / Exit Tracking & History APIs (`GET /logs`, `GET /vehicles/{plate}/history`).
-- [ ] **Phase 7:** Delivery Order Model & Verification State Management.
-- [ ] **Phase 8:** Invoice Processing API (`POST /orders/process-invoice`).
-- [ ] **Phase 9:** Delivery Order Matching (`DeliveryVerificationService`).
-- [ ] **Phase 10:** WhatsApp Integration (Abstract provider with offline dev mock).
-- [ ] **Phase 11:** Security Review Queue (`/security/reviews`).
-- [ ] **Phase 12:** Auditability & Reason Codes.
-- [ ] **Phase 13:** FastAPI OpenAPI Documentation grouping.
-- [ ] **Phase 14:** Automated End-to-End Test Suite across all 13 test scenarios.
-- [ ] **Phase 15:** Simulation Mode (`SIMULATION_MODE=true`).
-- [ ] **Phase 16:** React Guard & Admin Dashboard.
+# Serve on the LAN so a phone can open the intake page
+PYTHONPATH=. .venv/bin/uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
+# Rider / guard phone: http://<server LAN IP>:8000/intake  -> order ID + invoice photo/PDF -> chat-style reply
+```
+The WhatsApp Business API is not available yet, so `WHATSAPP_PROVIDER=local` (default) keeps replies in an outbox (`media/whatsapp_outbox/outbox.jsonl`) and on the intake result page. `mock` and `meta` (Cloud API stub, needs `WHATSAPP_TOKEN` / `WHATSAPP_PHONE_ID`) plug in behind the same interface; `POST /webhooks/whatsapp` accepts forwarded chat messages (e.g. from n8n).
 
 ---
 
-## 7. Documentation Directory
+## 6. Implementation Status & Phase Matrix
 
-- [`context.md`](context.md): Comprehensive developer onboarding and LLM context guide.
-- [`PROJECT_ARCHITECTURE.md`](PROJECT_ARCHITECTURE.md): Research architecture, theoretical foundations, and system invariants.
-- [`SETUP_REPORT.md`](SETUP_REPORT.md): Complete infrastructure verification and phase execution reports.
+The project has completed its core architecture, database migrations, security hardening, multi-gate observation ingestion, web/mobile console, and initial ML model training. The remaining work focuses on real-world dataset collection, cloud GPU model fine-tuning, and on-site PEC campus calibration.
+
+- [x] **Milestone 0:** Environment inspection, Docker infrastructure, and containerized stack verification.
+- [x] **Phase 1:** Database Models & Alembic Migrations (19 relational models / 7 migrations applied, zero schema drift).
+- [x] **Phase 2:** Vehicle Registry API (`/vehicles`) & Authoritative Identity Context (15/15 scenarios PASS).
+- [x] **Phase 3:** Gate Registry (`/gates`) & Gate Observation Management (`/observations`, 20/20 scenarios PASS).
+- [x] **Phase 4:** Frigate MQTT Observation Ingestion Worker (`frigate_worker`, 20/20 scenarios PASS).
+- [x] **Phase 5A & 5C:** Identity resolution prototype (27/27) and live plate feed with SSE stream (`/feed`), manual sightings, and guard resolutions (`/resolutions`, 16/16 scenarios PASS).
+- [ ] **Phase 5B:** Real PEC gate video data evaluation & `RESOLUTION_CONFIDENCE_THRESHOLD` calibration (awaiting on-site frames).
+- [x] **Phase 6:** Entry/exit movement logging with direction provenance (`DirectionResolver`, `camera_lanes`), append-only corrections, derived presence (`/presence`, `/presence/inside`), `GET /logs`, `GET /vehicles/{plate}/history` (14/14 scenarios PASS).
+- [x] **Phase 7:** Delivery invoice screening: dual-engine OCR (RapidOCR + Tesseract fallback) $\rightarrow$ line-item extraction $\rightarrow$ arithmetic check $\rightarrow$ deterministic policy table $\rightarrow$ append-only guard decisions (`/deliveries`, `/alerts`); mobile LAN intake page (`/intake`); edit-distance `registry_match` on feed; demo seed (11/11 scenarios PASS).
+- [x] **Phase 8:** Invoice Processing API — delivered as `POST /deliveries/process` and `POST /intake/upload` (multimodal VLM fine-tuning queued for AWS EC2).
+- [ ] **Phase 9:** Automated Delivery Order Matching (`DeliveryVerificationService` connecting courier invoices to hostel resident room rosters).
+- [x] **Phase 10:** WhatsApp Integration — provider abstraction (`local`, `mock`, `meta` stub, `POST /webhooks/whatsapp`) active; production Meta Business Cloud API credentials to be provisioned.
+- [ ] **Phase 11:** Multi-gate Security Review Queue (`GET /security/reviews`, `POST /security/reviews/{id}/resolve`).
+- [ ] **Phase 12:** Standardized Immutable Audit Reason Codes.
+- [x] **Phase 13:** FastAPI OpenAPI Documentation grouping (16 modular routers with OpenAPI tags).
+- [ ] **Phase 14:** Automated End-to-End Test Suite across all 13 canonical operational scenarios.
+- [ ] **Phase 15:** Simulation Mode (`SIMULATION_MODE=true` gate stream & WhatsApp invoice replay).
+- [x] **Phase 16:** Web & mobile guard console (`frontend/` v0.7.0): React 19 + TypeScript + Vite + Tailwind CSS + Capacitor 7 (Android APK build; 16 views, 7/7 API scenarios PASS).
+
+---
+
+## 7. Master Documentation & Research Suite
+
+The complete technical documentation, architecture specifications, quality assurance guides, empirical test reports, and research whitepapers are organized into dedicated repository documents:
+
+### Core System Manuals & Architecture
+| Document | Purpose & Key Contents |
+| :--- | :--- |
+| **[`DOCUMENTATION_OVERVIEW.md`](DOCUMENTATION_OVERVIEW.md)** | **Master Architectural Blueprint**: Ingestion flow, 4 production Mermaid sequence diagrams (sensor intake, review queue, presence/overstay, and delivery screening), and 19-table database ER schema. |
+| **[`API_REFERENCE.md`](API_REFERENCE.md)** | **Complete REST API Manual**: OpenAPI reference for all 17 backend routers with RBAC role rules (`ADMIN`, `GUARD`, `PUBLIC`), request schemas, status codes, and response payloads. |
+| **[`DEPLOYMENT_AND_TESTING_GUIDE.md`](DEPLOYMENT_AND_TESTING_GUIDE.md)** | **Operations & QA Runbook**: Container setup, Alembic migrations, dataset seeding/purging via `scripts/manage_dataset.py`, and test execution instructions. |
+| **[`WHAT_HAS_BEEN_DONE.md`](WHAT_HAS_BEEN_DONE.md)** | **Exhaustive Inventory**: Completed features, statutory institutional IDs, 1.5h unlinked overstay alert rules, 1,000 multi-vendor QR delivery invoices, 690 campus members, and administrative deletion capabilities. |
+| **[`WHAT_HAS_TO_BE_DONE.md`](WHAT_HAS_TO_BE_DONE.md)** | **Future Engineering Roadmap**: AWS EC2 GPU fine-tuning, camera mounting geometry at PEC Gates 1–3, barrier controller integration, and TLS hardening. |
+
+### Academic Research & Production Operations
+| Document | Purpose & Key Contents |
+| :--- | :--- |
+| **[`research/SOTA_CAMPUS_ACCESS_CONTROL_RESEARCH.md`](research/SOTA_CAMPUS_ACCESS_CONTROL_RESEARCH.md)** | **Publication-Ready Research Whitepaper (9,158 words)**: SOTA in Indian ANPR, multi-modal Vision-Language Models (VLMs) for cargo screening, Kuhn-Munkres bipartite matching, and privacy-preserving institutional surveillance. |
+| **[`research/PRODUCTION_DEPLOYMENT_AND_EC2_MANUAL.md`](research/PRODUCTION_DEPLOYMENT_AND_EC2_MANUAL.md)** | **Cloud GPU & Production Blueprint**: AWS EC2 `g4dn.xlarge` / `g5.xlarge` setup, Spot instance optimization, automated tmux training workflows, Docker multi-stage containers, Nginx reverse proxy, systemd units, and automated DB backup/restore scripts. |
+
+### Specialized Empirical Test & Audit Reports
+| Report | Scope & Validation Metrics |
+| :--- | :--- |
+| **[`research/TEST_REPORT_VIDEO_ANPR.md`](research/TEST_REPORT_VIDEO_ANPR.md)** | Video pipeline evaluation on `gate_demo_1.mp4`, `gate_demo_2.mp4`, `phase5_test_video.mp4`; ONNX inference latency (41.7 ms); statutory rules (100% pass). |
+| **[`research/TEST_REPORT_INVOICE_SCREENING.md`](research/TEST_REPORT_INVOICE_SCREENING.md)** | RapidOCR vs Tesseract on 996 multi-vendor invoices (Zomato, Swiggy, Amazon, Uber, Reliance, Blinkit, Zepto); 97.9% Order ID accuracy; 94% QR detection rate; arithmetic checks. |
+| **[`research/TEST_REPORT_IDENTITY_MOVEMENT.md`](research/TEST_REPORT_IDENTITY_MOVEMENT.md)** | Statutory ID schema compliance across 690 members; vehicle linkage; presence tracking; detection of 89 unlinked overstay alerts (>1.5h); 40/40 passing unit/integration tests. |
+| **[`research/TEST_REPORT_FRONTEND_UI.md`](research/TEST_REPORT_FRONTEND_UI.md)** | Full UI audit of all 15 navigation routes, College Members Directory (`/members`), interactive modals, mobile responsiveness, and zero build errors (`tsc -b && vite build`). |
+| **[`research/TEST_REPORT_ML_PIPELINE.md`](research/TEST_REPORT_ML_PIPELINE.md)** | Audit of Track A OCR, Track B Document VLM, Track C LLM policy engine; 181 passed tests, 93% code coverage, 0 bug tester failures. |
+| **[`research/TEST_REPORT_EDGE_CASES.md`](research/TEST_REPORT_EDGE_CASES.md)** | Stress and resilience testing: malformed plates, corrupted invoice uploads, 60s debounce, 1.49h vs 1.50h overstay boundary, and database reconnect; 33/33 tests passed. |
+| **[`BUG_TESTER.md`](BUG_TESTER.md)** | Quality assurance and bug testing guide with regression tests and Locust load testing profiles. |
+| **[`DATASETS_AND_MODELS.md`](DATASETS_AND_MODELS.md)** | Exhaustive data & model catalog: Indian license plate datasets, invoice corpora, and pretrained/fine-tuned checkpoints. |
+| **[`ROADMAP.md`](ROADMAP.md)** | Phased production roadmap from prototype to full campus deployment at PEC Gates 1–3. |
+| **[`PROJECT_ARCHITECTURE.md`](PROJECT_ARCHITECTURE.md)** | Research architecture, theoretical foundations, 10 core invariants, and distributed system design. |

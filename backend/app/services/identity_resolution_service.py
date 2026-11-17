@@ -23,6 +23,7 @@ from backend.app.schemas.feed import (
     DirectionInfo,
     FeedObservation,
     LinkedVehicle,
+    RegistryMatch,
     RegistrySuggestion,
     ResidenceInfo,
     ResolutionSummary,
@@ -35,6 +36,7 @@ from backend.app.services.direction_resolver import direction_resolver
 from backend.app.services.feed_events import record_feed_event
 from backend.app.services.movement_lookup import Movement, movement_summary, movements_for_observations
 from backend.app.services.plate_similarity import plate_similarity
+from backend.app.services.registry_match import RegistryIndex
 from backend.app.services.vehicle_identity_service import vehicle_identity_service
 
 @dataclass(frozen=True)
@@ -90,6 +92,7 @@ class IdentityResolutionService:
         observations: Sequence[ObservationEvent],
         with_suggestions: bool = True,
         with_movement: bool = True,
+        with_registry_match: bool = True,
     ) -> List[ResolvedObservation]:
         if not observations:
             return []
@@ -143,7 +146,79 @@ class IdentityResolutionService:
             if with_movement:
                 self._attach_movement(db, item, obs, movements.get(obs.id), lanes)
             results.append(item)
+        if with_registry_match:
+            self._attach_registry_matches(db, observations, results, candidates)
         return results
+
+    def _attach_registry_matches(
+        self,
+        db: Session,
+        observations: Sequence[ObservationEvent],
+        items: List[ResolvedObservation],
+        candidates: Optional[List[_Candidate]],
+    ) -> None:
+        """Phase 7: the slide-6 edit-distance view (registry_match). Display only; writes nothing."""
+        pending = []
+        for obs, item in zip(observations, items):
+            if item.resolution is not None:
+                if item.resolution.outcome == ResolutionOutcome.VEHICLE_CONFIRMED and item.vehicle is not None:
+                    item.registry_match = RegistryMatch(
+                        outcome="LINKED", basis="GUARD_CONFIRMED", explanation=f"Guard confirmed {item.vehicle.plate}",
+                        owner=item.owner, residence=item.residence,
+                    )
+                else:
+                    item.registry_match = RegistryMatch(
+                        outcome="UNLINKED", basis="GUARD_NONE", explanation="A guard recorded that no registry plate matches",
+                    )
+            elif not obs.normalized_plate:
+                item.registry_match = RegistryMatch(outcome="NEEDS_REVIEW", basis="NO_PLATE", explanation="No plate was read")
+            elif item.vehicle is not None and item.link_basis == LinkBasis.EXACT_PLATE:
+                item.registry_match = RegistryMatch(
+                    outcome="LINKED", basis="EXACT", edits=0, explanation=f"Exact registry match {item.vehicle.plate}",
+                    owner=item.owner, residence=item.residence,
+                )
+            else:
+                pending.append((obs, item))
+        if not pending:
+            return
+
+        if candidates is None:
+            candidates = self._registry_candidates(db)
+        by_plate = {c.plate: c for c in candidates}
+        index = RegistryIndex(by_plate.keys())
+        one_edit: Dict[UUID, List[ResolvedObservation]] = {}
+        for obs, item in pending:
+            match = index.classify(obs.normalized_plate)
+            close = [
+                RegistrySuggestion(
+                    vehicle_id=c.vehicle_id, plate=c.plate, raw_plate=c.raw_plate,
+                    similarity=plate_similarity(obs.normalized_plate, c.plate), category=c.category,
+                    registry_status=c.registry_status, owner_name=c.owner_name,
+                )
+                for c in (by_plate[p] for p in match.plates)
+            ]
+            if item.link_status == LinkStatus.LOW_CONFIDENCE:
+                # 5C rule: a low-confidence read is never linked automatically, even to an exact plate
+                if close or item.suggestions:
+                    item.registry_match = RegistryMatch(
+                        outcome="NEEDS_REVIEW", basis="LOW_CONFIDENCE", edits=match.edits,
+                        explanation=f"Low-confidence read; {match.explanation[0].lower()}{match.explanation[1:]}",
+                        candidates=close or item.suggestions,
+                    )
+                else:
+                    item.registry_match = RegistryMatch(outcome="UNLINKED", basis="NO_MATCH", explanation=match.explanation)
+                continue
+            item.registry_match = RegistryMatch(
+                outcome=match.outcome, basis=match.basis, edits=match.edits, explanation=match.explanation, candidates=close,
+            )
+            if match.basis == "ONE_EDIT":
+                one_edit.setdefault(close[0].vehicle_id, []).append(item)
+
+        for vehicle in self.load_vehicles(db, ids=set(one_edit)):
+            _, owner, residence, _ = self.vehicle_context(vehicle)
+            for item in one_edit[vehicle.id]:
+                item.registry_match.owner = owner
+                item.registry_match.residence = residence
 
     @staticmethod
     def _attach_movement(db: Session, item: ResolvedObservation, obs: ObservationEvent, movement: Optional[Movement], lanes) -> None:
@@ -156,12 +231,15 @@ class IdentityResolutionService:
                 method=eff.direction_method,
                 confidence=eff.direction_confidence,
                 evidence=eff.direction_evidence or {},
+                is_provisional=False,
             )
+            item.is_provisional = False
             return
         result = direction_resolver.resolve(db, obs, lanes)
         item.direction = DirectionInfo(**result.as_dict())
         # A known direction without a log only happens when it repeated a recent movement
         item.movement_status = "REPEAT_NOT_LOGGED" if result.is_known else "DIRECTION_UNKNOWN"
+        item.is_provisional = result.is_provisional
 
     @staticmethod
     def vehicle_context(vehicle: Vehicle) -> Tuple[LinkedVehicle, Optional[OwnerContextResponse], Optional[ResidenceInfo], List[str]]:

@@ -1,0 +1,168 @@
+# ==============================================================================
+# CVS-ACS Production Full-Stack Docker Compose Orchestration
+# Campus Vehicle Security & Access Control System - Production Blueprint
+# ==============================================================================
+
+services:
+  # ----------------------------------------------------------------------------
+  # 1. Message Broker: Eclipse Mosquitto
+  # ----------------------------------------------------------------------------
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: campus_mosquitto
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./config/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro,z
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+    networks:
+      - campus_net
+
+  # ----------------------------------------------------------------------------
+  # 2. Primary Relational Store: PostgreSQL 16
+  # ----------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: campus_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-campus_security}
+      POSTGRES_USER: ${POSTGRES_USER:-campus_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-campus_dev_pass}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-campus_admin} -d ${POSTGRES_DB:-campus_security}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - campus_net
+
+  # ----------------------------------------------------------------------------
+  # 3. Vision Pipeline & NVR: Frigate
+  # ----------------------------------------------------------------------------
+  frigate:
+    image: ghcr.io/blakeblackshear/frigate:stable
+    container_name: campus_frigate
+    privileged: true
+    restart: unless-stopped
+    shm_size: "256mb"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ./config/frigate/config.yml:/config/config.yml:z
+      - ./media:/media:z
+      - frigate_storage:/media/frigate
+    ports:
+      - "5000:5000"
+      - "8554:8554"
+    devices:
+      - /dev/dri:/dev/dri
+    environment:
+      FRIGATE_RTSP_PASSWORD: ${FRIGATE_RTSP_PASSWORD:-campus_pass}
+    depends_on:
+      - mosquitto
+    networks:
+      - campus_net
+
+  # ----------------------------------------------------------------------------
+  # 4. Core Application Backend: FastAPI / Uvicorn + MQTT Worker
+  # ----------------------------------------------------------------------------
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: campus_backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-campus_admin}:${POSTGRES_PASSWORD:-campus_dev_pass}@postgres:5432/${POSTGRES_DB:-campus_security}
+      MQTT_BROKER_HOST: mosquitto
+      MQTT_BROKER_PORT: 1883
+      KERAS_BACKEND: torch
+      PYTHONPATH: /app
+    volumes:
+      - ./media:/app/media:z
+      - ./weights:/app/weights:ro,z
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mosquitto:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - campus_net
+
+  # ----------------------------------------------------------------------------
+  # 5. Guard Console Frontend: Vite React SPA
+  # ----------------------------------------------------------------------------
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: campus_frontend
+    restart: unless-stopped
+    networks:
+      - campus_net
+
+  # ----------------------------------------------------------------------------
+  # 6. Edge Ingress & Reverse Proxy: Nginx
+  # ----------------------------------------------------------------------------
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: campus_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro,z
+      - ./config/nginx/cvs-acs.conf:/etc/nginx/conf.d/default.conf:ro,z
+      - ./media:/var/www/cvs-acs/media:ro,z
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_started
+    networks:
+      - campus_net
+
+  # ----------------------------------------------------------------------------
+  # 7. Workflow Automation: n8n
+  # ----------------------------------------------------------------------------
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    container_name: campus_n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      N8N_SECURE_COOKIE: "false"
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      WEBHOOK_URL: "http://localhost:5678/"
+    volumes:
+      - n8n_data:/home/node/.n8n
+    networks:
+      - campus_net
+
+volumes:
+  postgres_data:
+  mosquitto_data:
+  mosquitto_log:
+  frigate_storage:
+  n8n_data:
+
+networks:
+  campus_net:
+    driver: bridge

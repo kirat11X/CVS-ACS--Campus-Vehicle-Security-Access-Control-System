@@ -110,19 +110,29 @@ class FieldNormalizer:
     def parse_currency(self, text: Optional[str]) -> Tuple[Optional[str], str]:
         """
         Extracts currency code from text and returns (currency_code, remaining_text).
+        Supports Indian currency formats (₹, Rs., RS, INR, /-), whitespace, and international codes.
         Does not guess when ambiguous.
         """
         if not text:
             return None, ""
 
         cleaned = text.strip()
+        cleaned_no_dash = re.sub(r"/\s*-\s*$", "", cleaned).strip()
+        cleaned_no_dash = re.sub(r"^/\s*-\s*", "", cleaned_no_dash).strip()
+
         # Check prefixes and standalone tokens
         for symbol, code in sorted(self.currency_map.items(), key=lambda x: len(x[0]), reverse=True):
             pattern = re.compile(re.escape(symbol), re.IGNORECASE)
             if pattern.search(cleaned):
                 # Remove matched symbol from text
                 rem = pattern.sub("", cleaned).strip()
+                rem = re.sub(r"/\s*-\s*$", "", rem).strip()
+                rem = re.sub(r"^/\s*-\s*", "", rem).strip()
                 return code, rem
+
+        if cleaned != cleaned_no_dash:
+            # Trailing or leading '/-' notation is distinctively Indian INR
+            return self.default_currency or "INR", cleaned_no_dash
 
         return self.default_currency, cleaned
 
@@ -133,7 +143,8 @@ class FieldNormalizer:
     ) -> Optional[Decimal]:
         """
         Parses monetary strings safely into Decimal.
-        Handles standard (1,234.50) and European (1.234,50) formats under explicit locale policies.
+        Handles standard Indian (1,23,456.78) and international (123,456.78) formats,
+        currency symbols (₹, Rs., INR, /-), whitespace, parenthetical negatives, and European formats.
         Never silently misinterprets ambiguous numbers.
         """
         if raw_val is None:
@@ -149,10 +160,14 @@ class FieldNormalizer:
             return None
 
         # Remove currency symbols first
-        for sym in self.currency_map.keys():
+        for sym in sorted(self.currency_map.keys(), key=len, reverse=True):
             s = re.sub(re.escape(sym), "", s, flags=re.IGNORECASE).strip()
 
-        # Handle negative values with parenthetical syntax e.g. (10.00) or -$10.00
+        # Strip Indian '/-' currency notation
+        s = re.sub(r"/\s*-\s*$", "", s).strip()
+        s = re.sub(r"^/\s*-\s*", "", s).strip()
+
+        # Handle negative values with parenthetical syntax e.g. (10.00) or -$10.00 or -₹500.00 or 500.00-
         is_negative = False
         if s.startswith("(") and s.endswith(")"):
             is_negative = True
@@ -160,6 +175,15 @@ class FieldNormalizer:
         elif s.startswith("-"):
             is_negative = True
             s = s[1:].strip()
+        elif s.endswith("-"):
+            is_negative = True
+            s = s[:-1].strip()
+
+        # Re-strip any currency symbols or '/-' revealed after removing outer negative wrappers
+        for sym in sorted(self.currency_map.keys(), key=len, reverse=True):
+            s = re.sub(re.escape(sym), "", s, flags=re.IGNORECASE).strip()
+        s = re.sub(r"/\s*-\s*$", "", s).strip()
+        s = re.sub(r"^/\s*-\s*", "", s).strip()
 
         # Check for European format with comma decimal separator e.g. "1.234,50" or "50,00"
         # If locale_hint is de/fr/eu or decimal_separator is ','
@@ -171,23 +195,22 @@ class FieldNormalizer:
                 # "50,00" -> replace comma with dot
                 s = s.replace(",", ".")
         else:
-            # Standard US/Indian format e.g. "1,234.50" or "1,23,456.00"
+            # Standard US/Indian format e.g. "1,234.50" or "1,23,456.00" or "1,23,456"
             if "," in s and "." in s:
                 s = s.replace(",", "")
             elif "," in s and "." not in s:
-                # Ambiguous case: "1,234" vs "50,00"
-                # If there are exactly two digits after comma (e.g. 50,00), and no other comma
                 parts = s.split(",")
-                if len(parts) == 2 and len(parts[1]) == 2 and parts[0].isdigit():
-                    # Likely a European decimal or typo; require explicit locale, but if comma is decimal sep:
-                    if self.decimal_separator == ",":
-                        s = s.replace(",", ".")
-                    else:
-                        # Standard interpretation: comma is thousands separator, missing decimals
-                        s = s.replace(",", "")
-                else:
-                    # Thousands separator (e.g. 1,000 or 1,23,456)
+                # If 3 or more parts (e.g. 1,23,456 or 1,23,45,678), they are grouping commas
+                if len(parts) >= 3:
                     s = s.replace(",", "")
+                elif len(parts) == 2:
+                    if len(parts[1]) == 2 and parts[0].isdigit():
+                        if self.decimal_separator == ",":
+                            s = s.replace(",", ".")
+                        else:
+                            s = s.replace(",", "")
+                    else:
+                        s = s.replace(",", "")
 
         # Clean remaining whitespace
         s = s.replace(" ", "")
@@ -265,9 +288,15 @@ class FieldNormalizer:
         raw_tax_rate: Any = None,
         raw_tax_amount: Any = None,
         currency: Optional[str] = None,
+        page_number: Optional[int] = None,
+        source_page: Optional[int] = None,
+        bounding_box: Optional[List[float]] = None,
+        raw_text_snippet: Optional[str] = None,
+        line_item_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        Produces clean, typed line item dictionary with decimal-safe numeric values.
+        Produces clean, typed line item dictionary with decimal-safe numeric values
+        and multi-page provenance support.
         """
         norm_desc = self.normalize_whitespace(raw_description) or "UNKNOWN_ITEM"
         qty = self.parse_decimal_amount(raw_quantity)
@@ -278,7 +307,19 @@ class FieldNormalizer:
         tax_amt = self.parse_decimal_amount(raw_tax_amount)
         unit = self.normalize_unit(raw_unit)
 
+        effective_page = page_number or source_page
+        evidence: Optional[Dict[str, Any]] = None
+        if bounding_box is not None or effective_page is not None or raw_text_snippet is not None:
+            evidence = {}
+            if effective_page is not None:
+                evidence["page"] = effective_page
+            if bounding_box is not None:
+                evidence["bounding_box"] = [float(b) for b in bounding_box]
+            if raw_text_snippet is not None:
+                evidence["raw_text_snippet"] = str(raw_text_snippet)
+
         return {
+            "line_item_id": line_item_id,
             "description": raw_description.strip() if raw_description else "",
             "normalized_description": norm_desc,
             "quantity": qty,
@@ -289,4 +330,8 @@ class FieldNormalizer:
             "tax_amount": tax_amt,
             "line_total": total,
             "currency": currency or self.default_currency,
+            "source_page": effective_page,
+            "page_number": effective_page,
+            "bounding_box": bounding_box,
+            "evidence": evidence,
         }

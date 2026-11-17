@@ -1,9 +1,9 @@
 [
-  {"category_code":"TOBACCO_NICOTINE","action":"ALERT","min_quantity":1,"max_quantity":null,"platform":null,"priority":10,"policy_version":"draft-1","active":true},
-  {"category_code":"ALCOHOL","action":"ALERT","min_quantity":1,"max_quantity":null,"platform":null,"priority":10,"policy_version":"draft-1","active":true},
-  {"category_code":"RX_SCHEDULED_DRUG","action":"ALERT","min_quantity":1,"max_quantity":null,"platform":null,"priority":10,"policy_version":"draft-1","active":true},
-  {"category_code":"HAZARDOUS_CHEMICAL","action":"REVIEW","min_quantity":3,"max_quantity":null,"platform":null,"priority":30,"policy_version":"draft-1","active":true},
-  {"category_code":"OTC_MEDICINE","action":"ALLOW","min_quantity":1,"max_quantity":null,"platform":null,"priority":90,"policy_version":"draft-1","active":true},
-  {"category_code":"SHARP_OBJECT","action":"REVIEW","min_quantity":1,"max_quantity":null,"platform":null,"priority":40,"policy_version":"draft-1","active":true},
-  {"category_code":"NORMAL","action":"ALLOW","min_quantity":1,"max_quantity":null,"platform":null,"priority":100,"policy_version":"draft-1","active":true}
+  {"category_code":"TOBACCO_NICOTINE","action":"ALERT","min_quantity":1,"max_quantity":null,"platform":null,"priority":10,"policy_version":"1.0","active":true},
+  {"category_code":"ALCOHOL","action":"ALERT","min_quantity":1,"max_quantity":null,"platform":null,"priority":10,"policy_version":"1.0","active":true},
+  {"category_code":"RX_SCHEDULED_DRUG","action":"ALERT","min_quantity":1,"max_quantity":null,"platform":null,"priority":10,"policy_version":"1.0","active":true},
+  {"category_code":"HAZARDOUS_CHEMICAL","action":"REVIEW","min_quantity":3,"max_quantity":null,"platform":null,"priority":30,"policy_version":"1.0","active":true},
+  {"category_code":"OTC_MEDICINE","action":"ALLOW","min_quantity":1,"max_quantity":null,"platform":null,"priority":90,"policy_version":"1.0","active":true},
+  {"category_code":"SHARP_OBJECT","action":"REVIEW","min_quantity":1,"max_quantity":null,"platform":null,"priority":40,"policy_version":"1.0","active":true},
+  {"category_code":"NORMAL","action":"ALLOW","min_quantity":1,"max_quantity":null,"platform":null,"priority":100,"policy_version":"1.0","active":true}
 ]

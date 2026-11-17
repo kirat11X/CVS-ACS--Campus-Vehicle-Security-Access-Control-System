@@ -48,6 +48,8 @@ class OwnerContextResponse(BaseModel):
     residence: Optional[str] = None
     department: Optional[str] = None
     status: str
+    vehicle_plates: Optional[list[str]] = Field(default_factory=list)
+    vehicle_count: Optional[int] = 0
 
 class ResidenceContextResponse(BaseModel):
     person_type: Optional[str] = None

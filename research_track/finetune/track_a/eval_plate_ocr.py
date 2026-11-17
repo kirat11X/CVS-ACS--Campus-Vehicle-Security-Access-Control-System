@@ -23,6 +23,15 @@ os.environ.setdefault("KERAS_BACKEND", "torch")
 
 import numpy as np  # noqa: E402
 
+try:
+    from research_track.track_a.src.plate_normalizer import is_valid_indian_plate
+except Exception:
+    import re
+    _STD_FMT = re.compile(r"^[A-Z]{2}[0-9]{1,2}[A-Z]{0,3}[0-9]{4}$")
+    _BH_FMT = re.compile(r"^[0-9]{2}BH[0-9]{4}[A-Z]{1,2}$")
+    def is_valid_indian_plate(p: str) -> bool:
+        return bool(_STD_FMT.match(p) or _BH_FMT.match(p))
+
 CONFIGS = Path(__file__).resolve().parent / "configs"
 FPO_MODELS = Path.home() / "ml-assets/campus/models/fast-plate-ocr"
 PROVENANCE = "Kaggle avinash-6 (Apache-2.0) + kp00011 (MIT) held-out split, grouped by plate text; NOT PEC gate performance"
@@ -59,12 +68,16 @@ def mcnemar_exact(b: int, c: int) -> float:
 def score(gold: list[str], pred: list[str]) -> dict:
     exact = sum(g == p for g, p in zip(gold, pred))
     edits = sum(levenshtein(g, p) for g, p in zip(gold, pred))
+    total_chars = sum(len(g) for g in gold)
+    format_valid = sum(is_valid_indian_plate(p) for p in pred)
+    n = len(gold)
     return {
-        "n": len(gold),
-        "plate_accuracy": round(exact / len(gold), 4),
-        "plate_accuracy_95ci_wilson": wilson(exact, len(gold)),
-        "cer": round(edits / sum(len(g) for g in gold), 4),
-        "within_one_edit": round(sum(levenshtein(g, p) <= 1 for g, p in zip(gold, pred)) / len(gold), 4),
+        "n": n,
+        "plate_accuracy": round(exact / n, 4) if n > 0 else 0.0,
+        "plate_accuracy_95ci_wilson": wilson(exact, n),
+        "cer": round(edits / max(1, total_chars), 4),
+        "format_valid_rate": round(format_valid / n, 4) if n > 0 else 0.0,
+        "within_one_edit": round(sum(levenshtein(g, p) <= 1 for g, p in zip(gold, pred)) / n, 4) if n > 0 else 0.0,
     }
 
 
@@ -112,6 +125,12 @@ def main() -> None:
     parser.add_argument("--baseline", default="global-v2/cct_s_v2_global", help="pretrained ONNX under models/fast-plate-ocr")
     args = parser.parse_args()
 
+    data_dir = args.data_dir
+    if not data_dir.is_dir():
+        local_cand = Path(__file__).resolve().parents[3] / "data" / "datasets" / "prepared" / "ocr_in_v1"
+        if local_cand.is_dir():
+            data_dir = local_cand
+
     lock = args.run_dir / "TEST_EVALUATED.lock"
     if args.split == "test":
         if lock.exists():
@@ -120,7 +139,7 @@ def main() -> None:
     out_dir = args.run_dir / f"eval_{args.split}"
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    csv_path = args.data_dir / f"{args.split}.csv"
+    csv_path = data_dir / f"{args.split}.csv"
     with csv_path.open(newline="") as fh:
         rows = list(csv.DictReader(fh))
     paths = [(csv_path.parent / r["image_path"]).resolve() for r in rows]

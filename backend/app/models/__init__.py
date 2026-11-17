@@ -24,12 +24,15 @@ from backend.app.models.enums import (
     DirectionMethod,
     LogPlateSource,
     LinkMethod,
-    PresenceStatus
+    PresenceStatus,
+    ScreeningVerdict,
+    GuardDecision,
+    DeliverySource
 )
 from backend.app.models.identity import User, VehicleOwner, Visitor
 from backend.app.models.vehicle import Vehicle, DeliveryVehicle
 from backend.app.models.gate import Gate, AccessDecision, EntryExitLog, SecurityAlert
-from backend.app.models.delivery import DeliveryOrder, Invoice, InvoiceItem
+from backend.app.models.delivery import DeliveryOrder, Invoice, InvoiceItem, DeliveryDecision
 from backend.app.models.health import HealthCheckRecord
 from backend.app.models.observation import ObservationEvent, ObservationResolution, ObservationFeedEvent
 from backend.app.models.movement import CameraLane, VehicleLinkEvent
@@ -80,5 +83,9 @@ __all__ = [
     "LinkMethod",
     "PresenceStatus",
     "CameraLane",
-    "VehicleLinkEvent"
+    "VehicleLinkEvent",
+    "ScreeningVerdict",
+    "GuardDecision",
+    "DeliverySource",
+    "DeliveryDecision"
 ]

@@ -2,10 +2,32 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Gate Live Feed</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="description" content="Campus gate console: live plate feed, movement log and registry context for security staff." />
+  <meta name="theme-color" content="#f1f5f9" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Gate Console" />
+  <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <title>Campus Gate Console</title>
+  <script>
+    // Apply the saved theme before first paint, so a dark guard room never sees a white flash.
+    (function () {
+      try {
+        var pref = localStorage.getItem("campus-console.theme");
+        var dark = pref === "dark" || ((!pref || pref === "system") && window.matchMedia("(prefers-color-scheme: dark)").matches);
+        if (dark) {
+          document.documentElement.classList.add("dark");
+          document.querySelector('meta[name="theme-color"]').setAttribute("content", "#020617");
+        }
+      } catch (e) {}
+    })();
+  </script>
 </head>
-<body class="bg-slate-100">
+<body>
   <div id="root"></div>
   <script type="module" src="/src/main.tsx"></script>
 </body>

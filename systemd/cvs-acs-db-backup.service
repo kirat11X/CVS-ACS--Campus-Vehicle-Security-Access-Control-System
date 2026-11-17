@@ -1,0 +1,14 @@
+[Unit]
+Description=CVS-ACS Automated PostgreSQL Database Backup Service
+Documentation=https://github.com/kirat11X/CVS-ACS--Campus-Vehicle-Security-Access-Control-System
+After=docker.service postgresql.service
+
+[Service]
+Type=oneshot
+User=kirat
+Group=kirat
+WorkingDirectory=/home/kirat/coding/honours
+EnvironmentFile=/home/kirat/coding/honours/.env
+ExecStart=/home/kirat/coding/honours/scripts/backup_db.sh --retention-days 14
+StandardOutput=journal
+StandardError=journal

@@ -137,6 +137,18 @@
           "minimum": 1,
           "description": "Page index on which this item appears"
         },
+        "page_number": {
+          "type": ["integer", "null"],
+          "minimum": 1,
+          "description": "Page index on which this item appears (alias for source_page)"
+        },
+        "bounding_box": {
+          "type": ["array", "null"],
+          "items": { "type": "number" },
+          "minItems": 4,
+          "maxItems": 4,
+          "description": "[x_min, y_min, x_max, y_max] normalized coordinates"
+        },
         "evidence": {
           "type": ["object", "null"],
           "properties": {
@@ -194,6 +206,38 @@
         "shipping_total": {
           "$ref": "#/$defs/DecimalString",
           "description": "Delivery, logistics, or convenience fees"
+        },
+        "delivery_fee": {
+          "$ref": "#/$defs/DecimalString",
+          "description": "Platform delivery fee / shipping charge"
+        },
+        "packaging_fee": {
+          "$ref": "#/$defs/DecimalString",
+          "description": "Platform packaging charge or container charge"
+        },
+        "packaging_charge": {
+          "$ref": "#/$defs/DecimalString",
+          "description": "Alias for packaging fee"
+        },
+        "platform_fee": {
+          "$ref": "#/$defs/DecimalString",
+          "description": "Platform convenience or handling fee"
+        },
+        "cgst": {
+          "$ref": "#/$defs/DecimalString",
+          "description": "Central Goods and Services Tax (CGST)"
+        },
+        "sgst": {
+          "$ref": "#/$defs/DecimalString",
+          "description": "State Goods and Services Tax (SGST)"
+        },
+        "igst": {
+          "$ref": "#/$defs/DecimalString",
+          "description": "Integrated Goods and Services Tax (IGST)"
+        },
+        "round_off": {
+          "$ref": "#/$defs/DecimalString",
+          "description": "Rounding adjustment / round off"
         },
         "grand_total": {
           "$ref": "#/$defs/DecimalString",

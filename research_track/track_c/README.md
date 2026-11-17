@@ -52,7 +52,7 @@ research_track/track_c/
 │   ├── audit_records.py                 # Immutable audit ledger & human review event tracking
 │   └── evaluation.py                    # Independent perception & policy evaluation metrics
 ├── fixtures/                            # Deterministic evaluation test sets
-│   ├── item_taxonomy_seed.csv           # 321 curated items across 8 categories (synthetic)
+│   ├── item_taxonomy_seed.csv           # 320 curated items across 8 categories (synthetic)
 │   ├── policy_rules.json                # 21 versioned rules (defaults, overrides, conflicts)
 │   ├── synthetic_screening_cases.json   # 115 test cases covering all edge scenarios
 │   └── synthetic_ground_truth.json      # 115 expected ground-truth labels and outcomes

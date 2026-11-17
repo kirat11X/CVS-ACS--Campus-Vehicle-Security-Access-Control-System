@@ -20,6 +20,13 @@ from .evaluation import (
     LineItemAlignment,
 )
 from .pipeline import InvoicePipeline
+from .adapter_c import (
+    TrackBToCAdapter,
+    ScreeningItemInput,
+    ScreeningInputPayload,
+    convert_invoice_to_screening_payloads,
+    convert_line_item_to_screening_input,
+)
 
 __all__ = [
     "FieldNormalizer",
@@ -43,4 +50,9 @@ __all__ = [
     "BenchmarkAggregateSummary",
     "LineItemAlignment",
     "InvoicePipeline",
+    "TrackBToCAdapter",
+    "ScreeningItemInput",
+    "ScreeningInputPayload",
+    "convert_invoice_to_screening_payloads",
+    "convert_line_item_to_screening_input",
 ]

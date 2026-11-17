@@ -149,7 +149,7 @@ export HF_HUB_ENABLE_HF_TRANSFER=1  # Fast Rust downloads
 * `requirements-ml.txt`: Pinned Python 3.12 ML environment specifications (177 packages).
 * `MANIFEST.yaml`: Machine-readable asset catalog with licenses and SHA256 checksums.
 * `LINKS.md`: Cross-referenced resource catalog organized across Tracks A, B, and C.
-* `datasets/item_taxonomy_seed/seed_items.csv`: 300 unique synthetic quick-commerce line items.
+* `datasets/item_taxonomy_seed/seed_items.csv`: 320 canonical synthetic line items across 8 categories.
 * `db_draft/`: Staging DDL, Alembic migration draft, SQLAlchemy 2.0 models, and seed policy JSON.
 * `frontend/`: React + Vite + TypeScript dashboard scaffold with 5 pages and mock data.
 * `ec2/`: Provisioning templates (`bootstrap.sh`, `sync_assets.sh`) for AWS g4dn.xlarge instances.

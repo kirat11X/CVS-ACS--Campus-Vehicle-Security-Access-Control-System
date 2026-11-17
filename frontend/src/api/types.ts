@@ -1,4 +1,4 @@
-// Mirrors backend/app/schemas/feed.py, vehicle.py, owner.py and gate.py.
+// Mirrors backend/app/schemas/*.py (feed, vehicle, owner, gate, movement, dashboard, user, delivery, alert).
 
 export type Role = "ADMIN" | "SUPERVISOR" | "GUARD";
 
@@ -82,6 +82,8 @@ export interface OwnerContext {
   residence: string | null;
   department: string | null;
   status: string;
+  vehicle_plates?: string[];
+  vehicle_count?: number;
 }
 
 export interface ResidenceInfo {
@@ -159,12 +161,34 @@ export interface FeedPage {
   entries: FeedEntry[];
 }
 
+export type GateStatus = "ACTIVE" | "MAINTENANCE" | "LOCKED" | "OFFLINE" | "INACTIVE";
+
 export interface Gate {
   id: string;
   name: string;
   location: string | null;
-  status: string;
+  status: GateStatus;
   camera_id: string | null;
+  direction_capability: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GateCreate {
+  id: string;
+  name: string;
+  location?: string | null;
+  status?: GateStatus;
+  camera_id?: string | null;
+  direction_capability?: string;
+}
+
+export interface GateUpdate {
+  name?: string;
+  location?: string | null;
+  status?: GateStatus;
+  camera_id?: string | null;
+  direction_capability?: string;
 }
 
 export interface VehicleCreate {
@@ -189,10 +213,13 @@ export interface OwnerCreate {
   department?: string | null;
 }
 
+export type ObservedVehicleType = "CAR" | "MOTORCYCLE" | "BUS" | "TRUCK" | "BICYCLE" | "UNKNOWN";
+
 export interface ManualObservationCreate {
   gate_id: string;
   plate: string;
   direction: Direction;
+  vehicle_type?: ObservedVehicleType;
   note?: string | null;
 }
 
@@ -330,6 +357,261 @@ export interface VehicleLinkRequest {
 }
 
 export interface VehicleLinkResponse {
+  vehicle: VehicleDetail;
   link_event: LinkEvent;
   retroactive: { movements: number; sightings: number };
+}
+
+// ---- Registry detail (GET /vehicles, GET /vehicles/{plate}) ----
+
+export type VehicleStatus = "ACTIVE" | "INACTIVE" | "EXPIRED" | "SUSPENDED" | "BLACKLISTED";
+
+export interface VehicleRecord {
+  id: string;
+  plate: string;
+  raw_plate: string;
+  category: VehicleCategory;
+  status: VehicleStatus;
+  is_active: boolean;
+  make_model: string | null;
+  color: string | null;
+  valid_from: string | null;
+  valid_until: string | null;
+  notes: string | null;
+}
+
+export interface VehicleDetail {
+  vehicle: VehicleRecord;
+  owner: OwnerContext | null;
+  context: {
+    person_type: string | null;
+    residence_type: string | null;
+    residence: string | null;
+    department: string | null;
+    is_active: boolean;
+    vehicle_status: string;
+  };
+}
+
+export interface VehicleUpdate {
+  owner_id?: string | null;
+  vehicle_category?: VehicleCategory;
+  status?: VehicleStatus;
+  make_model?: string | null;
+  color?: string | null;
+  valid_from?: string | null;
+  valid_until?: string | null;
+  notes?: string | null;
+}
+
+// ---- Owners (GET /owners/{id}, PUT /owners/{id}) ----
+
+export interface OwnerDetail {
+  owner: OwnerContext;
+  vehicles: VehicleDetail[];
+}
+
+export interface OwnerUpdate {
+  full_name?: string;
+  email?: string | null;
+  phone?: string | null;
+  person_type?: PersonType;
+  residence_type?: ResidenceType;
+  residence?: string | null;
+  department?: string | null;
+}
+
+// ---- Camera lanes ----
+
+export type LaneRole = "ENTRY_LANE" | "EXIT_LANE" | "BIDIRECTIONAL";
+
+export interface Lane {
+  camera_id: string;
+  gate_id: string;
+  lane_role: LaneRole;
+  outside_zone: string | null;
+  inside_zone: string | null;
+  is_active: boolean;
+  notes: string | null;
+  updated_at: string;
+}
+
+export interface LaneUpsert {
+  gate_id: string;
+  lane_role: LaneRole;
+  outside_zone?: string | null;
+  inside_zone?: string | null;
+  is_active: boolean;
+  notes?: string | null;
+}
+
+// ---- Users (ADMIN) ----
+
+export interface UserAccount {
+  id: string;
+  username: string;
+  full_name: string;
+  email: string;
+  role: Role;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserCreate {
+  username: string;
+  full_name: string;
+  email: string;
+  role: Role;
+  password: string;
+}
+
+export interface UserUpdate {
+  full_name?: string;
+  email?: string;
+  role?: Role;
+  is_active?: boolean;
+  password?: string;
+}
+
+// ---- Dashboard ----
+
+export interface ActivityBucket {
+  start: string;
+  observations: number;
+  entries: number;
+  exits: number;
+}
+
+export interface DashboardSummary {
+  since: string;
+  generated_at: string;
+  bucket_minutes: number;
+  observations: { total: number; camera: number; manual: number; without_plate: number; low_confidence_unresolved: number };
+  movements: { entries: number; exits: number };
+  presence: { inside: number; inside_linked: number; inside_unlinked: number; long_stay: number; unattributed_entries: number };
+  registry: {
+    vehicles: number;
+    vehicles_by_status: Record<string, number>;
+    vehicles_by_category: Record<string, number>;
+    temporary_active: number;
+    owners: number;
+  };
+  activity: ActivityBucket[];
+  /** Deliveries whose overall verdict is REVIEW / ALERT and that no guard has decided yet. */
+  delivery_flags?: number;
+}
+
+// ---- Delivery screening (invoices via local intake / WhatsApp / console) ----
+
+/** Deterministic policy outcome per invoice line; OCR / ML never decides. */
+export type Verdict = "ALLOW" | "REVIEW" | "ALERT";
+export type GuardDecision = "CLEARED" | "HELD" | "ESCALATED";
+export type DeliverySource = "LOCAL_INTAKE" | "WHATSAPP" | "CONSOLE";
+
+export interface DeliveryDecision {
+  decision: GuardDecision;
+  note: string | null;
+  by: string;
+  at: string;
+}
+
+export interface DeliverySummary {
+  order_id: string;
+  platform: string | null;
+  gate_id: string | null;
+  source: DeliverySource;
+  sender: string | null;
+  received_at: string;
+  line_count: number;
+  review_count: number;
+  alert_count: number;
+  overall: Verdict;
+  totals_match: boolean | null;
+  total_amount: number | null;
+  latest_decision: DeliveryDecision | null;
+  reply_text: string;
+}
+
+export interface DeliveryLine {
+  line_no: number;
+  item_name: string;
+  quantity: number | null;
+  amount: number | null;
+  category: string;
+  category_label: string;
+  reason_code: string;
+  verdict: Verdict;
+  confidence: number | null;
+}
+
+export interface DeliveryInvoice {
+  image_url: string | null;
+  ocr_engine: string | null;
+  ocr_confidence: number | null;
+  raw_ocr_text: string | null;
+  vendor: string | null;
+  subtotal: number | null;
+  delivery_fee: number | null;
+  total: number | null;
+  computed_total: number | null;
+}
+
+export interface DeliveryDetail extends DeliverySummary {
+  invoice: DeliveryInvoice;
+  items: DeliveryLine[];
+  decisions: DeliveryDecision[];
+}
+
+// ---- Alerts (GET /alerts) ----
+
+export type AlertKind = "PLATE_REVIEW" | "PLATE_UNLINKED" | "DELIVERY_REVIEW" | "DELIVERY_ALERT" | "OVERSTAY_UNLINKED";
+export type AlertSeverity = "LOW" | "MEDIUM" | "HIGH";
+
+export interface AlertItem {
+  kind: AlertKind;
+  severity: AlertSeverity;
+  title: string;
+  detail: string;
+  ref: string;
+  gate_id: string | null;
+  at: string;
+}
+
+// ---- Messaging provider (GET /system/whatsapp) ----
+
+export interface WhatsAppStatus {
+  provider: "local" | "mock" | "meta" | string;
+  available: boolean;
+  intake_url: string;
+  outbox_count: number;
+}
+
+// ---- Admin-only test sighting (POST /observations) ----
+
+export interface ObservationCreate {
+  gate_id: string;
+  camera_id?: string | null;
+  source: "FRIGATE" | "OTHER";
+  source_event_id?: string | null;
+  raw_plate?: string | null;
+  plate_confidence?: number | null;
+  vehicle_type?: ObservedVehicleType;
+  direction?: Direction;
+}
+
+// ---- Health (GET /health/all) ----
+
+export interface ComponentHealth {
+  status: string;
+  detail?: unknown;
+  [key: string]: unknown;
+}
+
+export interface HealthAll {
+  status: "ok" | "degraded";
+  database: ComponentHealth;
+  mqtt: ComponentHealth;
+  frigate_worker: { running: boolean; connected: boolean; topic: string; stats: Record<string, number> };
+  whatsapp_mock?: { status: string; available: boolean };
 }

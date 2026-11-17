@@ -13,6 +13,43 @@ class ScreeningAction(str, enum.Enum):
     ALERT = "ALERT"
 
 
+class ReasonCode(str, enum.Enum):
+    """Standardized audit reason codes emitted by deterministic screening policy."""
+    ALLOW_PERMITTED_FOOD = "ALLOW_PERMITTED_FOOD"
+    ALLOW_PERMITTED_GOODS = "ALLOW_PERMITTED_GOODS"
+    CATEGORY_RULE_ALLOW = "CATEGORY_RULE_ALLOW"
+
+    REVIEW_UNCERTAIN_CLASSIFICATION = "REVIEW_UNCERTAIN_CLASSIFICATION"
+    REVIEW_CONTROLLED_ITEM = "REVIEW_CONTROLLED_ITEM"
+    REVIEW_HAZARDOUS_QUANTITY = "REVIEW_HAZARDOUS_QUANTITY"
+    CATEGORY_RULE_REVIEW = "CATEGORY_RULE_REVIEW"
+    MANUAL_REVIEW_REQUIRED = "MANUAL_REVIEW_REQUIRED"
+    UNKNOWN_CATEGORY = "UNKNOWN_CATEGORY"
+    LOW_CLASSIFIER_CONFIDENCE = "LOW_CLASSIFIER_CONFIDENCE"
+    MISSING_CLASSIFIER_CONFIDENCE = "MISSING_CLASSIFIER_CONFIDENCE"
+    INVALID_CLASSIFICATION = "INVALID_CLASSIFICATION"
+    MISSING_QUANTITY = "MISSING_QUANTITY"
+    INVALID_QUANTITY = "INVALID_QUANTITY"
+    UNSUPPORTED_QUANTITY_UNIT = "UNSUPPORTED_QUANTITY_UNIT"
+    POLICY_RULE_CONFLICT = "POLICY_RULE_CONFLICT"
+    POLICY_VERSION_INVALID = "POLICY_VERSION_INVALID"
+    HAZARDOUS_THRESHOLD_MET = "HAZARDOUS_THRESHOLD_MET"
+
+    ALERT_PROHIBITED_CHEMICAL = "ALERT_PROHIBITED_CHEMICAL"
+    ALERT_PROHIBITED_TOBACCO = "ALERT_PROHIBITED_TOBACCO"
+    ALERT_PROHIBITED_ALCOHOL = "ALERT_PROHIBITED_ALCOHOL"
+    ALERT_PROHIBITED_DRUG = "ALERT_PROHIBITED_DRUG"
+    ALERT_PROHIBITED_WEAPON = "ALERT_PROHIBITED_WEAPON"
+    CATEGORY_RULE_ALERT = "CATEGORY_RULE_ALERT"
+
+    NO_MATCHING_POLICY_RULE = "NO_MATCHING_POLICY_RULE"
+    POLICY_RULE_INACTIVE = "POLICY_RULE_INACTIVE"
+    POLICY_RULE_EXPIRED = "POLICY_RULE_EXPIRED"
+    MISSING_REQUIRED_PLATFORM = "MISSING_REQUIRED_PLATFORM"
+    MULTIPLE_RULES_MATCHED = "MULTIPLE_RULES_MATCHED"
+    HAZARDOUS_THRESHOLD_NOT_MET = "HAZARDOUS_THRESHOLD_NOT_MET"
+
+
 class ItemCategory(Base, TimestampMixin):
     __tablename__ = "item_categories"
 
@@ -37,7 +74,7 @@ class ScreeningPolicyRule(Base, TimestampMixin):
     max_quantity = Column(Integer, nullable=True)
     platform = Column(String(30), nullable=True, index=True)
     priority = Column(Integer, nullable=False, default=100)
-    policy_version = Column(String(40), nullable=False, index=True)
+    policy_version = Column(String(40), nullable=False, default="1.0", server_default="1.0", index=True)
     effective_from = Column(DateTime(timezone=True), nullable=False, default=utc_now)
     effective_to = Column(DateTime(timezone=True), nullable=True)
     active = Column(Boolean, nullable=False, default=True, index=True)  # soft-deactivate only
@@ -51,7 +88,7 @@ class InvoiceLineClassification(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     invoice_item_id = Column(UUID(as_uuid=True), ForeignKey("invoice_items.id"), nullable=False, index=True)
     category_code = Column(String(50), ForeignKey("item_categories.code"), nullable=False, index=True)
-    confidence = Column(Float, nullable=False)
+    confidence = Column(Float, nullable=True)  # Nullable for manual entries or low-res images without score
     classifier_name = Column(String(120), nullable=False)
     classifier_version = Column(String(120), nullable=False)
     normalized_item_text = Column(String(300), nullable=False)
@@ -69,8 +106,9 @@ class InvoiceScreeningResult(Base):
     invoice_id = Column(UUID(as_uuid=True), ForeignKey("invoices.id"), nullable=False, index=True)
     outcome = Column(SQLEnum(ScreeningAction, name="screening_action_enum"), nullable=False, index=True)
     matched_rule_ids = Column(ARRAY(UUID(as_uuid=True)), nullable=False)
-    reason_codes = Column(ARRAY(String(80)), nullable=False)
-    policy_version = Column(String(40), nullable=False)
+    reason_codes = Column(ARRAY(String(80)), nullable=False)  # Validated against ReasonCode enum values
+    policy_version = Column(String(40), nullable=False, default="1.0", server_default="1.0")
+    raw_payload = Column(JSONB, nullable=False)  # Immutable raw screening JSON payload for audit verification
     security_alert_id = Column(UUID(as_uuid=True), ForeignKey("security_alerts.id"), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False, index=True)
 

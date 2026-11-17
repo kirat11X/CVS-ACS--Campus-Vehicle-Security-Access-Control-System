@@ -27,7 +27,7 @@ export interface VehicleDetail {
 export interface ScreeningItem {
   item: string;
   category: string;
-  confidence: number;
+  confidence: number | null;
   rule: string;
   reasonCode: string;
   outcome: "ALLOW" | "REVIEW" | "ALERT";

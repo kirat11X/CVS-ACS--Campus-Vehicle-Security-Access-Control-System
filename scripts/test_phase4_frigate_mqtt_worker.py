@@ -419,7 +419,7 @@ def run_tests():
     assert persisted_obs.gate_id == "GATE_1"
     assert persisted_obs.plate_confidence == 0.96
     assert persisted_obs.vehicle_type == ObservedVehicleType.CAR
-    print(f"  -> [SUCCESS] Real MQTT event consumed from Mosquitto and verified in PostgreSQL:")
+    print("  -> [SUCCESS] Real MQTT event consumed from Mosquitto and verified in PostgreSQL:")
     print(f"     * Observation ID: {persisted_obs.id}")
     print(f"     * Gate: {persisted_obs.gate_id}")
     print(f"     * Plate: {persisted_obs.raw_plate} (normalized: {persisted_obs.normalized_plate})")

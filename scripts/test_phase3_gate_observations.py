@@ -343,7 +343,7 @@ def run_tests():
     assert "threat" not in inv_obs
     assert "owner" not in inv_obs
     print(f"  -> AccessDecision count remained unchanged ({decisions_count_before} -> {decisions_count_after})")
-    print(f"  -> Observation response strictly contains sensory data (No 'decision', No 'threat', No 'owner')")
+    print("  -> Observation response strictly contains sensory data (No 'decision', No 'threat', No 'owner')")
     print("  -> PASS Scenario 20: Invariant OBSERVATION != DECISION fully verified.")
 
     print("\n========================================================")

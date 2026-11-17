@@ -1,0 +1,42 @@
+[Unit]
+Description=CVS-ACS FastAPI Core Backend Service (Bare-Metal / Systemd)
+Documentation=https://github.com/kirat11X/CVS-ACS--Campus-Vehicle-Security-Access-Control-System
+After=network.target postgresql.service mosquitto.service
+Wants=postgresql.service mosquitto.service
+
+[Service]
+Type=exec
+User=kirat
+Group=kirat
+WorkingDirectory=/home/kirat/coding/honours
+EnvironmentFile=/home/kirat/coding/honours/.env
+Environment="PYTHONPATH=/home/kirat/coding/honours"
+Environment="KERAS_BACKEND=torch"
+Environment="CUDA_VISIBLE_DEVICES=0"
+
+# Pre-start migration check
+ExecStartPre=/home/kirat/coding/honours/.venv/bin/alembic upgrade head
+
+# Launch Uvicorn with 4 worker processes
+ExecStart=/home/kirat/coding/honours/.venv/bin/uvicorn backend.app.main:app \
+    --host 127.0.0.1 \
+    --port 8000 \
+    --workers 4 \
+    --log-level info \
+    --access-log
+
+# Auto-recovery and restart policy
+Restart=always
+RestartSec=5
+KillMode=mixed
+TimeoutStopSec=30
+
+# Sandboxing and security hardening
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=/home/kirat/coding/honours/media /home/kirat/coding/honours/logs
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

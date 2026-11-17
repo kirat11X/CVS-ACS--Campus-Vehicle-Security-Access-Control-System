@@ -8,6 +8,13 @@ from backend.app.routes.resolutions import router as resolutions_router
 from backend.app.routes.lanes import router as lanes_router
 from backend.app.routes.movements import router as movements_router
 from backend.app.routes.presence import router as presence_router
+from backend.app.routes.dashboard import router as dashboard_router
+from backend.app.routes.users import router as users_router
+from backend.app.routes.deliveries import router as deliveries_router
+from backend.app.routes.intake import router as intake_router
+from backend.app.routes.webhooks import router as webhooks_router
+from backend.app.routes.system import router as system_router
+from backend.app.routes.reviews import router as reviews_router
 
 __all__ = [
     "vehicles_router",
@@ -20,4 +27,11 @@ __all__ = [
     "lanes_router",
     "movements_router",
     "presence_router",
+    "dashboard_router",
+    "users_router",
+    "deliveries_router",
+    "intake_router",
+    "webhooks_router",
+    "system_router",
+    "reviews_router",
 ]

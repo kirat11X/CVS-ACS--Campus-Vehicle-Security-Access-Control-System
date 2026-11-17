@@ -35,7 +35,7 @@ All 15 deliverables required by the specification have been implemented under `r
 | **10** | Deterministic Policy Engine | `src/policy_engine.py` | Pure evaluation engine with priority sorting, temporal filtering, and tie conflict safety. |
 | **11** | Audit Records & Ledger | `src/audit_records.py` | Immutable append-only audit log events and human review escalation records. |
 | **12** | Evaluation Metrics Module | `src/evaluation.py` | Independent perception and policy metrics (False-Allow Rate, Confusion Matrix, property tests). |
-| **13** | Seed Taxonomy Fixture | `fixtures/item_taxonomy_seed.csv` | 321 synthetic items across all 8 categories (grocery, Hinglish, truncated, ambiguous, UNKNOWN). |
+| **13** | Seed Taxonomy Fixture | `fixtures/item_taxonomy_seed.csv` | 320 canonical synthetic items across all 8 categories (grocery, Hinglish, truncated, ambiguous, UNKNOWN). |
 | **14** | Versioned Policy Rules | `fixtures/policy_rules.json` | 21 rules covering defaults, bulk hazardous chemicals, platform overrides, and conflict pairs. |
 | **15** | Synthetic Cases & Ground Truth | `fixtures/synthetic_screening_cases.json`<br>`fixtures/synthetic_ground_truth.json` | 115 test cases covering all edge scenarios and matching ground-truth outcomes. |
 | **16** | Test Matrix & Plan | `tests/test_cases.md`<br>`reports/EVALUATION_PLAN.md` | Comprehensive evaluation matrix, future model comparison plan (Qwen3-1.7B), property tests. |

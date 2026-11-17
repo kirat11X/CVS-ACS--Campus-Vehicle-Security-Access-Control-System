@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_
 
 from backend.app.db import SessionLocal
-from backend.app.dependencies import CurrentUser, require_admin, require_staff
+from backend.app.dependencies import CurrentUser, get_db, require_admin, require_staff
 from backend.app.models.vehicle import Vehicle
 from backend.app.models.identity import VehicleOwner
 from backend.app.models.enums import VehicleCategory, VehicleStatus, ResidenceType
@@ -25,12 +25,6 @@ from backend.app.services.vehicle_link_service import link_vehicle
 
 router = APIRouter(prefix="/vehicles", tags=["Vehicles"])
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 @router.post("", response_model=VehicleDetailResponse, status_code=status.HTTP_201_CREATED)
 def register_vehicle(
@@ -72,6 +66,7 @@ def list_vehicles(
     status_filter: Optional[VehicleStatus] = Query(None, alias="status", description="Filter by vehicle status"),
     owner_id: Optional[str] = Query(None, description="Filter by owner UUID or institutional ID"),
     plate: Optional[str] = Query(None, description="Filter by plate (raw or normalized)"),
+    q: Optional[str] = Query(None, max_length=30, description="Plate fragment, format-tolerant (e.g. 'pb 65')"),
     residence_type: Optional[ResidenceType] = Query(None, description="Filter by owner residence type"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
@@ -79,7 +74,8 @@ def list_vehicles(
     user: CurrentUser = Depends(require_staff)
 ):
     """
-    Lists registered vehicles with optional filters for category, status, owner, plate, or residence type.
+    Lists registered vehicles (newest first) with optional filters for category, status, owner,
+    exact plate, plate fragment, or residence type.
     """
     query = db.query(Vehicle)
 
@@ -89,6 +85,9 @@ def list_vehicles(
         query = query.filter(Vehicle.status == status_filter)
     if plate:
         query = query.filter(Vehicle.normalized_plate == normalize_plate(plate))
+    if q and normalize_plate(q):
+        # normalize_plate keeps only [A-Z0-9], so the fragment carries no LIKE wildcards
+        query = query.filter(Vehicle.normalized_plate.contains(normalize_plate(q)))
     if owner_id:
         owner = resolve_owner(owner_id, db)
         if owner:
@@ -100,13 +99,8 @@ def list_vehicles(
             VehicleOwner.residence_type == residence_type
         )
 
-    vehicles = query.offset(skip).limit(limit).all()
-    results = []
-    for v in vehicles:
-        res = vehicle_identity_service.resolve(v.normalized_plate, db)
-        if res:
-            results.append(res)
-    return results
+    vehicles = query.order_by(Vehicle.created_at.desc(), Vehicle.id.asc()).offset(skip).limit(limit).all()
+    return [vehicle_identity_service.build_context(v) for v in vehicles]
 
 @router.put("/{plate}", response_model=VehicleDetailResponse)
 def update_vehicle(

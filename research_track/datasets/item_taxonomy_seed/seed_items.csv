@@ -299,3 +299,23 @@ KitKat Dessert Delight 50g,NORMAL,normal_grocery
 Snickers Peanut 50g,NORMAL,normal_grocery
 Dairy Mlk Slk,NORMAL,quick_commerce_truncated
 Snckrs 50g,NORMAL,quick_commerce_truncated
+XKJ-9943 1pc,UNKNOWN,ambiguous
+random barcode ###,UNKNOWN,ambiguous
+Unknown Box item #44,UNKNOWN,ambiguous
+Misprinted receipt text ??,UNKNOWN,ambiguous
+ZX-8820 Component,UNKNOWN,ambiguous
+G789-V1 Mystery Pack,UNKNOWN,ambiguous
+Garbled OCR token 11x,UNKNOWN,ambiguous
+### SKU_NON_CATALOG ###,UNKNOWN,ambiguous
+Miscellaneous Campus Pouch,UNKNOWN,ambiguous
+Unlabeled Liquid Bottle,UNKNOWN,ambiguous
+Unreadable Hindi Receipt Text,UNKNOWN,hinglish
+kuch ajeeb sa dabba,UNKNOWN,hinglish
+koi anjaan samaan,UNKNOWN,hinglish
+Unbranded Metal Part,UNKNOWN,ambiguous
+Unspecified Chemical Vial,UNKNOWN,ambiguous
+Custom Student Assembly 01,UNKNOWN,ambiguous
+Generic Sealed Carton #12,UNKNOWN,ambiguous
+Null description text,UNKNOWN,ambiguous
+Unclassified Electronics Board,UNKNOWN,ambiguous
+Novel Quick Commerce Promo X,UNKNOWN,quick_commerce_truncated

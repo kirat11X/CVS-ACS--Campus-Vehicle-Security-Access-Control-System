@@ -5,5 +5,6 @@
   {"code":"OTC_MEDICINE","display_name":"Over-the-counter medicine","description":"Non-prescription medicines","default_action":"ALLOW","severity":"LOW","active":true},
   {"code":"HAZARDOUS_CHEMICAL","display_name":"Hazardous chemical","description":"Flammable, corrosive or toxic household chemical","default_action":"REVIEW","severity":"MEDIUM","active":true},
   {"code":"SHARP_OBJECT","display_name":"Sharp object","description":"Bladed or piercing item","default_action":"REVIEW","severity":"MEDIUM","active":true},
-  {"code":"NORMAL","display_name":"Normal item","description":"Ordinary grocery or household item","default_action":"ALLOW","severity":"NONE","active":true}
+  {"code":"NORMAL","display_name":"Normal item","description":"Ordinary grocery or household item","default_action":"ALLOW","severity":"NONE","active":true},
+  {"code":"UNKNOWN","display_name":"Unknown / Unrecognized","description":"Unrecognized, ambiguous, or truncated item descriptions requiring review","default_action":"REVIEW","severity":"LOW","active":true}
 ]

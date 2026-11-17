@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "anpr-hitl"
+version = "0.1.0"
+description = "Human-in-the-loop self-training pipeline for Indian number-plate detection and reading (research track)."
+requires-python = ">=3.11"
+# Exact versions are pinned in requirements.lock. Ultralytics is AGPL-3.0: academic use only unless licensed.
+dependencies = []
+
+[project.scripts]
+anpr = "anpr_hitl.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+markers = [
+    "gpu: needs a CUDA GPU",
+    "slow: takes more than a few seconds",
+]

@@ -208,8 +208,11 @@ class FrigateEventParser:
         if not observed_at:
             observed_at = utc_now()
 
-        # Direction is strictly UNKNOWN (Section 4 mandate)
+        # Direction is strictly UNKNOWN (Section 4 mandate) - marked provisional
+        # until lane role or guard confirmation (ENTRY/EXIT) is established.
         direction = ObservationDirection.UNKNOWN
+        meta = dict(payload) if isinstance(payload, dict) else {}
+        meta["is_provisional"] = True
 
         return ObservationCreate(
             gate_id=gate.id,
@@ -222,5 +225,5 @@ class FrigateEventParser:
             vehicle_type=vehicle_type,
             vehicle_confidence=vehicle_confidence,
             direction=direction,
-            metadata_payload=payload
+            metadata_payload=meta
         )

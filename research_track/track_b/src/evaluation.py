@@ -310,11 +310,13 @@ class MetricCalculator:
         gt_items: List[Dict[str, Any]]
     ) -> List[LineItemAlignment]:
         """
-        Greedy bipartite alignment between predicted and ground truth line items.
+        Optimal maximum-weight 1-to-1 bipartite matching between predicted and ground truth line items.
         Scores pairs based on description token overlap and line total agreement.
+        When two pairings have identical scores, breaks ties deterministically using
+        (predicted_index, ground_truth_index, description_lexicographical_order).
         Ensures strict 1-to-1 matching without double-counting.
         """
-        pair_scores: List[Tuple[int, int, float]] = []
+        candidates: List[Tuple[int, int, float, str, str]] = []
 
         for p_idx, p in enumerate(pred_items):
             p_desc = p.get("description") or p.get("normalized_description") or ""
@@ -336,63 +338,126 @@ class MetricCalculator:
 
                 composite_score = min(1.0, (desc_sim * 0.70) + price_bonus)
                 if composite_score >= self.line_item_similarity_threshold:
-                    pair_scores.append((p_idx, g_idx, composite_score))
+                    candidates.append((p_idx, g_idx, composite_score, p_desc, g_desc))
 
-        scores_by_pred: Dict[int, List[Tuple[int, float]]] = {}
-        for p_idx, g_idx, score in pair_scores:
-            scores_by_pred.setdefault(p_idx, []).append((g_idx, score))
+        N = len(pred_items)
+        M = len(gt_items)
+        if N == 0 or M == 0 or not candidates:
+            return []
 
-        @lru_cache(maxsize=None)
-        def best_assignment(pred_idx: int, used_gt_mask: int) -> Tuple[int, Decimal, Tuple[Tuple[int, int], ...]]:
-            if pred_idx >= len(pred_items):
-                return 0, Decimal("0"), ()
+        # Sort candidate edges deterministically to break ties:
+        # (predicted_index, ground_truth_index, description_lexicographical_order)
+        candidates.sort(
+            key=lambda c: (
+                c[0],
+                c[1],
+                (c[3] or "").strip().upper(),
+                (c[4] or "").strip().upper(),
+            )
+        )
+        total_candidates = len(candidates)
 
-            best_count, best_score, best_pairs = best_assignment(pred_idx + 1, used_gt_mask)
-            for g_idx, score in sorted(scores_by_pred.get(pred_idx, [])):
-                if used_gt_mask & (1 << g_idx):
-                    continue
-                count, total_score, pairs = best_assignment(pred_idx + 1, used_gt_mask | (1 << g_idx))
-                candidate = (count + 1, total_score + Decimal(str(score)), ((pred_idx, g_idx),) + pairs)
-                incumbent = (best_count, best_score, best_pairs)
-                if candidate[:2] > incumbent[:2]:
-                    best_count, best_score, best_pairs = candidate
-            return best_count, best_score, best_pairs
+        weights: Dict[Tuple[int, int], float] = {}
+        raw_scores: Dict[Tuple[int, int], float] = {}
+        for rank, (p_idx, g_idx, score, _, _) in enumerate(candidates):
+            # Infinitesimal deterministic tie-breaker preserving raw scores
+            eps = (total_candidates - rank) * 1e-9
+            weights[(p_idx, g_idx)] = score + eps
+            raw_scores[(p_idx, g_idx)] = score
 
-        _, _, selected_pairs = best_assignment(0, 0)
+        # Kuhn-Munkres (Hungarian algorithm) for maximum weight bipartite matching on (N + M) x (N + M)
+        K = N + M
+        W = [[0.0] * K for _ in range(K)]
+        for (i, j), w in weights.items():
+            W[i][j] = w
+
+        max_w = max([w for w in weights.values()] + [0.0])
+        big = max_w + 1.0
+        C = [[big - W[i][j] for j in range(K)] for i in range(K)]
+
+        u = [0.0] * (K + 1)
+        v = [0.0] * (K + 1)
+        p = [0] * (K + 1)
+        way = [0] * (K + 1)
+
+        for i in range(1, K + 1):
+            p[0] = i
+            j0 = 0
+            minv = [float("inf")] * (K + 1)
+            used = [False] * (K + 1)
+            while True:
+                used[j0] = True
+                i0 = p[j0]
+                delta = float("inf")
+                j1 = 0
+                for j in range(1, K + 1):
+                    if not used[j]:
+                        cur = C[i0 - 1][j - 1] - u[i0] - v[j]
+                        if cur < minv[j]:
+                            minv[j] = cur
+                            way[j] = j0
+                        if minv[j] < delta:
+                            delta = minv[j]
+                            j1 = j
+                for j in range(0, K + 1):
+                    if used[j]:
+                        u[p[j]] += delta
+                        v[j] -= delta
+                    else:
+                        minv[j] -= delta
+                j0 = j1
+                if p[j0] == 0:
+                    break
+            while True:
+                j1 = way[j0]
+                p[j0] = p[j1]
+                j0 = j1
+                if j0 == 0:
+                    break
+
+        ans = [-1] * K
+        for j in range(1, K + 1):
+            if p[j] != 0:
+                ans[p[j] - 1] = j - 1
+
+        selected_pairs: List[Tuple[int, int, float]] = []
+        for i in range(N):
+            j = ans[i]
+            if j < M and (i, j) in raw_scores:
+                selected_pairs.append((i, j, raw_scores[(i, j)]))
+
         alignments: List[LineItemAlignment] = []
+        for p_idx, g_idx, score in selected_pairs:
+            p = pred_items[p_idx]
+            g = gt_items[g_idx]
 
-        for p_idx, g_idx in selected_pairs:
-                score = next(score for candidate_gt, score in scores_by_pred[p_idx] if candidate_gt == g_idx)
-                p = pred_items[p_idx]
-                g = gt_items[g_idx]
+            p_desc = (p.get("description") or "").strip().upper()
+            g_desc = (g.get("description") or "").strip().upper()
 
-                p_desc = (p.get("description") or "").strip().upper()
-                g_desc = (g.get("description") or "").strip().upper()
+            p_qty = self._to_decimal(p.get("quantity"))
+            g_qty = self._to_decimal(g.get("quantity"))
 
-                p_qty = self._to_decimal(p.get("quantity"))
-                g_qty = self._to_decimal(g.get("quantity"))
+            p_price = self._to_decimal(p.get("unit_price"))
+            g_price = self._to_decimal(g.get("unit_price"))
 
-                p_price = self._to_decimal(p.get("unit_price"))
-                g_price = self._to_decimal(g.get("unit_price"))
+            p_total = self._to_decimal(p.get("line_total"))
+            g_total = self._to_decimal(g.get("line_total"))
 
-                p_total = self._to_decimal(p.get("line_total"))
-                g_total = self._to_decimal(g.get("line_total"))
+            total_exact = (p_total == g_total) if (p_total is not None and g_total is not None) else (p_total is None and g_total is None)
+            total_tol = (abs(p_total - g_total) <= self.numeric_tolerance) if (p_total is not None and g_total is not None) else total_exact
 
-                total_exact = (p_total == g_total) if (p_total is not None and g_total is not None) else (p_total is None and g_total is None)
-                total_tol = (abs(p_total - g_total) <= self.numeric_tolerance) if (p_total is not None and g_total is not None) else total_exact
-
-                alignments.append(LineItemAlignment(
-                    pred_idx=p_idx,
-                    gt_idx=g_idx,
-                    pred_item=p,
-                    gt_item=g,
-                    similarity_score=score,
-                    description_exact=(p_desc == g_desc),
-                    quantity_exact=(p_qty == g_qty) if (p_qty is not None and g_qty is not None) else (p_qty is None and g_qty is None),
-                    unit_price_exact=(p_price == g_price) if (p_price is not None and g_price is not None) else (p_price is None and g_price is None),
-                    line_total_exact=total_exact,
-                    line_total_within_tolerance=total_tol,
-                ))
+            alignments.append(LineItemAlignment(
+                pred_idx=p_idx,
+                gt_idx=g_idx,
+                pred_item=p,
+                gt_item=g,
+                similarity_score=score,
+                description_exact=(p_desc == g_desc),
+                quantity_exact=(p_qty == g_qty) if (p_qty is not None and g_qty is not None) else (p_qty is None and g_qty is None),
+                unit_price_exact=(p_price == g_price) if (p_price is not None and g_price is not None) else (p_price is None and g_price is None),
+                line_total_exact=total_exact,
+                line_total_within_tolerance=total_tol,
+            ))
 
         return alignments
 

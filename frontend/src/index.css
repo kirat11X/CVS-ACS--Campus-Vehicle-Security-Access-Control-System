@@ -1,7 +1,133 @@
+@import "@fontsource-variable/inter";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-body {
-  @apply bg-slate-100 text-slate-900 antialiased;
+/* Chart roles. Series hues validated (dataviz palette checks) against the card surfaces:
+   light #ffffff, dark #0f172a. Entries = slot 1 blue, exits = slot 2 orange. */
+:root {
+  color-scheme: light;
+  --chart-surface: #ffffff;
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --chart-grid: #e2e8f0;
+  --chart-axis: #cbd5e1;
+  --chart-muted: #94a3b8;
+}
+
+.dark {
+  color-scheme: dark;
+  --chart-surface: #0f172a;
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --chart-grid: #1e293b;
+  --chart-axis: #334155;
+  --chart-muted: #64748b;
+}
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+    text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-slate-100 text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100;
+    overscroll-behavior-y: none;
+  }
+  ::selection {
+    @apply bg-sky-200 text-slate-900 dark:bg-sky-800 dark:text-white;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-xl bg-white shadow-sm ring-1 ring-slate-200/80 dark:bg-slate-900 dark:shadow-none dark:ring-slate-800;
+  }
+
+  .btn {
+    @apply inline-flex select-none items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3.5 py-2 text-sm font-medium transition-colors
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white
+      disabled:cursor-not-allowed disabled:opacity-50 dark:focus-visible:ring-offset-slate-900;
+  }
+  .btn-primary {
+    @apply bg-slate-900 text-white hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white;
+  }
+  .btn-secondary {
+    @apply bg-white text-slate-700 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 hover:text-slate-900
+      dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700 dark:hover:bg-slate-700 dark:hover:text-white;
+  }
+  .btn-ghost {
+    @apply text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white;
+  }
+  .btn-sm {
+    @apply gap-1.5 px-2.5 py-1.5 text-xs;
+  }
+  .btn-icon {
+    @apply p-2;
+  }
+
+  .input {
+    @apply block w-full rounded-lg border-0 bg-white px-3 py-2 text-base text-slate-900 shadow-sm ring-1 ring-inset ring-slate-300
+      placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-sky-500
+      disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500
+      sm:text-sm dark:bg-slate-950 dark:text-slate-100 dark:ring-slate-700 dark:placeholder:text-slate-500 dark:disabled:bg-slate-800;
+  }
+  .label {
+    @apply text-sm font-medium text-slate-700 dark:text-slate-300;
+  }
+  .hint {
+    @apply text-xs text-slate-500 dark:text-slate-400;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium ring-1 ring-inset transition-colors
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500;
+  }
+  .chip-off {
+    @apply bg-white text-slate-700 ring-slate-300 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-300 dark:ring-slate-700 dark:hover:bg-slate-800;
+  }
+  .chip-on {
+    @apply bg-slate-900 text-white ring-slate-900 dark:bg-slate-100 dark:text-slate-900 dark:ring-slate-100;
+  }
+
+  .plate {
+    @apply font-mono font-semibold uppercase tracking-wider;
+  }
+
+  .table-head {
+    @apply bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:bg-slate-800/60 dark:text-slate-400;
+  }
+
+  .link {
+    @apply font-medium text-sky-700 underline-offset-2 hover:underline dark:text-sky-400;
+  }
+}
+
+@layer utilities {
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .px-safe {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

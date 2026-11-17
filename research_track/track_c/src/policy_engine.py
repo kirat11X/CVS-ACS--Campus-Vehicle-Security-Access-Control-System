@@ -126,6 +126,7 @@ class DeterministicPolicyEngine:
 
         # 3. Filter matching rules based on category, validity, platform, and quantity
         matched_candidates: List[PolicyRule] = []
+        has_unit_mismatch = False
 
         for rule in version_rules:
             # A. Active check
@@ -180,8 +181,7 @@ class DeterministicPolicyEngine:
                 if rule.quantity_unit:
                     if not unit or rule.quantity_unit.strip().upper() != unit.strip().upper():
                         rejected_rules[rule.rule_id] = f"Unit mismatch ({rule.quantity_unit} != {unit})"
-                        if ReasonCode.UNSUPPORTED_QUANTITY_UNIT.value not in reason_codes:
-                            reason_codes.append(ReasonCode.UNSUPPORTED_QUANTITY_UNIT.value)
+                        has_unit_mismatch = True
                         continue
 
                 # Check numerical interval
@@ -202,6 +202,9 @@ class DeterministicPolicyEngine:
         resolution_method: str
 
         if not matched_candidates:
+            if has_unit_mismatch and ReasonCode.UNSUPPORTED_QUANTITY_UNIT.value not in reason_codes:
+                reason_codes.append(ReasonCode.UNSUPPORTED_QUANTITY_UNIT.value)
+
             # Case: No matching rule
             cat_def = CategoryNormalizer.get_definition(cat)
             outcome = cat_def.default_action
@@ -210,14 +213,22 @@ class DeterministicPolicyEngine:
             if cat != ItemCategoryCode.UNKNOWN:
                 reason_codes.append(ReasonCode.NO_MATCHING_POLICY_RULE.value)
 
-            # Special case for hazardous chemicals below threshold when no threshold rule matched
+            # Special case for hazardous chemicals when no threshold rule matched
             if cat == ItemCategoryCode.HAZARDOUS_CHEMICAL:
-                if quantity is not None and quantity < 3.0:
+                if quantity is None:
+                    outcome = ScreeningOutcome.REVIEW
+                    if ReasonCode.MISSING_QUANTITY.value not in reason_codes:
+                        reason_codes.append(ReasonCode.MISSING_QUANTITY.value)
+                elif quantity < 0 or ReasonCode.INVALID_QUANTITY.value in reason_codes:
+                    outcome = ScreeningOutcome.REVIEW
+                elif ReasonCode.UNSUPPORTED_QUANTITY_UNIT.value in reason_codes:
+                    outcome = ScreeningOutcome.REVIEW
+                elif 0 <= quantity < 3.0:
                     outcome = ScreeningOutcome.ALLOW
                     reason_codes.append(ReasonCode.HAZARDOUS_THRESHOLD_NOT_MET.value)
-                elif quantity is None:
+                else:
                     outcome = ScreeningOutcome.REVIEW
-                    reason_codes.append(ReasonCode.MISSING_QUANTITY.value)
+                    reason_codes.append(ReasonCode.HAZARDOUS_THRESHOLD_MET.value)
         else:
             # Sort candidates strictly by priority (lower int = higher priority)
             # Secondarily sort deterministically by rule_id string to be order-independent
@@ -249,40 +260,77 @@ class DeterministicPolicyEngine:
                 # Attach matching reason code
                 if outcome == ScreeningOutcome.ALERT:
                     reason_codes.append(ReasonCode.CATEGORY_RULE_ALERT.value)
+                    if cat == ItemCategoryCode.HAZARDOUS_CHEMICAL:
+                        reason_codes.append(ReasonCode.ALERT_PROHIBITED_CHEMICAL.value)
+                    elif cat == ItemCategoryCode.TOBACCO_NICOTINE:
+                        reason_codes.append(ReasonCode.ALERT_PROHIBITED_TOBACCO.value)
+                    elif cat == ItemCategoryCode.ALCOHOL:
+                        reason_codes.append(ReasonCode.ALERT_PROHIBITED_ALCOHOL.value)
+                    elif cat == ItemCategoryCode.RX_SCHEDULED_DRUG:
+                        reason_codes.append(ReasonCode.ALERT_PROHIBITED_DRUG.value)
+                    elif cat == ItemCategoryCode.SHARP_OBJECT:
+                        reason_codes.append(ReasonCode.ALERT_PROHIBITED_WEAPON.value)
                 elif outcome == ScreeningOutcome.REVIEW:
                     reason_codes.append(ReasonCode.CATEGORY_RULE_REVIEW.value)
+                    if cat == ItemCategoryCode.SHARP_OBJECT:
+                        reason_codes.append(ReasonCode.REVIEW_CONTROLLED_ITEM.value)
+                    elif cat == ItemCategoryCode.HAZARDOUS_CHEMICAL:
+                        reason_codes.append(ReasonCode.REVIEW_HAZARDOUS_QUANTITY.value)
                 elif outcome == ScreeningOutcome.ALLOW:
                     reason_codes.append(ReasonCode.CATEGORY_RULE_ALLOW.value)
+                    if cat == ItemCategoryCode.NORMAL:
+                        reason_codes.append(ReasonCode.ALLOW_PERMITTED_FOOD.value)
 
                 # Hazardous threshold indicator
                 if cat == ItemCategoryCode.HAZARDOUS_CHEMICAL:
-                    if applied_rule.min_quantity is not None and quantity is not None and quantity >= applied_rule.min_quantity:
+                    if quantity is not None and quantity >= 3.0:
                         reason_codes.append(ReasonCode.HAZARDOUS_THRESHOLD_MET.value)
+                    elif quantity is not None and 0 <= quantity < 3.0:
+                        reason_codes.append(ReasonCode.HAZARDOUS_THRESHOLD_NOT_MET.value)
 
-        # 5. Apply Confidence Safety Invariants
-        # A low confidence or missing confidence MUST NOT allow items through without review
+        # 5. Apply Confidence & Uncertainty Safety Degradation
+        # CRITICAL UNCERTAINTY ESCALATION:
+        # - If is_uncertain=True or classification confidence < 0.70 (or None),
+        #   any tentative ALLOW decision MUST degrade to REVIEW for human guard inspection.
+        # - Any ALERT decision NEVER degrades—if a hazardous or prohibited item is detected
+        #   with high or low confidence, it MUST remain ALERT.
+        tentative_outcome = outcome
         conf = classification.confidence
-        if conf is None:
-            if self.treat_missing_confidence_as_review:
-                if ReasonCode.MISSING_CLASSIFIER_CONFIDENCE.value not in reason_codes:
-                    reason_codes.append(ReasonCode.MISSING_CLASSIFIER_CONFIDENCE.value)
-                # If outcome was ALLOW, downgrade to REVIEW! (Never downgrade ALERT)
-                if outcome == ScreeningOutcome.ALLOW:
-                    outcome = ScreeningOutcome.REVIEW
-                    resolution_method += "_downgraded_due_to_missing_confidence"
-        elif conf < self.confidence_review_threshold:
+
+        is_low_conf = (conf is not None and conf < self.confidence_review_threshold)
+        is_missing_conf = (conf is None and self.treat_missing_confidence_as_review)
+        is_uncertain = classification.is_uncertain
+
+        if is_missing_conf:
+            if ReasonCode.MISSING_CLASSIFIER_CONFIDENCE.value not in reason_codes:
+                reason_codes.append(ReasonCode.MISSING_CLASSIFIER_CONFIDENCE.value)
+            if ReasonCode.REVIEW_UNCERTAIN_CLASSIFICATION.value not in reason_codes:
+                reason_codes.append(ReasonCode.REVIEW_UNCERTAIN_CLASSIFICATION.value)
+            if tentative_outcome == ScreeningOutcome.ALLOW:
+                outcome = ScreeningOutcome.REVIEW
+                resolution_method += "_downgraded_due_to_missing_confidence"
+
+        if is_low_conf:
             if ReasonCode.LOW_CLASSIFIER_CONFIDENCE.value not in reason_codes:
                 reason_codes.append(ReasonCode.LOW_CLASSIFIER_CONFIDENCE.value)
-            # If outcome was ALLOW, downgrade to REVIEW!
-            if outcome == ScreeningOutcome.ALLOW:
+            if ReasonCode.REVIEW_UNCERTAIN_CLASSIFICATION.value not in reason_codes:
+                reason_codes.append(ReasonCode.REVIEW_UNCERTAIN_CLASSIFICATION.value)
+            if tentative_outcome == ScreeningOutcome.ALLOW:
                 outcome = ScreeningOutcome.REVIEW
                 resolution_method += "_downgraded_due_to_low_confidence"
 
-        if classification.is_uncertain and outcome == ScreeningOutcome.ALLOW:
+        if is_uncertain:
             if ReasonCode.MANUAL_REVIEW_REQUIRED.value not in reason_codes:
                 reason_codes.append(ReasonCode.MANUAL_REVIEW_REQUIRED.value)
-            outcome = ScreeningOutcome.REVIEW
-            resolution_method += "_downgraded_due_to_uncertain_classification"
+            if ReasonCode.REVIEW_UNCERTAIN_CLASSIFICATION.value not in reason_codes:
+                reason_codes.append(ReasonCode.REVIEW_UNCERTAIN_CLASSIFICATION.value)
+            if tentative_outcome == ScreeningOutcome.ALLOW:
+                outcome = ScreeningOutcome.REVIEW
+                resolution_method += "_downgraded_due_to_uncertain_classification"
+
+        # Invariant assertion: ALERT outcomes NEVER degrade regardless of confidence or uncertainty
+        if tentative_outcome == ScreeningOutcome.ALERT:
+            outcome = ScreeningOutcome.ALERT
 
         # 6. Final Review Flag & Plain English Explanation
         requires_review = (outcome != ScreeningOutcome.ALLOW) or (ReasonCode.MANUAL_REVIEW_REQUIRED.value in reason_codes)

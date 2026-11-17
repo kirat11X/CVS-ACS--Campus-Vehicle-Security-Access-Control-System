@@ -12,6 +12,20 @@ build/
 # Environment and secrets
 .env
 *.local
+*.pem
+*.key
+honors.pem
+
+# Heavy training datasets and runs
+TRAINING_VIDEOS/
+training/
+training_1/
+runs/
+data/
+.coverage
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
 # Volumes & persistent service data
 postgres_data/

@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { api, onUnauthorized } from "../api/client";
 import type { UserSummary } from "../api/types";
+import { isNativeApp } from "../lib/platform";
 
 interface Session {
   token: string;
@@ -17,10 +18,20 @@ interface AuthState {
 const STORAGE_KEY = "gate-feed-session";
 const AuthContext = createContext<AuthState | null>(null);
 
-// sessionStorage: the session ends with the browser tab on shared guard-room machines.
+// Browser: sessionStorage, so the session ends with the tab on shared guard-room machines.
+// App: the WebView's private localStorage, so a guard is not signed out on every app restart.
+// Either way the token expires after AUTH_TOKEN_TTL_MINUTES.
+function store(): Storage | null {
+  try {
+    return isNativeApp ? window.localStorage : window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
 function loadSession(): Session | null {
   try {
-    const raw = sessionStorage.getItem(STORAGE_KEY);
+    const raw = store()?.getItem(STORAGE_KEY);
     if (!raw) return null;
     const session = JSON.parse(raw) as Session;
     return new Date(session.expiresAt).getTime() > Date.now() ? session : null;
@@ -31,8 +42,8 @@ function loadSession(): Session | null {
 
 function saveSession(session: Session | null): void {
   try {
-    if (session) sessionStorage.setItem(STORAGE_KEY, JSON.stringify(session));
-    else sessionStorage.removeItem(STORAGE_KEY);
+    if (session) store()?.setItem(STORAGE_KEY, JSON.stringify(session));
+    else store()?.removeItem(STORAGE_KEY);
   } catch {
     // storage unavailable (private mode); the session lives in memory only
   }
@@ -64,6 +75,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const timer = window.setTimeout(logout, Math.max(0, ms));
     return () => window.clearTimeout(timer);
   }, [session, logout]);
+
+  // Roles are read from the database on every request; pick up a change (or a disabled
+  // account, which answers 401 and signs out) when a stored session is resumed.
+  const token = session?.token;
+  useEffect(() => {
+    if (!token) return;
+    api
+      .me(token)
+      .then((user) =>
+        setSession((current) => {
+          if (!current || current.token !== token) return current;
+          const u = current.user;
+          if (u.role === user.role && u.full_name === user.full_name && u.username === user.username) return current;
+          const next = { ...current, user };
+          saveSession(next);
+          return next;
+        }),
+      )
+      .catch(() => undefined);
+  }, [token]);
 
   const value = useMemo(() => ({ session, login, logout }), [session, login, logout]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

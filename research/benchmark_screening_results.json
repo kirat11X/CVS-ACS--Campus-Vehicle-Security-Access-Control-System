@@ -1,0 +1,222 @@
+{
+  "timestamp": "2026-11-17T03:17:41Z",
+  "policy_tests": {
+    "category_rules": {
+      "passed": 25,
+      "total": 28
+    },
+    "escalations": "ALL_PASSED"
+  },
+  "arithmetic_tests": {
+    "clean_match": "ALLOW",
+    "mismatched_total_escalates": "REVIEW",
+    "mismatched_total_with_restricted": "ALERT",
+    "missing_total_escalates": "REVIEW",
+    "order_mismatch_escalates": "REVIEW",
+    "unreadable_row_escalates": "REVIEW"
+  },
+  "ocr_vendor_benchmarks": {
+    "Amazon India": {
+      "vendor": "Amazon India",
+      "samples": 7,
+      "order_id_recognized": 6,
+      "lines_extracted": 14,
+      "totals_extracted": 7,
+      "arithmetic_matches": 6,
+      "avg_latency_s": 1.876,
+      "avg_confidence": 0.8244,
+      "verdicts": {
+        "ALLOW": 4,
+        "REVIEW": 3
+      }
+    },
+    "Blinkit": {
+      "vendor": "Blinkit",
+      "samples": 7,
+      "order_id_recognized": 7,
+      "lines_extracted": 16,
+      "totals_extracted": 7,
+      "arithmetic_matches": 6,
+      "avg_latency_s": 1.716,
+      "avg_confidence": 0.8179,
+      "verdicts": {
+        "ALLOW": 4,
+        "REVIEW": 3
+      }
+    },
+    "Reliance Smart / Fresh": {
+      "vendor": "Reliance Smart / Fresh",
+      "samples": 7,
+      "order_id_recognized": 7,
+      "lines_extracted": 12,
+      "totals_extracted": 7,
+      "arithmetic_matches": 5,
+      "avg_latency_s": 1.735,
+      "avg_confidence": 0.8252,
+      "verdicts": {
+        "REVIEW": 7
+      }
+    },
+    "Swiggy": {
+      "vendor": "Swiggy",
+      "samples": 7,
+      "order_id_recognized": 7,
+      "lines_extracted": 13,
+      "totals_extracted": 7,
+      "arithmetic_matches": 5,
+      "avg_latency_s": 1.736,
+      "avg_confidence": 0.8191,
+      "verdicts": {
+        "REVIEW": 3,
+        "ALLOW": 4
+      }
+    },
+    "Uber Trips & Eats": {
+      "vendor": "Uber Trips & Eats",
+      "samples": 7,
+      "order_id_recognized": 7,
+      "lines_extracted": 16,
+      "totals_extracted": 7,
+      "arithmetic_matches": 3,
+      "avg_latency_s": 1.76,
+      "avg_confidence": 0.8181,
+      "verdicts": {
+        "REVIEW": 7
+      }
+    },
+    "Zepto": {
+      "vendor": "Zepto",
+      "samples": 7,
+      "order_id_recognized": 7,
+      "lines_extracted": 23,
+      "totals_extracted": 7,
+      "arithmetic_matches": 5,
+      "avg_latency_s": 1.725,
+      "avg_confidence": 0.8106,
+      "verdicts": {
+        "ALLOW": 3,
+        "REVIEW": 4
+      }
+    },
+    "Zomato": {
+      "vendor": "Zomato",
+      "samples": 7,
+      "order_id_recognized": 7,
+      "lines_extracted": 16,
+      "totals_extracted": 7,
+      "arithmetic_matches": 6,
+      "avg_latency_s": 1.708,
+      "avg_confidence": 0.8205,
+      "verdicts": {
+        "REVIEW": 7
+      }
+    }
+  },
+  "qr_benchmark": {
+    "tested": 200,
+    "direct_detected": 62,
+    "upscaled_detected": 126,
+    "total_detected": 188,
+    "upi_scheme_count": 108,
+    "https_scheme_count": 80,
+    "order_id_verified": 188,
+    "amount_extracted": 108
+  },
+  "engine_comparison": [
+    {
+      "case": "Clean Digital",
+      "rapid_rows": 14,
+      "rapid_lines": 5,
+      "rapid_conf": 0.7915,
+      "rapid_time_s": 1.774,
+      "rapid_match": true,
+      "rapid_verdict": "ALERT",
+      "tess_rows": 13,
+      "tess_lines": 5,
+      "tess_conf": 0.924,
+      "tess_time_s": 0.471,
+      "tess_match": true,
+      "tess_verdict": "ALERT"
+    },
+    {
+      "case": "All Clear",
+      "rapid_rows": 14,
+      "rapid_lines": 5,
+      "rapid_conf": 0.8005,
+      "rapid_time_s": 1.519,
+      "rapid_match": true,
+      "rapid_verdict": "REVIEW",
+      "tess_rows": 13,
+      "tess_lines": 5,
+      "tess_conf": 0.9011,
+      "tess_time_s": 0.334,
+      "tess_match": true,
+      "tess_verdict": "ALLOW"
+    },
+    {
+      "case": "Alcohol Restricted",
+      "rapid_rows": 11,
+      "rapid_lines": 2,
+      "rapid_conf": 0.8051,
+      "rapid_time_s": 1.358,
+      "rapid_match": true,
+      "rapid_verdict": "ALERT",
+      "tess_rows": 10,
+      "tess_lines": 2,
+      "tess_conf": 0.9289,
+      "tess_time_s": 0.325,
+      "tess_match": true,
+      "tess_verdict": "ALERT"
+    },
+    {
+      "case": "Hinglish QuickCommerce",
+      "rapid_rows": 14,
+      "rapid_lines": 5,
+      "rapid_conf": 0.7969,
+      "rapid_time_s": 1.712,
+      "rapid_match": true,
+      "rapid_verdict": "ALERT",
+      "tess_rows": 13,
+      "tess_lines": 5,
+      "tess_conf": 0.9243,
+      "tess_time_s": 0.395,
+      "tess_match": true,
+      "tess_verdict": "ALERT"
+    },
+    {
+      "case": "Degraded Scan",
+      "rapid_rows": 18,
+      "rapid_lines": 5,
+      "rapid_conf": 0.8168,
+      "rapid_time_s": 1.921,
+      "rapid_match": false,
+      "rapid_verdict": "REVIEW",
+      "tess_rows": 13,
+      "tess_lines": 5,
+      "tess_conf": 0.8607,
+      "tess_time_s": 0.695,
+      "tess_match": true,
+      "tess_verdict": "ALLOW"
+    },
+    {
+      "case": "Phone Camera Photo",
+      "rapid_rows": 19,
+      "rapid_lines": 4,
+      "rapid_conf": 0.8049,
+      "rapid_time_s": 1.513,
+      "rapid_match": null,
+      "rapid_verdict": "REVIEW",
+      "tess_rows": 15,
+      "tess_lines": 4,
+      "tess_conf": 0.8135,
+      "tess_time_s": 0.64,
+      "tess_match": true,
+      "tess_verdict": "REVIEW"
+    }
+  ],
+  "overall_throughput": {
+    "total_samples": 49,
+    "total_time_s": 85.8,
+    "invoices_per_sec": 0.57
+  }
+}

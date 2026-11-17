@@ -71,6 +71,8 @@ class MovementLogRow(BaseModel):
     created_by: Optional[UserSummary] = None
     created_at: datetime
     note: Optional[str] = None
+    decision: Optional[str] = None
+    reason_code: Optional[str] = None
 
 class MovementEntry(BaseModel):
     """Effective view of a movement: latest correction applied, owner resolved on read."""
@@ -95,6 +97,9 @@ class MovementEntry(BaseModel):
     recorded_by: Optional[UserSummary] = None
     last_corrected_by: Optional[UserSummary] = None
     note: Optional[str] = None
+    decision: Optional[str] = None
+    reason_code: Optional[str] = None
+    guard_override_notes: Optional[str] = None
 
 class MovementPage(BaseModel):
     total: int
@@ -138,7 +143,12 @@ class InsideResponse(BaseModel):
 class TimelineItem(BaseModel):
     type: Literal["MOVEMENT", "SIGHTING"]
     time: datetime
+    timestamp: Optional[datetime] = None
     gate: GateSummary
+    direction: Optional[str] = None
+    decision: Optional[str] = None
+    reason_code: Optional[str] = None
+    guard_override_notes: Optional[str] = None
     movement: Optional[MovementEntry] = None
     sighting: Optional[ResolvedObservation] = None
 
@@ -163,16 +173,30 @@ class VehicleHistory(BaseModel):
     timeline: List[TimelineItem]
     link_events: List[LinkEventResponse] = []
 
+from backend.app.services.identifier_validator import validate_and_normalize_identifier
+
 # ---- Linking an unknown vehicle to an owner ----
 
 class NewOwnerForLink(BaseModel):
     """Minimum PII: identifier, name, person type and residence. No ID document images."""
     person_type: PersonType
-    identifier: str = Field(..., min_length=1, max_length=50, description="SID, employee ID or other institutional ID")
+    identifier: str = Field(
+        ...,
+        min_length=1,
+        max_length=50,
+        description="Institutional ID: Student (8 digits, e.g. 24103042), Faculty (F + 7 digits, e.g. F1234567), Resident (R + 4-digit house no, e.g. R1042)",
+    )
     full_name: str = Field(..., min_length=1, max_length=100)
     residence_type: ResidenceType = ResidenceType.UNKNOWN
     residence: Optional[str] = Field(None, max_length=100)
     department: Optional[str] = Field(None, max_length=100)
+
+    @model_validator(mode="after")
+    def validate_identifier_format(self) -> "NewOwnerForLink":
+        self.identifier = validate_and_normalize_identifier(self.identifier, self.person_type)
+        if self.person_type == PersonType.RESIDENT and not self.residence:
+            self.residence = f"House {self.identifier[1:]}"
+        return self
 
 class VehicleLinkRequest(BaseModel):
     owner_id: Optional[str] = Field(None, description="Existing owner UUID or institutional identifier")

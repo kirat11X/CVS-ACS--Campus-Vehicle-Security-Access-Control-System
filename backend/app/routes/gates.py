@@ -2,7 +2,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from backend.app.db import SessionLocal
-from backend.app.dependencies import CurrentUser, require_admin, require_staff
+from backend.app.dependencies import CurrentUser, get_db, require_admin, require_staff
 from backend.app.models.gate import Gate
 from backend.app.models.movement import CameraLane
 from backend.app.models.enums import GateStatus
@@ -12,12 +12,6 @@ from backend.app.services.observation_service import ObservationService
 
 router = APIRouter(prefix="/gates", tags=["Gates"])
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 def _camera_owner_conflict(db: Session, camera_id: Optional[str], gate_id: str) -> Optional[str]:
     """Why camera_id cannot be this gate's camera: another live gate or another gate's active lane owns it."""

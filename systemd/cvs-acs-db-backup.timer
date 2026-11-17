@@ -1,0 +1,11 @@
+[Unit]
+Description=CVS-ACS Automated PostgreSQL Database Backup Timer (Daily at 02:30 AM)
+Documentation=https://github.com/kirat11X/CVS-ACS--Campus-Vehicle-Security-Access-Control-System
+
+[Timer]
+OnCalendar=*-*-* 02:30:00
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

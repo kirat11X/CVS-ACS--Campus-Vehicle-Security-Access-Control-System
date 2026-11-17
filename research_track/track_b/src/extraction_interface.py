@@ -19,7 +19,13 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from jsonschema import Draft202012Validator, FormatChecker
+try:
+    from jsonschema import Draft202012Validator, FormatChecker
+    _HAS_JSONSCHEMA = True
+except ImportError:
+    Draft202012Validator = None
+    FormatChecker = None
+    _HAS_JSONSCHEMA = False
 
 
 @dataclass(frozen=True)
@@ -102,9 +108,83 @@ class SchemaValidator:
         with schema_path.open("r", encoding="utf-8") as schema_file:
             schema = json.load(schema_file)
 
-        validator = Draft202012Validator(schema, format_checker=FormatChecker())
-        errors = sorted(validator.iter_errors(data), key=lambda error: list(error.absolute_path))
-        return not errors, [f"{list(error.absolute_path)}: {error.message}" for error in errors]
+        if _HAS_JSONSCHEMA:
+            validator = Draft202012Validator(schema, format_checker=FormatChecker())
+            errors = sorted(validator.iter_errors(data), key=lambda error: list(error.absolute_path))
+            return not errors, [f"{list(error.absolute_path)}: {error.message}" for error in errors]
+
+        # Self-contained structural validation fallback when jsonschema library is unavailable
+        errors = []
+        root_props = schema.get("properties", {})
+        root_required = schema.get("required", [])
+
+        # Check required fields
+        for req in root_required:
+            if req not in data:
+                errors.append(f"['{req}']: '{req}' is a required property")
+
+        # Check additionalProperties at root
+        if schema.get("additionalProperties") is False:
+            for k in data.keys():
+                if k not in root_props:
+                    errors.append(f"['{k}']: Additional properties are not allowed ('{k}' was unexpected)")
+
+        # Validate line_items
+        line_items = data.get("line_items")
+        if line_items is not None:
+            if not isinstance(line_items, list):
+                errors.append("['line_items']: 'line_items' must be an array")
+            else:
+                li_schema = schema.get("$defs", {}).get("LineItem", {})
+                li_props = li_schema.get("properties", {})
+                li_req = li_schema.get("required", [])
+                for idx, item in enumerate(line_items):
+                    if not isinstance(item, dict):
+                        errors.append(f"['line_items', {idx}]: item must be an object")
+                        continue
+                    for req in li_req:
+                        if req not in item:
+                            errors.append(f"['line_items', {idx}, '{req}']: '{req}' is a required property")
+                    if li_schema.get("additionalProperties") is False:
+                        for k in item.keys():
+                            if k not in li_props:
+                                errors.append(f"['line_items', {idx}, '{k}']: Additional properties are not allowed ('{k}' was unexpected)")
+
+        # Validate totals
+        totals = data.get("totals")
+        if totals is not None:
+            if not isinstance(totals, dict):
+                errors.append("['totals']: 'totals' must be an object")
+            else:
+                totals_schema = schema.get("$defs", {}).get("InvoiceTotals", {})
+                totals_props = totals_schema.get("properties", {})
+                totals_req = totals_schema.get("required", [])
+                for req in totals_req:
+                    if req not in totals:
+                        errors.append(f"['totals', '{req}']: '{req}' is a required property")
+                if totals_schema.get("additionalProperties") is False:
+                    for k in totals.keys():
+                        if k not in totals_props:
+                            errors.append(f"['totals', '{k}']: Additional properties are not allowed ('{k}' was unexpected)")
+
+        # Validate extraction_metadata
+        metadata = data.get("extraction_metadata")
+        if metadata is not None:
+            if not isinstance(metadata, dict):
+                errors.append("['extraction_metadata']: 'extraction_metadata' must be an object")
+            else:
+                meta_schema = schema.get("$defs", {}).get("ExtractionMetadata", {})
+                meta_props = meta_schema.get("properties", {})
+                meta_req = meta_schema.get("required", [])
+                for req in meta_req:
+                    if req not in metadata:
+                        errors.append(f"['extraction_metadata', '{req}']: '{req}' is a required property")
+                if meta_schema.get("additionalProperties") is False:
+                    for k in metadata.keys():
+                        if k not in meta_props:
+                            errors.append(f"['extraction_metadata', '{k}']: Additional properties are not allowed ('{k}' was unexpected)")
+
+        return not errors, errors
 
 
 class InvoiceExtractor(ABC):

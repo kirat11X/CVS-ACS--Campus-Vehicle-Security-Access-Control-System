@@ -7,7 +7,10 @@ export function FlagChips({ flags, hide = [] }: { flags: string[]; hide?: string
   return (
     <span className="inline-flex flex-wrap gap-1">
       {shown.map((f) => (
-        <span key={f} className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-700 ring-1 ring-slate-300">
+        <span
+          key={f}
+          className="whitespace-nowrap rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-700 ring-1 ring-inset ring-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-600"
+        >
           {FLAG_LABEL[f] ?? f}
         </span>
       ))}

@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from backend.app.db import SessionLocal
-from backend.app.dependencies import CurrentUser, require_admin, require_staff
+from backend.app.dependencies import CurrentUser, get_db, require_admin, require_staff
 from backend.app.models.enums import ObservationSource
 from backend.app.schemas.observation import ObservationCreate, ObservationResponse
 from backend.app.schemas.feed import ManualObservationCreate, ResolvedObservation
@@ -13,12 +13,6 @@ from backend.app.services.plate_normalizer import normalize_plate
 
 router = APIRouter(prefix="/observations", tags=["Observations"])
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 @router.post("", response_model=ObservationResponse, status_code=status.HTTP_201_CREATED)
 def record_observation(payload: ObservationCreate, db: Session = Depends(get_db), user: CurrentUser = Depends(require_admin)):

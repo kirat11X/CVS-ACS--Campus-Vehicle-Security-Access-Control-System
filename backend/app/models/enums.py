@@ -68,6 +68,12 @@ class PlatformType(str, enum.Enum):
     ZOMATO = "ZOMATO"
     SWIGGY = "SWIGGY"
     UBER_EATS = "UBER_EATS"
+    AMAZON = "AMAZON"
+    UBER = "UBER"
+    BLINKIT = "BLINKIT"
+    ZEPTO = "ZEPTO"
+    INSTAMART = "INSTAMART"
+    RELIANCE = "RELIANCE"
     OTHER = "OTHER"
 
 class OrderStatus(str, enum.Enum):
@@ -92,6 +98,18 @@ class AlertStatus(str, enum.Enum):
     DISMISSED = "DISMISSED"
 
 class ReasonCode(str, enum.Enum):
+    # Phase 5 Policy Engine Reason Codes
+    ALLOW_REGISTERED_VEHICLE = "ALLOW_REGISTERED_VEHICLE"
+    REVIEW_LOW_CONFIDENCE_PLATE = "REVIEW_LOW_CONFIDENCE_PLATE"
+    REVIEW_UNREADABLE_PLATE = "REVIEW_UNREADABLE_PLATE"
+    REVIEW_UNKNOWN_VEHICLE = "REVIEW_UNKNOWN_VEHICLE"
+    ALERT_RESTRICTED_ITEM = "ALERT_RESTRICTED_ITEM"
+    REVIEW_CARGO_SCREENING_UNCERTAIN = "REVIEW_CARGO_SCREENING_UNCERTAIN"
+    ALERT_BLACKLISTED_VEHICLE = "ALERT_BLACKLISTED_VEHICLE"
+    ALLOW_VISITOR = "ALLOW_VISITOR"
+    REVIEW_EXPIRED_VEHICLE = "REVIEW_EXPIRED_VEHICLE"
+
+    # Canonical registry & access codes
     VEHICLE_REGISTERED = "VEHICLE_REGISTERED"
     VEHICLE_NOT_REGISTERED = "VEHICLE_NOT_REGISTERED"
     VEHICLE_EXPIRED = "VEHICLE_EXPIRED"
@@ -164,3 +182,21 @@ class PresenceStatus(str, enum.Enum):
     INSIDE = "INSIDE"
     OUTSIDE = "OUTSIDE"
     UNKNOWN = "UNKNOWN"
+
+class ScreeningVerdict(str, enum.Enum):
+    """Deterministic policy-table outcome for an invoice line (Phase 7). Never a gate action."""
+    ALLOW = "ALLOW"
+    REVIEW = "REVIEW"
+    ALERT = "ALERT"
+
+class GuardDecision(str, enum.Enum):
+    """What the guard decided about a screened delivery. The guard decides; software never blocks."""
+    CLEARED = "CLEARED"
+    HELD = "HELD"
+    ESCALATED = "ESCALATED"
+
+class DeliverySource(str, enum.Enum):
+    """How an invoice reached the server."""
+    LOCAL_INTAKE = "LOCAL_INTAKE"
+    WHATSAPP = "WHATSAPP"
+    CONSOLE = "CONSOLE"

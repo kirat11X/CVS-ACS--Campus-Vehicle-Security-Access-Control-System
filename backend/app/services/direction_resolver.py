@@ -17,12 +17,18 @@ class DirectionResult:
     def is_known(self) -> bool:
         return self.direction in (ObservationDirection.ENTRY, ObservationDirection.EXIT)
 
+    @property
+    def is_provisional(self) -> bool:
+        """Provisional until lane role (CAMERA_ROLE / ZONE_ORDER) or guard confirmation (GUARD_CONFIRMED) is established."""
+        return (not self.is_known) or (self.method == DirectionMethod.NONE)
+
     def as_dict(self) -> Dict[str, Any]:
         return {
             "direction": self.direction.value,
             "method": self.method.value,
             "confidence": self.confidence,
             "evidence": self.evidence,
+            "is_provisional": self.is_provisional,
         }
 
 def _unknown(reason: str, **evidence) -> DirectionResult:

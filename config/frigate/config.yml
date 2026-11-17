@@ -6,12 +6,81 @@ mqtt:
 detectors:
   cpu1:
     type: cpu
+  # Extra CPU detector instances so the demo gate cameras (gate1_cam, gate2_cam) are not starved
+  # (with one instance Frigate skipped about 3 of 5 fps on a busy clip).
+  cpu2:
+    type: cpu
+  cpu3:
+    type: cpu
 
 lpr:
   enabled: true
   device: CPU
 
 cameras:
+  # Demo gate cameras: looped real street footage with readable Indian plates (media/gate_demo_*.mp4).
+  # The clips are hand-held/moving shots, so Frigate's default motion settings never finish calibrating
+  # and no object detection runs; the relaxed motion block below fixes that. A fixed gate camera can
+  # use the defaults. 'truck' is omitted: the default CPU model has no truck label (trucks come as car).
+  gate1_cam:
+    enabled: true
+    ffmpeg:
+      inputs:
+        - path: /media/gate_demo_1.mp4
+          input_args: -stream_loop -1 -re
+          roles:
+            - detect
+    detect:
+      enabled: true
+      width: 1280
+      height: 720
+      fps: 5
+    motion:
+      threshold: 50
+      contour_area: 40
+      improve_contrast: false
+    objects:
+      track:
+        - car
+        - motorcycle
+        - bus
+    # Frigate stores a tracked object in its own DB (/api/events, snapshot.jpg) only with a clip or snapshot.
+    snapshots:
+      enabled: true
+      bounding_box: true
+      retain:
+        default: 2
+    lpr:
+      enabled: true
+  gate2_cam:
+    enabled: true
+    ffmpeg:
+      inputs:
+        - path: /media/gate_demo_2.mp4
+          input_args: -stream_loop -1 -re
+          roles:
+            - detect
+    detect:
+      enabled: true
+      width: 720
+      height: 1280
+      fps: 5
+    motion:
+      threshold: 50
+      contour_area: 40
+      improve_contrast: false
+    objects:
+      track:
+        - car
+        - motorcycle
+        - bus
+    snapshots:
+      enabled: true
+      bounding_box: true
+      retain:
+        default: 2
+    lpr:
+      enabled: true
   gate_cam:
     enabled: true
     ffmpeg:

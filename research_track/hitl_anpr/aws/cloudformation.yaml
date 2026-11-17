@@ -1,0 +1,196 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  campus-anpr-hitl training storage: private SSE-KMS bucket with versioning and a retention rule, an EC2 role
+  limited to that bucket, and a monthly cost budget with e-mail alerts. Deploying this stack costs little
+  (KMS key ~1 USD/month plus storage); GPU instances are launched separately by `make train-aws CONFIRM=1`.
+
+Parameters:
+  BucketName:
+    Type: String
+    Description: Globally unique bucket name, e.g. campus-anpr-hitl-<account-id>
+  Prefix:
+    Type: String
+    Default: campus-anpr-hitl
+  RawRetentionDays:
+    Type: Number
+    Default: 180
+    Description: Days before raw frames, crops and predictions (personal data) are deleted
+  NoncurrentRetentionDays:
+    Type: Number
+    Default: 30
+  MonthlyBudgetUsd:
+    Type: Number
+    Default: 30
+  AlertEmail:
+    Type: String
+    Description: Receives budget alerts
+  Owner:
+    Type: String
+    Default: pec-honours
+
+Resources:
+  DataKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: campus-anpr-hitl data key (frames, labels, checkpoints)
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AccountAdmin
+            Effect: Allow
+            Principal: { AWS: !Sub "arn:aws:iam::${AWS::AccountId}:root" }
+            Action: "kms:*"
+            Resource: "*"
+          - Sid: TrainingRoleUse
+            Effect: Allow
+            Principal: { AWS: !GetAtt TrainingRole.Arn }
+            Action: [kms:Decrypt, kms:Encrypt, kms:GenerateDataKey, kms:DescribeKey]
+            Resource: "*"
+      Tags:
+        - { Key: Project, Value: campus-anpr-hitl }
+        - { Key: Owner, Value: !Ref Owner }
+        - { Key: DataClass, Value: personal-data }
+
+  DataBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Ref BucketName
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules: [{ ObjectOwnership: BucketOwnerEnforced }]
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID: !GetAtt DataKey.Arn
+            BucketKeyEnabled: true
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: raw-personal-data-retention
+            Status: Enabled
+            Prefix: !Sub "${Prefix}/data/frames/"
+            ExpirationInDays: !Ref RawRetentionDays
+          - Id: crops-retention
+            Status: Enabled
+            Prefix: !Sub "${Prefix}/data/rounds/"
+            ExpirationInDays: !Ref RawRetentionDays
+          - Id: old-versions
+            Status: Enabled
+            NoncurrentVersionExpiration:
+              NoncurrentDays: !Ref NoncurrentRetentionDays
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 3
+      Tags:
+        - { Key: Project, Value: campus-anpr-hitl }
+        - { Key: Owner, Value: !Ref Owner }
+        - { Key: DataClass, Value: personal-data }
+
+  DataBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref DataBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: "*"
+            Action: "s3:*"
+            Resource: [!GetAtt DataBucket.Arn, !Sub "${DataBucket.Arn}/*"]
+            Condition: { Bool: { "aws:SecureTransport": "false" } }
+          - Sid: DenyOtherKmsKeys
+            Effect: Deny
+            Principal: "*"
+            Action: s3:PutObject
+            Resource: !Sub "${DataBucket.Arn}/*"
+            Condition:
+              StringNotEqualsIfExists:
+                "s3:x-amz-server-side-encryption-aws-kms-key-id": !GetAtt DataKey.Arn
+
+  TrainingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ec2.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: bucket-prefix-only
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [s3:ListBucket]
+                Resource: !Sub "arn:aws:s3:::${BucketName}"
+                Condition: { StringLike: { "s3:prefix": [!Sub "${Prefix}/*"] } }
+              - Effect: Allow
+                Action: [s3:GetObject, s3:PutObject]
+                Resource: !Sub "arn:aws:s3:::${BucketName}/${Prefix}/*"
+        - PolicyName: pull-training-image
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [ecr:GetAuthorizationToken]
+                Resource: "*"
+              - Effect: Allow
+                Action: [ecr:BatchGetImage, ecr:GetDownloadUrlForLayer, ecr:BatchCheckLayerAvailability]
+                Resource: !Sub "arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/campus-anpr-hitl"
+      Tags:
+        - { Key: Project, Value: campus-anpr-hitl }
+        - { Key: Owner, Value: !Ref Owner }
+
+  TrainingInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [!Ref TrainingRole]
+
+  Repository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: campus-anpr-hitl
+      ImageScanningConfiguration: { ScanOnPush: true }
+      ImageTagMutability: IMMUTABLE
+      LifecyclePolicy:
+        LifecyclePolicyText: '{"rules":[{"rulePriority":1,"description":"keep 10 images","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":10},"action":{"type":"expire"}}]}'
+      Tags:
+        - { Key: Project, Value: campus-anpr-hitl }
+
+  MonthlyBudget:
+    Type: AWS::Budgets::Budget
+    Properties:
+      Budget:
+        BudgetName: campus-anpr-hitl-monthly
+        BudgetType: COST
+        TimeUnit: MONTHLY
+        BudgetLimit: { Amount: !Ref MonthlyBudgetUsd, Unit: USD }
+        CostFilters:
+          TagKeyValue: ["user:Project$campus-anpr-hitl"]
+      NotificationsWithSubscribers:
+        - Notification: { NotificationType: ACTUAL, ComparisonOperator: GREATER_THAN, Threshold: 50 }
+          Subscribers: [{ SubscriptionType: EMAIL, Address: !Ref AlertEmail }]
+        - Notification: { NotificationType: ACTUAL, ComparisonOperator: GREATER_THAN, Threshold: 80 }
+          Subscribers: [{ SubscriptionType: EMAIL, Address: !Ref AlertEmail }]
+        - Notification: { NotificationType: FORECASTED, ComparisonOperator: GREATER_THAN, Threshold: 100 }
+          Subscribers: [{ SubscriptionType: EMAIL, Address: !Ref AlertEmail }]
+
+Outputs:
+  Bucket:
+    Value: !Ref DataBucket
+  KmsKeyArn:
+    Value: !GetAtt DataKey.Arn
+  InstanceProfile:
+    Value: !Ref TrainingInstanceProfile
+  RepositoryUri:
+    Value: !GetAtt Repository.RepositoryUri

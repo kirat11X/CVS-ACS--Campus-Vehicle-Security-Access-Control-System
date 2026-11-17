@@ -76,7 +76,7 @@ def run_tests():
         gate3 = Gate(id="GATE_3", name="Hostel East Gate", location="Hostel Sector", status=GateStatus.ACTIVE, camera_id="gate_3_cam")
         session.add(gate3)
     session.commit()
-    print(f"  [PASS] Verified 3 Gates: GATE_1, GATE_2, GATE_3")
+    print("  [PASS] Verified 3 Gates: GATE_1, GATE_2, GATE_3")
 
     print("\n--- TEST 3: Create Vehicle Owner (Student) ---")
     student = VehicleOwner(

@@ -17,10 +17,45 @@ depends_on: Union[str, Sequence[str], None] = None
 screening_action = postgresql.ENUM("ALLOW", "REVIEW", "ALERT", name="screening_action_enum")
 screening_action_col = postgresql.ENUM("ALLOW", "REVIEW", "ALERT", name="screening_action_enum", create_type=False)
 
+screening_reason_code = postgresql.ENUM(
+    "ALLOW_PERMITTED_FOOD",
+    "ALLOW_PERMITTED_GOODS",
+    "CATEGORY_RULE_ALLOW",
+    "REVIEW_UNCERTAIN_CLASSIFICATION",
+    "REVIEW_CONTROLLED_ITEM",
+    "REVIEW_HAZARDOUS_QUANTITY",
+    "CATEGORY_RULE_REVIEW",
+    "MANUAL_REVIEW_REQUIRED",
+    "UNKNOWN_CATEGORY",
+    "LOW_CLASSIFIER_CONFIDENCE",
+    "MISSING_CLASSIFIER_CONFIDENCE",
+    "INVALID_CLASSIFICATION",
+    "MISSING_QUANTITY",
+    "INVALID_QUANTITY",
+    "UNSUPPORTED_QUANTITY_UNIT",
+    "POLICY_RULE_CONFLICT",
+    "POLICY_VERSION_INVALID",
+    "HAZARDOUS_THRESHOLD_MET",
+    "ALERT_PROHIBITED_CHEMICAL",
+    "ALERT_PROHIBITED_TOBACCO",
+    "ALERT_PROHIBITED_ALCOHOL",
+    "ALERT_PROHIBITED_DRUG",
+    "ALERT_PROHIBITED_WEAPON",
+    "CATEGORY_RULE_ALERT",
+    "NO_MATCHING_POLICY_RULE",
+    "POLICY_RULE_INACTIVE",
+    "POLICY_RULE_EXPIRED",
+    "MISSING_REQUIRED_PLATFORM",
+    "MULTIPLE_RULES_MATCHED",
+    "HAZARDOUS_THRESHOLD_NOT_MET",
+    name="screening_reason_code_enum",
+)
+
 
 def upgrade() -> None:
-    # Explicitly create enum type with checkfirst=True per context.md section 3F
+    # Explicitly create enum types with checkfirst=True per context.md section 3F
     screening_action.create(op.get_bind(), checkfirst=True)
+    screening_reason_code.create(op.get_bind(), checkfirst=True)
 
     op.create_table(
         "item_categories",
@@ -44,7 +79,7 @@ def upgrade() -> None:
         sa.Column("max_quantity", sa.Integer(), nullable=True),
         sa.Column("platform", sa.String(30), nullable=True),
         sa.Column("priority", sa.Integer(), nullable=False, server_default="100"),
-        sa.Column("policy_version", sa.String(40), nullable=False),
+        sa.Column("policy_version", sa.String(40), nullable=False, server_default="1.0"),
         sa.Column("effective_from", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
         sa.Column("effective_to", sa.DateTime(timezone=True), nullable=True),
         sa.Column("active", sa.Boolean(), nullable=False, server_default=sa.true()),
@@ -62,7 +97,7 @@ def upgrade() -> None:
         sa.Column("id", sa.UUID(), primary_key=True),
         sa.Column("invoice_item_id", sa.UUID(), nullable=False),
         sa.Column("category_code", sa.String(50), nullable=False),
-        sa.Column("confidence", sa.Float(), nullable=False),
+        sa.Column("confidence", sa.Float(), nullable=True),
         sa.Column("classifier_name", sa.String(120), nullable=False),
         sa.Column("classifier_version", sa.String(120), nullable=False),
         sa.Column("normalized_item_text", sa.String(300), nullable=False),
@@ -82,7 +117,8 @@ def upgrade() -> None:
         sa.Column("outcome", screening_action_col, nullable=False),
         sa.Column("matched_rule_ids", postgresql.ARRAY(sa.UUID()), nullable=False),
         sa.Column("reason_codes", postgresql.ARRAY(sa.String(80)), nullable=False),
-        sa.Column("policy_version", sa.String(40), nullable=False),
+        sa.Column("policy_version", sa.String(40), nullable=False, server_default="1.0"),
+        sa.Column("raw_payload", postgresql.JSONB(), nullable=False),
         sa.Column("security_alert_id", sa.UUID(), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
         sa.ForeignKeyConstraint(["invoice_id"], ["invoices.id"]),
@@ -132,4 +168,5 @@ def downgrade() -> None:
     op.drop_index("ix_item_categories_active", table_name="item_categories")
     op.drop_table("item_categories")
 
+    screening_reason_code.drop(op.get_bind(), checkfirst=True)
     screening_action.drop(op.get_bind(), checkfirst=True)

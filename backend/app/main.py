@@ -1,6 +1,7 @@
 import logging
 from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Dict, Any, Optional
 
@@ -8,8 +9,7 @@ from backend.app.db import check_db_connection
 from backend.app.dependencies import CurrentUser, require_admin
 from backend.app.mqtt import mqtt_manager
 from backend.app.workers.frigate_mqtt_worker import frigate_worker
-from backend.app.whatsapp.mock import mock_whatsapp
-from backend.app.config import AUTH_SECRET_KEY_IS_EPHEMERAL
+from backend.app.config import AUTH_SECRET_KEY_IS_EPHEMERAL, CORS_ALLOW_ORIGINS
 from backend.app.routes import (
     vehicles_router,
     gates_router,
@@ -21,7 +21,15 @@ from backend.app.routes import (
     lanes_router,
     movements_router,
     presence_router,
+    dashboard_router,
+    users_router,
+    deliveries_router,
+    intake_router,
+    webhooks_router,
+    system_router,
+    reviews_router,
 )
+from backend.app.whatsapp import get_whatsapp_provider
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("campus_security")
@@ -42,9 +50,24 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Campus Vehicle Security & Access Control System",
-    version="0.6.0",
+    version="0.7.0",
     description="Authoritative campus vehicle security, intelligence, and observation management API.",
-    lifespan=lifespan
+    lifespan=lifespan,
+    openapi_tags=[
+        {"name": "Delivery Screening", "description": "Phase 7: invoice OCR, deterministic per-line policy (ALLOW / REVIEW / ALERT), append-only guard decisions."},
+        {"name": "Delivery Intake", "description": "Phase 7: public LAN page riders use to send an invoice while the WhatsApp Business API is unavailable."},
+        {"name": "WhatsApp", "description": "Phase 7: provider-agnostic chat webhook (local intake / mock / Meta Cloud API)."},
+        {"name": "Alerts & System", "description": "Phase 7: unified needs-attention list and chat provider status."},
+    ],
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=CORS_ALLOW_ORIGINS,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "Last-Event-ID"],
+    max_age=600,
 )
 
 app.include_router(vehicles_router)
@@ -57,6 +80,13 @@ app.include_router(resolutions_router)
 app.include_router(lanes_router)
 app.include_router(movements_router)
 app.include_router(presence_router)
+app.include_router(dashboard_router)
+app.include_router(users_router)
+app.include_router(deliveries_router)
+app.include_router(intake_router)
+app.include_router(webhooks_router)
+app.include_router(system_router)
+app.include_router(reviews_router)
 
 class WebhookTestPayload(BaseModel):
     source: str
@@ -93,12 +123,13 @@ def get_health_all():
     mqtt_status = mqtt_manager.check_connection()
     worker_stats = frigate_worker.get_stats()
     overall = (db_status.get("status") == "ok") and (mqtt_status.get("status") == "ok")
+    whatsapp_provider = get_whatsapp_provider()
     return {
         "status": "ok" if overall else "degraded",
         "database": db_status,
         "mqtt": mqtt_status,
         "frigate_worker": worker_stats,
-        "whatsapp_mock": {"status": "ok", "available": mock_whatsapp.is_available()}
+        "whatsapp": {"provider": whatsapp_provider.name, "available": whatsapp_provider.is_available()},
     }
 
 @app.get("/api/workers/frigate-worker")

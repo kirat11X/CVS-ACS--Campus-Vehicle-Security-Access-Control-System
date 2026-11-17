@@ -52,6 +52,8 @@ class VehicleIdentityService:
         }
 
     def build_owner_context(self, owner: VehicleOwner) -> Dict[str, Any]:
+        vehicles = getattr(owner, "vehicles", None) or []
+        plates = [v.raw_plate or v.normalized_plate for v in vehicles if v]
         return {
             "id": str(owner.id),
             "institutional_id": owner.identifier,
@@ -62,7 +64,9 @@ class VehicleIdentityService:
             "residence_type": owner.residence_type.value if owner.residence_type else None,
             "residence": owner.residence,
             "department": owner.department,
-            "status": owner.status
+            "status": owner.status,
+            "vehicle_plates": plates,
+            "vehicle_count": len(plates),
         }
 
     def resolve(self, plate: str, db: Session) -> Optional[Dict[str, Any]]:

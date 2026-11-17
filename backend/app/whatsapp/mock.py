@@ -8,6 +8,8 @@ class MockWhatsAppProvider(WhatsAppProvider):
     Local mock implementation of WhatsAppProvider for offline development and testing.
     """
 
+    name = "mock"
+
     def __init__(self):
         self.sent_messages: List[Dict[str, Any]] = []
         self.received_webhooks: List[Dict[str, Any]] = []
@@ -33,16 +35,23 @@ class MockWhatsAppProvider(WhatsAppProvider):
         # Handle simple mock webhook payload or Meta-like simulation
         sender = payload.get("sender") or payload.get("from") or "mock_user"
         message_id = payload.get("id") or f"msg_{uuid.uuid4().hex[:8]}"
-        text = payload.get("text") or payload.get("body") or ""
+        text = payload.get("text") or payload.get("body") or payload.get("caption") or ""
         media_url = payload.get("media_url") or payload.get("image_url")
-        media_type = payload.get("media_type", "image" if media_url else "text")
+        media_base64 = payload.get("media_base64") or payload.get("file_base64")
+        media_type = payload.get("media_type", "image" if (media_url or media_base64) else "text")
 
         return {
             "sender": sender,
             "message_id": message_id,
             "text": text,
             "media_url": media_url,
-            "media_type": media_type
+            "media_type": media_type,
+            "media_base64": media_base64,
+            "media_mime": payload.get("media_mime") or payload.get("mime_type"),
+            "filename": payload.get("filename"),
         }
+
+    def outbox_count(self) -> int:
+        return len(self.sent_messages)
 
 mock_whatsapp = MockWhatsAppProvider()

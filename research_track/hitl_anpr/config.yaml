@@ -1,0 +1,113 @@
+# Human-in-the-loop ANPR pipeline configuration. Paths starting with ~ are expanded.
+# Every model card records the sha256 of the resolved configuration.
+project: campus-anpr-hitl
+seed: 42
+data_root: ~/ml-assets/campus/hitl          # private: raw frames, labels, runs, registry (never in git)
+class_names: [license_plate]                # Frigate's native plate label (not "plate")
+
+ingest:
+  fps: 2.0                                  # frames sampled per second of video
+  dedup_max_bits: 4                         # drop a frame whose pHash is within this many bits of the last kept frame
+  blur_min_laplacian_var: 40.0              # drop frames whose variance of the Laplacian is below this
+  jpeg_quality: 95
+
+splits:                                     # assigned per video group (site) BEFORE any frame is used
+  gold_fraction: 0.20
+  val_fraction: 0.10
+  min_gold_videos: 10                       # below this, the provisional public GOLD set is used
+  leakage_max_bits: 6                       # cross-split frames within this many dHash bits = leakage
+
+predict:
+  imgsz: 1280
+  conf: 0.25
+  iou: 0.7
+  track_fps: 10.0                           # ByteTrack runs on this denser stream (2 fps is too sparse to associate)
+  tracker: bytetrack.yaml
+  device: 0                                 # CUDA index, or "cpu"
+  crop_pad: 0.08                            # padding around a plate box when cutting the OCR crop
+  ocr_top_crops: 3                          # best crops per track read by OCR (disagreement => review)
+
+ocr:
+  engine: rapidocr                          # rapidocr | tesseract | fast_plate_ocr
+  # Chosen on the OCR dev set (600 crops, never GOLD; `anpr ocr-benchmark`): PP-OCRv6 small 70.8% exact
+  # (95% CI 67.3-74.3) vs PP-OCRv4 English mobile 49.5% (45.5-53.5). For PP-OCRv4: PP-OCRv4 / en / mobile.
+  rapidocr_version: PP-OCRv6
+  rapidocr_rec_lang: ch                     # the v6 multilingual recogniser (reads Latin capitals and digits)
+  rapidocr_rec_model_type: small
+  rapidocr_det_limit_side: 160              # text-line detector input (short side); 736 is slower and less accurate on plate crops
+  fallback: tesseract                       # used when the primary read is empty or below fallback_below_conf
+                                            # (dev set: exact match unchanged, CER 11.42% -> 11.36%)
+  fallback_below_conf: 0.60
+  low_char_conf: 0.50                       # characters below this confidence are flagged
+
+select:
+  review_budget: 300                        # frames per round
+  audit_fraction: 0.10                      # uniformly random, unbiased audit sample (inside the budget)
+  low_conf_band: [0.25, 0.60]
+  night_max_luma: 70                        # mean luma below this => night slice
+  max_group_fraction: 0.25                  # one video / site fills at most this share of a round's budget
+  weights:
+    low_confidence: 3.0
+    track_disagreement: 2.5
+    regex_failure: 2.0
+    low_char_conf: 1.0
+    rare_slice: 1.5
+
+review:
+  reviewer_env: ANPR_REVIEWER               # reviewer name is read from this env var (or --reviewer)
+  auto_accept:
+    enabled: false                          # off by default
+    min_audit_precision: 0.98               # Wilson lower bound of random-audit precision must reach this
+    min_audit_items: 150
+    min_conf: 0.90
+
+train:
+  base_model: yolo26s.pt                    # bootstrap only; later rounds fine-tune from the champion
+  imgsz: 1280
+  epochs: 40                                # bootstrap (from COCO-pretrained weights)
+  round_epochs: 20                          # each later round (from the champion)
+  patience: 10
+  batch: 4                                  # fits a 6 GB laptop GPU at 1280 with AMP
+  lr0: 0.001                                # bootstrap (from COCO-pretrained weights)
+  round_lr0: 0.0002                         # each later round: small learning rate when fine-tuning the champion
+  round_warmup_epochs: 0                    # no warmup in rounds (its 0.1 bias lr disrupts a converged model)
+  optimizer: AdamW
+  replay_fraction: 0.30                     # share of earlier approved/bootstrap data in every round
+  workers: 4
+  fliplr: 0.0                               # plates are not mirror-symmetric
+  degrees: 3.0
+  perspective: 0.0005
+  hsv_v: 0.5
+  close_mosaic: 5
+  ocr_finetune_min_crops: 2000              # human-approved crops required before OCR fine-tuning
+
+evaluate:                                   # GOLD only
+  imgsz: 1280                               # the training size; export reports the 640 deployment size too
+  iou: 0.5
+  conf: 0.25                                # operating threshold for precision / recall
+  bootstrap: 1000                           # resamples for 95% CIs (0 = off)
+
+promote:
+  min_gain_map50_95: 1.0                    # points
+  min_gain_exact: 2.0                       # points
+  max_slice_regression: 2.0                 # points
+  min_slice_n: 30                           # smaller slices are reported, not gated
+  require_significant: false                # also require the bootstrap 95% CI of the gain to exclude 0
+
+run_round:
+  stop_gain_pt: 0.5
+  stop_patience_rounds: 2
+  total_review_budget: 3000
+
+export:
+  imgsz: 640                                # deployment input size (Frigate on an Intel iGPU)
+  formats: [onnx, openvino]
+  parity_iou: 0.9
+  parity_max_conf_drift: 0.02
+
+s3:
+  enabled: false                            # never touched unless enabled AND credentials are present
+  bucket: null
+  prefix: campus-anpr-hitl
+  region: ap-south-1
+  kms_key_id: null                          # KmsKeyArn output of aws/cloudformation.yaml

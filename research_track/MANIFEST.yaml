@@ -169,10 +169,10 @@ assets:
     source_url: local_synthetic
     license: Project Internal (Synthetic)
     local_path: /home/kirat/coding/honours/research_track/datasets/item_taxonomy_seed/seed_items.csv
-    size_bytes: 14007
-    sha256: 150a1befda33c24f978fb26dc0666389dbdf493516409a7984bff22731b15e5a
+    size_bytes: 14544
+    sha256: a87326d5ee45facc6a5a16e4a04aa9ab5e7928c9d0acb2feb75f05856849d201
     status: downloaded
-    notes: 300 unique synthetic line items spanning 7 security categories with quick-commerce truncations and Hinglish slang.
+    notes: 320 unique synthetic line items spanning 8 security categories with quick-commerce truncations, Hinglish slang, and UNKNOWN samples.
 
   - id: indian-lpr-wild
     kind: dataset

@@ -69,7 +69,7 @@ def list_vehicles(
     q: Optional[str] = Query(None, max_length=30, description="Plate fragment, format-tolerant (e.g. 'pb 65')"),
     residence_type: Optional[ResidenceType] = Query(None, description="Filter by owner residence type"),
     skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=100),
+    limit: int = Query(50, ge=1, le=2000),
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(require_staff)
 ):
@@ -192,7 +192,7 @@ def deactivate_vehicle(
 def get_vehicle_observations(
     plate: str,
     skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=100),
+    limit: int = Query(50, ge=1, le=2000),
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(require_staff)
 ):

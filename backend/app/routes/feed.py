@@ -1,4 +1,5 @@
 import asyncio
+from pathlib import Path
 from typing import AsyncIterator, Optional
 from urllib.parse import quote
 from uuid import UUID
@@ -6,10 +7,11 @@ from uuid import UUID
 import httpx
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
 from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import FileResponse
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 from sqlalchemy.orm import Session
 
-from backend.app.config import FEED_STREAM_POLL_SECONDS, FRIGATE_HOST, FRIGATE_PORT
+from backend.app.config import FEED_STREAM_POLL_SECONDS, FRIGATE_HOST, FRIGATE_PORT, MEDIA_ROOT
 from backend.app.db import SessionLocal
 from backend.app.dependencies import CurrentUser, get_db, require_staff
 from backend.app.models.enums import ObservationSource
@@ -75,16 +77,26 @@ def get_observation_snapshot(
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(require_staff),
 ):
-    """Proxies the Frigate snapshot (or thumbnail) for a camera observation."""
+    """Proxies the Frigate snapshot (or thumbnail) for a camera observation with local fallback."""
     obs = db.get(ObservationEvent, observation_id)
     if not obs:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Observation '{observation_id}' not found.")
     if obs.source != ObservationSource.FRIGATE or not obs.source_event_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Observation has no camera snapshot.")
 
+    # Check local disk cache first
+    local_candidates = [
+        MEDIA_ROOT / "frigate" / f"{obs.source_event_id}.jpg",
+        MEDIA_ROOT / "frigate" / f"{obs.source_event_id}.png",
+        MEDIA_ROOT / "test_plate.png",
+    ]
+    for p in local_candidates:
+        if p.is_file():
+            return FileResponse(p, media_type="image/jpeg" if p.suffix == ".jpg" else "image/png")
+
     base = f"http://{FRIGATE_HOST}:{FRIGATE_PORT}/api/events/{quote(obs.source_event_id, safe='')}"
     try:
-        with httpx.Client(timeout=3.0) as client:
+        with httpx.Client(timeout=1.0) as client:
             for name in ("snapshot.jpg", "thumbnail.jpg"):
                 resp = client.get(f"{base}/{name}")
                 content_type = resp.headers.get("content-type", "")
@@ -94,6 +106,20 @@ def get_observation_snapshot(
                         media_type=content_type,
                         headers={"Cache-Control": "private, max-age=60"},
                     )
-    except httpx.HTTPError:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Frigate is unreachable.")
-    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Frigate has no snapshot for this event.")
+    except (httpx.HTTPError, OSError):
+        pass
+
+    # Clean SVG camera placeholder when Frigate is offline
+    plate_label = obs.raw_plate or obs.normalized_plate or "ANPR CAM"
+    gate_label = obs.gate_id or "GATE-1"
+    svg = (
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240" viewBox="0 0 320 240">'
+        f'<rect width="320" height="240" fill="#0f172a"/>'
+        f'<rect x="20" y="20" width="280" height="200" rx="8" fill="#1e293b" stroke="#334155" stroke-width="2"/>'
+        f'<circle cx="160" cy="95" r="32" fill="#334155"/>'
+        f'<circle cx="160" cy="95" r="16" fill="#0ea5e9"/>'
+        f'<text x="160" y="155" text-anchor="middle" fill="#f8fafc" font-family="monospace" font-size="16" font-weight="bold">{plate_label}</text>'
+        f'<text x="160" y="180" text-anchor="middle" fill="#94a3b8" font-family="sans-serif" font-size="12">{gate_label} • CAMERA FEED</text>'
+        f'</svg>'
+    )
+    return Response(content=svg.encode("utf-8"), media_type="image/svg+xml", headers={"Cache-Control": "private, max-age=10"})

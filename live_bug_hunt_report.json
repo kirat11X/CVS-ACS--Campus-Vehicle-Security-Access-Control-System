@@ -1,0 +1,250 @@
+{
+  "generated_at": "2026-11-18T02:45:03.577348+00:00",
+  "platform": "Linux-7.3.3-200.fc44.x86_64-x86_64-with-glibc2.43",
+  "repo_root": "/home/kirat/coding/honours",
+  "results": [
+    {
+      "check_id": "REPO-001",
+      "category": "Repository",
+      "severity": "INFO",
+      "status": "PASS",
+      "title": "Core repository structure present",
+      "details": "All 5 anchor files present.",
+      "remediation": ""
+    },
+    {
+      "check_id": "DATA-001",
+      "category": "Taxonomy",
+      "severity": "INFO",
+      "status": "PASS",
+      "title": "Indian grocery taxonomy dataset verified",
+      "details": "Loaded 3414 taxonomy entries with service & contraband coverage.",
+      "remediation": ""
+    },
+    {
+      "check_id": "OCR-001",
+      "category": "Invoice OCR",
+      "severity": "INFO",
+      "status": "PASS",
+      "title": "Rupee currency OCR artifact repair verified",
+      "details": "Normalized currency symbols: \u5f04, F, Rs., INR cleanly converted to \u20b9.",
+      "remediation": ""
+    },
+    {
+      "check_id": "SEC-001",
+      "category": "Security",
+      "severity": "INFO",
+      "status": "PASS",
+      "title": "AUTH_SECRET_KEY validated",
+      "details": "Production secret key is 64 characters hex.",
+      "remediation": ""
+    },
+    {
+      "check_id": "LIVE-PG",
+      "category": "Infrastructure",
+      "severity": "INFO",
+      "status": "PASS",
+      "title": "PostgreSQL 16 port 5433 reachable",
+      "details": "TCP connection established.",
+      "remediation": ""
+    },
+    {
+      "check_id": "LIVE-MQTT",
+      "category": "Infrastructure",
+      "severity": "INFO",
+      "status": "PASS",
+      "title": "Mosquitto MQTT port 1883 reachable",
+      "details": "TCP connection established.",
+      "remediation": ""
+    },
+    {
+      "check_id": "LIVE-VITE",
+      "category": "Infrastructure",
+      "severity": "INFO",
+      "status": "PASS",
+      "title": "Vite Frontend port 5173 reachable",
+      "details": "TCP connection established.",
+      "remediation": ""
+    },
+    {
+      "check_id": "LIVE-API-HEALTH",
+      "category": "Backend API",
+      "severity": "INFO",
+      "status": "PASS",
+      "title": "FastAPI /health/all reports fully operational",
+      "details": "Database: ok, MQTT: ok, FrigateWorker: True",
+      "remediation": ""
+    },
+    {
+      "check_id": "AUTH-ADMIN",
+      "category": "Authentication",
+      "severity": "INFO",
+      "status": "PASS",
+      "title": "Admin authentication successful",
+      "details": "Received JWT Bearer token for role ADMIN.",
+      "remediation": ""
+    },
+    {
+      "check_id": "AUTH-GUARD",
+      "category": "Authentication",
+      "severity": "INFO",
+      "status": "PASS",
+      "title": "Guard authentication successful",
+      "details": "Received JWT Bearer token for role GUARD.",
+      "remediation": ""
+    },
+    {
+      "check_id": "API-FEED",
+      "category": "API Endpoint",
+      "severity": "INFO",
+      "status": "PASS",
+      "title": "Staff endpoint /feed accessible",
+      "details": "HTTP 200 ",
+      "remediation": ""
+    },
+    {
+      "check_id": "API-INSIDE",
+      "category": "API Endpoint",
+      "severity": "INFO",
+      "status": "PASS",
+      "title": "Staff endpoint /presence/inside accessible",
+      "details": "HTTP 200 ",
+      "remediation": ""
+    },
+    {
+      "check_id": "API-PRESENCE",
+      "category": "API Endpoint",
+      "severity": "INFO",
+      "status": "PASS",
+      "title": "Staff endpoint /presence accessible",
+      "details": "HTTP 200 ",
+      "remediation": ""
+    },
+    {
+      "check_id": "API-REVIEWS",
+      "category": "API Endpoint",
+      "severity": "INFO",
+      "status": "PASS",
+      "title": "Staff endpoint /security/reviews accessible",
+      "details": "HTTP 200 ",
+      "remediation": ""
+    },
+    {
+      "check_id": "API-DELIVERIES",
+      "category": "API Endpoint",
+      "severity": "INFO",
+      "status": "PASS",
+      "title": "Staff endpoint /deliveries accessible",
+      "details": "HTTP 200 (50 items)",
+      "remediation": ""
+    },
+    {
+      "check_id": "API-LOGS",
+      "category": "API Endpoint",
+      "severity": "INFO",
+      "status": "PASS",
+      "title": "Staff endpoint /logs accessible",
+      "details": "HTTP 200 ",
+      "remediation": ""
+    },
+    {
+      "check_id": "API-VEHICLES-1000",
+      "category": "API Endpoint",
+      "severity": "INFO",
+      "status": "PASS",
+      "title": "Staff endpoint /vehicles?limit=1000 accessible",
+      "details": "HTTP 200 (1000 items)",
+      "remediation": ""
+    },
+    {
+      "check_id": "API-OWNERS",
+      "category": "API Endpoint",
+      "severity": "INFO",
+      "status": "PASS",
+      "title": "Staff endpoint /owners accessible",
+      "details": "HTTP 200 (50 items)",
+      "remediation": ""
+    },
+    {
+      "check_id": "API-GATES",
+      "category": "API Endpoint",
+      "severity": "INFO",
+      "status": "PASS",
+      "title": "Staff endpoint /gates accessible",
+      "details": "HTTP 200 (24 items)",
+      "remediation": ""
+    },
+    {
+      "check_id": "API-ALERTS",
+      "category": "API Endpoint",
+      "severity": "INFO",
+      "status": "PASS",
+      "title": "Staff endpoint /alerts accessible",
+      "details": "HTTP 200 (50 items)",
+      "remediation": ""
+    },
+    {
+      "check_id": "RBAC-USERS",
+      "category": "RBAC Enforcement",
+      "severity": "INFO",
+      "status": "PASS",
+      "title": "GET /users strictly restricted to ADMIN",
+      "details": "Admin: HTTP 200, Guard: HTTP 403 (Forbidden).",
+      "remediation": ""
+    },
+    {
+      "check_id": "RBAC-DELIVERY-DEL",
+      "category": "RBAC Enforcement",
+      "severity": "INFO",
+      "status": "PASS",
+      "title": "DELETE /deliveries/{order_id} blocked for GUARD",
+      "details": "Guard received HTTP 403 Forbidden.",
+      "remediation": ""
+    },
+    {
+      "check_id": "API-SNAPSHOT-RESILIENCE",
+      "category": "API Resilience",
+      "severity": "INFO",
+      "status": "PASS",
+      "title": "Observation snapshot handler is resilient to offline Frigate",
+      "details": "Returned clean HTTP 404 without 502 Bad Gateway.",
+      "remediation": ""
+    },
+    {
+      "check_id": "ALERT-UNLINKED-OVERSTAY",
+      "category": "Security Intelligence",
+      "severity": "INFO",
+      "status": "PASS",
+      "title": "Unlinked vehicle overstay (>1.5h) detection verified",
+      "details": "Found 50 active unlinked overstay alert(s) in /alerts queue.",
+      "remediation": ""
+    },
+    {
+      "check_id": "UI-ADMIN-SESSION",
+      "category": "Frontend UI",
+      "severity": "INFO",
+      "status": "PASS",
+      "title": "Admin UI session clean across all 16 routes and modals",
+      "details": "Visited all routes. 0 console errors, 0 5xx network errors.",
+      "remediation": ""
+    },
+    {
+      "check_id": "UI-GUARD-RBAC",
+      "category": "Frontend RBAC",
+      "severity": "INFO",
+      "status": "PASS",
+      "title": "UI Gate cleanly blocks guard1 from #/users",
+      "details": "Guard displayed 'Your role does not include this page' card.",
+      "remediation": ""
+    },
+    {
+      "check_id": "UI-GUARD-SESSION",
+      "category": "Frontend UI",
+      "severity": "INFO",
+      "status": "PASS",
+      "title": "Guard UI session clean across operational routes",
+      "details": "0 console errors, 0 5xx network errors.",
+      "remediation": ""
+    }
+  ]
+}

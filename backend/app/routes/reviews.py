@@ -248,28 +248,28 @@ def get_security_reviews(
     return ReviewQueueResponse(total=total, items=paged_items)
 
 
-@router.post("/{review_id}/triage", response_model=TriageResponse)
-def triage_security_review(
+def execute_review_triage(
+    db: Session,
     review_id: str,
-    payload: TriageRequest,
-    db: Session = Depends(get_db),
-    user: CurrentUser = Depends(require_staff),
-):
+    action: TriageAction,
+    guard_id: UUID,
+    reason_notes: str,
+    gate_override: Optional[str] = None,
+) -> TriageResponse:
     """
-    Guard action (ALLOW, REJECT, OVERRIDE) on a pending review item (Phase 11-12).
-    Mandatory guard_id and reason_notes.
-    Persists immutable audit records into the database.
+    Core triage execution engine: records guard decisions, persists immutable
+    AccessDecision audit logs into PostgreSQL, and resolves alerts/observations.
     """
     # 1. Verify guard exists
-    guard = db.get(User, payload.guard_id)
+    guard = db.get(User, guard_id)
     if not guard:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Guard user with ID '{payload.guard_id}' not found.",
+            detail=f"Guard user with ID '{guard_id}' not found.",
         )
 
     # 2. Verify optional gate override
-    effective_gate = payload.gate_override
+    effective_gate = gate_override
     if effective_gate:
         gate_obj = db.get(Gate, effective_gate)
         if not gate_obj:
@@ -304,7 +304,7 @@ def triage_security_review(
 
     if invoice and invoice.order_id:
         # Determine guard decision
-        if payload.action in (TriageAction.ALLOW, TriageAction.OVERRIDE):
+        if action in (TriageAction.ALLOW, TriageAction.OVERRIDE):
             g_decision = GuardDecision.CLEARED
             access_state = AccessState.ALLOWED
         else:
@@ -317,31 +317,31 @@ def triage_security_review(
             order_id=invoice.order_id,
             invoice_id=invoice.id,
             decision=g_decision,
-            note=f"[{payload.action.value}] {payload.reason_notes}"
-            + (f" (Gate override: {payload.gate_override})" if payload.gate_override else ""),
-            decided_by_id=payload.guard_id,
+            note=f"[{action.value}] {reason_notes}"
+            + (f" (Gate override: {gate_override})" if gate_override else ""),
+            decided_by_id=guard_id,
             decided_at=now,
         )
         db.add(delivery_decision)
 
         # Persist immutable AccessDecision audit record
         plate_str = invoice.order.delivery_vehicle_plate if invoice.order else "DELIVERY"
-        gate_id_val = effective_gate or invoice.gate_id or (invoice.order.gate_id if invoice.order else "GATE_1")
+        gate_id_val = effective_gate or invoice.gate_id or (invoice.order.gate_id if invoice.order else None) or "GATE_1"
         access_audit = AccessDecision(
             id=audit_decision_id,
             plate=plate_str or "DELIVERY",
             normalized_plate=plate_str or "DELIVERY",
             gate_id=gate_id_val,
             decision=access_state,
-            reason_code=f"GUARD_CARGO_{payload.action.value}",
-            reason=payload.reason_notes,
+            reason_code=f"GUARD_CARGO_{action.value}",
+            reason=reason_notes,
             confidence=1.0,
             context_data={
                 "review_id": review_id,
-                "action": payload.action.value,
-                "guard_id": str(payload.guard_id),
+                "action": action.value,
+                "guard_id": str(guard_id),
                 "guard_username": guard.username,
-                "gate_override": payload.gate_override,
+                "gate_override": gate_override,
                 "order_id": invoice.order.order_id if invoice.order else None,
                 "invoice_id": str(invoice.id),
                 "policy_version": "1.0",
@@ -354,10 +354,10 @@ def triage_security_review(
         return TriageResponse(
             status="SUCCESS",
             review_id=review_id,
-            action=payload.action.value,
+            action=action.value,
             audit_id=audit_decision_id,
             timestamp=now,
-            message=f"Cargo review '{review_id}' successfully triaged with action '{payload.action.value}'.",
+            message=f"Cargo review '{review_id}' successfully triaged with action '{action.value}'.",
         )
 
     # Case B: Observation / Access Event review
@@ -371,12 +371,12 @@ def triage_security_review(
         if alert and alert.log and alert.log.observation_id:
             obs = db.get(ObservationEvent, alert.log.observation_id)
 
-    gate_val = effective_gate or (obs.gate_id if obs else (alert.gate_id if alert else "GATE_1"))
+    gate_val = effective_gate or (obs.gate_id if obs else None) or (alert.gate_id if alert else None) or "GATE_1"
     plate_val = (obs.normalized_plate or obs.raw_plate) if obs else (alert.log.plate if alert and alert.log else "UNKNOWN")
 
     access_state = (
         AccessState.ALLOWED
-        if payload.action in (TriageAction.ALLOW, TriageAction.OVERRIDE)
+        if action in (TriageAction.ALLOW, TriageAction.OVERRIDE)
         else AccessState.DENIED
     )
 
@@ -387,15 +387,15 @@ def triage_security_review(
         normalized_plate=plate_val or "UNKNOWN",
         gate_id=gate_val,
         decision=access_state,
-        reason_code=f"GUARD_{payload.action.value}",
-        reason=payload.reason_notes,
+        reason_code=f"GUARD_{action.value}",
+        reason=reason_notes,
         confidence=1.0,
         context_data={
             "review_id": review_id,
-            "action": payload.action.value,
-            "guard_id": str(payload.guard_id),
+            "action": action.value,
+            "guard_id": str(guard_id),
             "guard_username": guard.username,
-            "gate_override": payload.gate_override,
+            "gate_override": gate_override,
             "observation_id": str(obs.id) if obs else None,
             "alert_id": str(alert.id) if alert else None,
             "policy_version": "1.0",
@@ -410,8 +410,8 @@ def triage_security_review(
             id=uuid.uuid4(),
             observation_id=obs.id,
             outcome=ResolutionOutcome.NONE_OF_THESE,
-            note=f"[{payload.action.value}] {payload.reason_notes}",
-            created_by_id=payload.guard_id,
+            note=f"[{action.value}] {reason_notes}",
+            created_by_id=guard_id,
             created_at=now,
         )
         db.add(resolution)
@@ -419,8 +419,8 @@ def triage_security_review(
     # If linked to a SecurityAlert, resolve the alert
     if alert:
         alert.status = AlertStatus.RESOLVED
-        alert.reviewed_by_id = payload.guard_id
-        alert.resolution_notes = f"[{payload.action.value}] {payload.reason_notes}"
+        alert.reviewed_by_id = guard_id
+        alert.resolution_notes = f"[{action.value}] {reason_notes}"
         alert.resolved_at = now
 
     db.commit()
@@ -428,8 +428,30 @@ def triage_security_review(
     return TriageResponse(
         status="SUCCESS",
         review_id=review_id,
-        action=payload.action.value,
+        action=action.value,
         audit_id=audit_decision_id,
         timestamp=now,
-        message=f"Access review '{review_id}' successfully triaged with action '{payload.action.value}'.",
+        message=f"Access review '{review_id}' successfully triaged with action '{action.value}'.",
+    )
+
+
+@router.post("/{review_id}/triage", response_model=TriageResponse)
+def triage_security_review(
+    review_id: str,
+    payload: TriageRequest,
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(require_staff),
+):
+    """
+    Guard action (ALLOW, REJECT, OVERRIDE) on a pending review item (Phase 11-12).
+    Mandatory guard_id and reason_notes.
+    Persists immutable audit records into the database.
+    """
+    return execute_review_triage(
+        db,
+        review_id=review_id,
+        action=payload.action,
+        guard_id=payload.guard_id,
+        reason_notes=payload.reason_notes,
+        gate_override=payload.gate_override,
     )

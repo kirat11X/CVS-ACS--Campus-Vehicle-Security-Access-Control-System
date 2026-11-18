@@ -13,3 +13,4 @@ opencv-python-headless>=4.10.0
 pytesseract>=0.3.10
 rapidocr-onnxruntime>=1.2.0
 python-multipart>=0.0.9
+python-telegram-bot>=21.0

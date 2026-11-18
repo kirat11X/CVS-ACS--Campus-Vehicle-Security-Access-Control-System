@@ -37,6 +37,17 @@ WHATSAPP_VERIFY_TOKEN = os.getenv("WHATSAPP_VERIFY_TOKEN", "")  # Meta webhook s
 WHATSAPP_APP_SECRET = os.getenv("WHATSAPP_APP_SECRET", "")  # when set, Meta webhook signatures are required
 WHATSAPP_GRAPH_VERSION = os.getenv("WHATSAPP_GRAPH_VERSION", "v21.0")
 
+# Telegram Bot Connector (Phase 7 / Stage 1)
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+TELEGRAM_MODE = os.getenv("TELEGRAM_MODE", "polling").strip().lower()  # "polling" or "webhook"
+TELEGRAM_ALLOWED_CHAT_IDS = [
+    int(cid.strip())
+    for cid in os.getenv("TELEGRAM_ALLOWED_CHAT_IDS", "").split(",")
+    if cid.strip() and (cid.strip().isdigit() or (cid.strip().startswith("-") and cid.strip()[1:].isdigit()))
+]
+TELEGRAM_WEBHOOK_URL = os.getenv("TELEGRAM_WEBHOOK_URL", "").strip()
+TELEGRAM_WEBHOOK_SECRET = os.getenv("TELEGRAM_WEBHOOK_SECRET", "").strip()
+
 # Delivery screening (Phase 7)
 MEDIA_ROOT = (BASE_DIR / os.getenv("MEDIA_ROOT", "media")).resolve()  # an absolute value replaces BASE_DIR
 INVOICE_MAX_UPLOAD_MB = float(os.getenv("INVOICE_MAX_UPLOAD_MB", "10"))

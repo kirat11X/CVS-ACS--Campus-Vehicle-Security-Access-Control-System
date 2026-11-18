@@ -28,7 +28,10 @@ from backend.app.routes import (
     webhooks_router,
     system_router,
     reviews_router,
+    telegram_router,
+    orders_router,
 )
+from backend.app.telegram import telegram_service
 from backend.app.whatsapp import get_whatsapp_provider
 
 logging.basicConfig(level=logging.INFO)
@@ -42,9 +45,13 @@ async def lifespan(app: FastAPI):
     logger.info("Initializing background services...")
     mqtt_manager.start()
     frigate_worker.start()
+    if telegram_service.is_configured:
+        await telegram_service.start()
     yield
     # Shutdown
     logger.info("Stopping background services...")
+    if telegram_service.is_configured:
+        await telegram_service.stop()
     frigate_worker.stop()
     mqtt_manager.stop()
 
@@ -57,6 +64,8 @@ app = FastAPI(
         {"name": "Delivery Screening", "description": "Phase 7: invoice OCR, deterministic per-line policy (ALLOW / REVIEW / ALERT), append-only guard decisions."},
         {"name": "Delivery Intake", "description": "Phase 7: public LAN page riders use to send an invoice while the WhatsApp Business API is unavailable."},
         {"name": "WhatsApp", "description": "Phase 7: provider-agnostic chat webhook (local intake / mock / Meta Cloud API)."},
+        {"name": "Telegram Connector", "description": "Stage 1: Interactive Telegram bot connector: polling/webhook, invoice screening, inline gate triage."},
+        {"name": "Orders & Delivery Screening", "description": "Standard invoice intake and multi-platform order verification."},
         {"name": "Alerts & System", "description": "Phase 7: unified needs-attention list and chat provider status."},
     ],
 )
@@ -87,6 +96,8 @@ app.include_router(intake_router)
 app.include_router(webhooks_router)
 app.include_router(system_router)
 app.include_router(reviews_router)
+app.include_router(telegram_router)
+app.include_router(orders_router)
 
 class WebhookTestPayload(BaseModel):
     source: str

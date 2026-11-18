@@ -200,3 +200,4 @@ class DeliverySource(str, enum.Enum):
     LOCAL_INTAKE = "LOCAL_INTAKE"
     WHATSAPP = "WHATSAPP"
     CONSOLE = "CONSOLE"
+    TELEGRAM = "TELEGRAM"

@@ -15,6 +15,8 @@ from backend.app.routes.intake import router as intake_router
 from backend.app.routes.webhooks import router as webhooks_router
 from backend.app.routes.system import router as system_router
 from backend.app.routes.reviews import router as reviews_router
+from backend.app.routes.telegram import router as telegram_router
+from backend.app.routes.orders import router as orders_router
 
 __all__ = [
     "vehicles_router",
@@ -34,4 +36,6 @@ __all__ = [
     "webhooks_router",
     "system_router",
     "reviews_router",
+    "telegram_router",
+    "orders_router",
 ]

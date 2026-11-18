@@ -37,6 +37,7 @@ from backend.app.services.invoice_reader import (
     normalize_order_id,
     parse_rows,
     read_image,
+    to_decimal,
 )
 from backend.app.services.llm_invoice_extractor import llm_invoice_extractor
 
@@ -148,6 +149,81 @@ class DeliveryScreeningService:
             totals_match = all(checks) if checks else None
         elif lines and (parsed.total is not None or parsed.subtotal is not None):
             totals_match = False  # a line amount could not be read, so the total cannot be confirmed
+
+        # Automated self-healing arithmetic check before flagging totals_match = False:
+        if totals_match is False and parsed.total is not None and lines:
+            # 1. Test stripping leading '2', '3', or '7' on each line
+            for l_idx, s_line in enumerate(lines):
+                if s_line.amount is not None:
+                    s_amt = f"{s_line.amount:.2f}"
+                    if s_amt[0] in ("2", "3", "7") and len(s_amt) > 4:
+                        try:
+                            cand_amt = Decimal(s_amt[1:])
+                            cand_items_sum = items_sum - s_line.amount + cand_amt
+                            cand_computed = cand_items_sum + (parsed.delivery_fee or 0) + (parsed.tax or 0) - (parsed.discount or 0)
+                            if abs(cand_computed - parsed.total) <= _TOLERANCE:
+                                logger.info(
+                                    "Screening arithmetic healed: stripped phantom '%s' on line '%s' (%s -> %s)",
+                                    s_amt[0], s_line.item_name, s_line.amount, cand_amt
+                                )
+                                s_line.amount = cand_amt
+                                if s_line.quantity and s_line.quantity > 0:
+                                    s_line.unit_price = (cand_amt / Decimal(s_line.quantity)).quantize(Decimal("0.01"))
+                                if l_idx < len(parsed.lines):
+                                    parsed.lines[l_idx].amount = cand_amt
+                                    parsed.lines[l_idx].unit_price = s_line.unit_price
+                                items_sum = cand_items_sum
+                                computed_total = cand_computed
+                                totals_match = True
+                                break
+                        except Exception:
+                            pass
+
+            # 2. Test swapping alternative prices (e.g. MRP vs discounted price from raw_text or parsed row)
+            if not totals_match:
+                for l_idx, s_line in enumerate(lines):
+                    raw_src = s_line.item_name
+                    if l_idx < len(parsed.lines) and parsed.lines[l_idx].raw_text:
+                        raw_src += " " + parsed.lines[l_idx].raw_text
+                    alt_candidates = re.findall(r"\b\d{2,5}(?:\.\d{2})?\b", raw_src)
+                    for alt_str in alt_candidates:
+                        alt_amt = to_decimal(alt_str)
+                        if alt_amt is not None and s_line.amount is not None and alt_amt != s_line.amount:
+                            cand_items_sum = items_sum - s_line.amount + alt_amt
+                            cand_computed = cand_items_sum + (parsed.delivery_fee or 0) + (parsed.tax or 0) - (parsed.discount or 0)
+                            if abs(cand_computed - parsed.total) <= _TOLERANCE:
+                                logger.info(
+                                    "Screening arithmetic healed: swapped MRP/discounted price on line '%s' (%s -> %s)",
+                                    s_line.item_name, s_line.amount, alt_amt
+                                )
+                                s_line.amount = alt_amt
+                                if s_line.quantity and s_line.quantity > 0:
+                                    s_line.unit_price = (alt_amt / Decimal(s_line.quantity)).quantize(Decimal("0.01"))
+                                if l_idx < len(parsed.lines):
+                                    parsed.lines[l_idx].amount = alt_amt
+                                    parsed.lines[l_idx].unit_price = s_line.unit_price
+                                items_sum = cand_items_sum
+                                computed_total = cand_computed
+                                totals_match = True
+                                break
+                    if totals_match:
+                        break
+
+            # 3. Test stripping leading '2', '3', or '7' on grand total itself
+            if not totals_match and computed_total is not None and computed_total > 0:
+                s_tot = f"{parsed.total:.2f}"
+                if s_tot[0] in ("2", "3", "7") and len(s_tot) > 4:
+                    try:
+                        cand_tot = Decimal(s_tot[1:])
+                        if abs(computed_total - cand_tot) <= _TOLERANCE:
+                            logger.info(
+                                "Screening arithmetic healed: stripped phantom '%s' on grand total (%s -> %s)",
+                                s_tot[0], parsed.total, cand_tot
+                            )
+                            parsed.total = cand_tot
+                            totals_match = True
+                    except Exception:
+                        pass
 
         overall = worst(l.verdict for l in lines) if lines else ScreeningVerdict.REVIEW
         if totals_match is False or parsed.total is None:
@@ -299,8 +375,9 @@ class DeliveryScreeningService:
             ocr_path = self.media_file(preview_rel or image_rel)
             ocr = read_image(ocr_path) if ocr_path else OcrResult("NONE", [], None)
 
-            if llm_invoice_extractor.is_available() and ocr.text.strip():
-                parsed = llm_invoice_extractor.extract_from_text(ocr.text)
+            ocr_input_text = ocr.formatted_text if hasattr(ocr, "formatted_text") and ocr.formatted_text else ocr.text
+            if llm_invoice_extractor.is_available() and ocr_input_text.strip():
+                parsed = llm_invoice_extractor.extract_from_text(ocr_input_text)
                 if not parsed or not parsed.lines:
                     parsed = parse_rows(ocr.rows)
             else:

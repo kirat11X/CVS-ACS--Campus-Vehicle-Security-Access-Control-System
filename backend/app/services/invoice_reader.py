@@ -17,6 +17,7 @@ logger = logging.getLogger("campus_security.invoice_reader")
 class OcrRow:
     text: str
     confidence: Optional[float] = None  # mean engine score of the row's fragments, 0..1
+    formatted_line: Optional[str] = None  # structured spatial line with per-token confidence, e.g. [L01] item (conf:0.95) | price (conf:0.89)
 
 @dataclass
 class OcrResult:
@@ -27,6 +28,11 @@ class OcrResult:
     @property
     def text(self) -> str:
         return "\n".join(r.text for r in self.rows)
+
+    @property
+    def formatted_text(self) -> str:
+        lines = [r.formatted_line or r.text for r in self.rows if (r.formatted_line or r.text)]
+        return "\n".join(lines)
 
 @dataclass
 class ParsedLine:
@@ -65,10 +71,11 @@ def _load_rgb(image_path: Path):
         return ImageOps.exif_transpose(img).convert("RGB")  # phone photos carry EXIF rotation
 
 def _group_rows(fragments) -> List[OcrRow]:
-    """fragments: (x_left, y_center, height, text, score). Same text line = overlapping y band."""
+    """fragments: (x_left, y_center, height, text, score). Same text line = overlapping y band within 12-15px."""
     rows = []
     for frag in sorted(fragments, key=lambda f: f[1]):
-        if rows and abs(frag[1] - rows[-1]["y"]) <= 0.5 * max(frag[2], rows[-1]["h"]):
+        y_thresh = max(14.0, 0.5 * max(frag[2], rows[-1]["h"] if rows else 0))
+        if rows and abs(frag[1] - rows[-1]["y"]) <= y_thresh:
             row = rows[-1]
             row["frags"].append(frag)
             row["y"] = mean(f[1] for f in row["frags"])
@@ -76,16 +83,32 @@ def _group_rows(fragments) -> List[OcrRow]:
         else:
             rows.append({"y": frag[1], "h": frag[2], "frags": [frag]})
     result = []
+    line_no = 1
     for row in rows:
         frags = sorted(row["frags"], key=lambda f: f[0])
-        scored = [(f[4], max(1, len(f[3].strip()))) for f in frags if f[4] is not None]
+        valid_frags = [f for f in frags if f[3].strip()]
+        if not valid_frags:
+            continue
+        scored = [(f[4], max(1, len(f[3].strip()))) for f in valid_frags if f[4] is not None]
         weight = sum(w for _, w in scored)
+        avg_conf = round(sum(s * w for s, w in scored) / weight, 4) if scored else None
+        plain_text = "  ".join(f[3].strip() for f in valid_frags)
+
+        # Formatted line with per-token confidence: [L01] <token> (conf:0.95) | <token> (conf:0.61) ...
+        frag_tokens = []
+        for f in valid_frags:
+            t = f[3].strip()
+            score_str = f" (conf:{f[4]:.2f})" if f[4] is not None else ""
+            frag_tokens.append(f"{t}{score_str}")
+        formatted_line = f"[L{line_no:02d}] " + " | ".join(frag_tokens)
+
         result.append(OcrRow(
-            text="  ".join(f[3].strip() for f in frags if f[3].strip()),
-            # weighted by text length: a lone low-score digit does not sink a well-read item name
-            confidence=round(sum(s * w for s, w in scored) / weight, 4) if scored else None,
+            text=plain_text,
+            confidence=avg_conf,
+            formatted_line=formatted_line,
         ))
-    return [r for r in result if r.text]
+        line_no += 1
+    return result
 
 def run_rapidocr(image_path: Path) -> OcrResult:
     global _rapid_engine
@@ -119,16 +142,29 @@ def run_tesseract(image_path: Path) -> OcrResult:
         conf = float(data["conf"][i])
         lines.setdefault(key, []).append((data["left"][i], data["width"][i], data["top"][i], word, conf / 100 if conf >= 0 else None))
     rows, all_scores = [], []
+    line_no = 1
     for key in sorted(lines, key=lambda k: (mean(w[2] for w in lines[k]), k)):
         words = sorted(lines[key], key=lambda w: w[0])
-        char_w = median(w[1] / max(1, len(w[3])) for w in words)
-        text = words[0][3]
-        for prev, cur in zip(words, words[1:]):
+        valid_words = [w for w in words if w[3].strip()]
+        if not valid_words:
+            continue
+        char_w = median(w[1] / max(1, len(w[3])) for w in valid_words)
+        text = valid_words[0][3]
+        for prev, cur in zip(valid_words, valid_words[1:]):
             gap = cur[0] - (prev[0] + prev[1])
             text += ("  " if gap > 2.5 * char_w else " ") + cur[3]  # keep column gaps visible
-        scores = [w[4] for w in words if w[4] is not None]
+        scores = [w[4] for w in valid_words if w[4] is not None]
         all_scores.extend(scores)
-        rows.append(OcrRow(text=text, confidence=round(mean(scores), 4) if scores else None))
+
+        frag_tokens = [f"{w[3].strip()} (conf:{w[4]:.2f})" if w[4] is not None else w[3].strip() for w in valid_words]
+        formatted_line = f"[L{line_no:02d}] " + " | ".join(frag_tokens)
+
+        rows.append(OcrRow(
+            text=text,
+            confidence=round(mean(scores), 4) if scores else None,
+            formatted_line=formatted_line,
+        ))
+        line_no += 1
     return OcrResult("TESSERACT", rows, round(mean(all_scores), 4) if all_scores else None)
 
 def extract_pdf_digital_text(pdf_path: Path) -> Optional[OcrResult]:
@@ -150,7 +186,14 @@ def extract_pdf_digital_text(pdf_path: Path) -> Optional[OcrResult]:
         lines = [line.rstrip() for line in raw.splitlines() if line.strip()]
         # Check if it has genuine digital text (> 2 lines and >= 25 chars)
         if len(lines) >= 2 and sum(len(l) for l in lines) >= 25:
-            rows = [OcrRow(text=l, confidence=1.0) for l in lines]
+            rows = [
+                OcrRow(
+                    text=l,
+                    confidence=1.0,
+                    formatted_line=f"[L{i+1:02d}] {l} (conf:1.00)",
+                )
+                for i, l in enumerate(lines)
+            ]
             return OcrResult("PDF_DIGITAL", rows, confidence=1.0)
     except Exception as exc:
         logger.debug("pdftotext extraction not available or failed for %s: %s", pdf_path, exc)

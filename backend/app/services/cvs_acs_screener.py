@@ -112,6 +112,9 @@ class CVSACSScreener:
 
     def _resolve_csv_path(self) -> Path:
         candidates = [
+            Path("cvs_acs_master_45000_deliverables.csv"),
+            Path(__file__).resolve().parent.parent.parent.parent / "cvs_acs_master_45000_deliverables.csv",
+            Path(__file__).resolve().parent.parent / "data" / "cvs_acs_master_45000_deliverables.csv",
             Path("cvs_acs_master_20000_deliverables.csv"),
             Path(__file__).resolve().parent.parent.parent.parent / "cvs_acs_master_20000_deliverables.csv",
             Path(__file__).resolve().parent.parent / "data" / "cvs_acs_master_20000_deliverables.csv",
@@ -119,11 +122,11 @@ class CVSACSScreener:
         for p in candidates:
             if p.is_file():
                 return p
-        return Path("cvs_acs_master_20000_deliverables.csv")
+        return Path("cvs_acs_master_45000_deliverables.csv")
 
     def _load_master_csv(self) -> None:
         if not self.csv_path.is_file():
-            logger.warning("cvs_acs_master_20000_deliverables.csv not found at %s", self.csv_path)
+            logger.warning("Master deliverables CSV not found at %s", self.csv_path)
             return
 
         try:

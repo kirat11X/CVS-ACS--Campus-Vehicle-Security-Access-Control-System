@@ -36,6 +36,7 @@ from backend.app.models.delivery import DeliveryOrder, Invoice, InvoiceItem, Del
 from backend.app.models.health import HealthCheckRecord
 from backend.app.models.observation import ObservationEvent, ObservationResolution, ObservationFeedEvent
 from backend.app.models.movement import CameraLane, VehicleLinkEvent
+from backend.app.models.stream_setting import GateStreamSetting
 
 __all__ = [
     "Base",
@@ -87,5 +88,6 @@ __all__ = [
     "ScreeningVerdict",
     "GuardDecision",
     "DeliverySource",
-    "DeliveryDecision"
+    "DeliveryDecision",
+    "GateStreamSetting"
 ]

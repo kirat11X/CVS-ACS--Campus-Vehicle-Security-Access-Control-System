@@ -225,10 +225,10 @@ class DeterministicValidator:
                 expected_total = (qty * u_price) - discount
                 diff = abs(line_total - expected_total)
                 if diff > self.rounding_tolerance:
-                    # Sanity check: detect and strip phantom leading '2' or '7' from Rupee (₹) OCR misread
+                    # Sanity check: detect and strip phantom leading '2', '3', or '7' from Rupee (₹) OCR misread
                     repaired = False
                     s_lt = f"{line_total:.2f}"
-                    if s_lt[0] in ("2", "7") and len(s_lt) > 4:
+                    if s_lt[0] in ("2", "3", "7") and len(s_lt) > 4:
                         try:
                             cand_lt = Decimal(s_lt[1:])
                             if abs(cand_lt - expected_total) <= self.rounding_tolerance:
@@ -249,7 +249,7 @@ class DeterministicValidator:
                             pass
                     if not repaired:
                         s_up = f"{u_price:.2f}"
-                        if s_up[0] in ("2", "7") and len(s_up) > 4:
+                        if s_up[0] in ("2", "3", "7") and len(s_up) > 4:
                             try:
                                 cand_up = Decimal(s_up[1:])
                                 if abs((qty * cand_up - discount) - line_total) <= self.rounding_tolerance:
@@ -382,7 +382,7 @@ class DeterministicValidator:
                             raw_lt = self._to_decimal(it.get("line_total"))
                             if raw_lt is not None:
                                 s_lt = f"{raw_lt:.2f}"
-                                if s_lt[0] in ("2", "7") and len(s_lt) > 4:
+                                if s_lt[0] in ("2", "3", "7") and len(s_lt) > 4:
                                     try:
                                         cand_lt = Decimal(s_lt[1:])
                                         new_sum = sum_line_totals - raw_lt + cand_lt
@@ -463,21 +463,70 @@ class DeterministicValidator:
 
                 best_diff = min(diff_std, diff_no_discount, diff_item_discount)
                 if best_diff > self.rounding_tolerance:
-                    findings.append(ValidationFinding(
-                        code=ReasonCode.VAL_GRAND_TOTAL_MISMATCH,
-                        severity=ValidationSeverity.CRITICAL,
-                        field_or_line_id="totals.grand_total",
-                        expected_value=f"{expected_std:.2f}",
-                        observed_value=f"{grand_total:.2f}",
-                        difference=f"{diff_std:.2f}",
-                        message=(
-                            f"Grand total reconciliation failed: subtotal ({subtotal:.2f}) + "
-                            f"tax ({tax_term:.2f}) + platform charges ({platform_charges:.2f}) - "
-                            f"discount ({discount_total:.2f}) + round_off ({round_off:.2f}) = {expected_std:.2f}, "
-                            f"but reported grand total is {grand_total:.2f} (diff: {diff_std:.2f})."
-                        ),
-                        requires_human_review=True,
-                    ))
+                    # Sanity check: detect and strip phantom leading '2', '3', or '7' on any line or grand total
+                    gt_repaired = False
+                    for idx, it in enumerate(line_items):
+                        raw_lt = self._to_decimal(it.get("line_total"))
+                        if raw_lt is not None:
+                            s_lt = f"{raw_lt:.2f}"
+                            if s_lt[0] in ("2", "3", "7") and len(s_lt) > 4:
+                                try:
+                                    cand_lt = Decimal(s_lt[1:])
+                                    new_subtotal = subtotal - raw_lt + cand_lt
+                                    new_std = new_subtotal + tax_term + platform_charges - discount_total + round_off
+                                    new_no_disc = new_subtotal + tax_term + platform_charges + round_off
+                                    if min(abs(grand_total - new_std), abs(grand_total - new_no_disc)) <= self.rounding_tolerance:
+                                        it["line_total"] = str(cand_lt)
+                                        gt_repaired = True
+                                        findings.append(ValidationFinding(
+                                            code=ReasonCode.VAL_SUSPICIOUS_ROUNDING,
+                                            severity=ValidationSeverity.INFO,
+                                            field_or_line_id=f"line-{idx+1}.line_total",
+                                            expected_value=f"{cand_lt:.2f}",
+                                            observed_value=s_lt,
+                                            difference=f"{abs(raw_lt - cand_lt):.2f}",
+                                            message=f"Grand total reconciled: stripped phantom Rupee digit '{s_lt[0]}' from line {idx+1} ({s_lt} -> {cand_lt:.2f}).",
+                                            requires_human_review=False,
+                                        ))
+                                        break
+                                except Exception:
+                                    pass
+                    if not gt_repaired:
+                        s_gt = f"{grand_total:.2f}"
+                        if s_gt[0] in ("2", "3", "7") and len(s_gt) > 4:
+                            try:
+                                cand_gt = Decimal(s_gt[1:])
+                                if abs(cand_gt - expected_std) <= self.rounding_tolerance or abs(cand_gt - expected_no_discount) <= self.rounding_tolerance:
+                                    totals["grand_total"] = str(cand_gt)
+                                    gt_repaired = True
+                                    findings.append(ValidationFinding(
+                                        code=ReasonCode.VAL_SUSPICIOUS_ROUNDING,
+                                        severity=ValidationSeverity.INFO,
+                                        field_or_line_id="totals.grand_total",
+                                        expected_value=f"{expected_std:.2f}",
+                                        observed_value=s_gt,
+                                        difference=f"{abs(grand_total - cand_gt):.2f}",
+                                        message=f"Grand total reconciled: stripped phantom Rupee digit '{s_gt[0]}' from grand_total ({s_gt} -> {cand_gt:.2f}).",
+                                        requires_human_review=False,
+                                    ))
+                            except Exception:
+                                pass
+                    if not gt_repaired:
+                        findings.append(ValidationFinding(
+                            code=ReasonCode.VAL_GRAND_TOTAL_MISMATCH,
+                            severity=ValidationSeverity.CRITICAL,
+                            field_or_line_id="totals.grand_total",
+                            expected_value=f"{expected_std:.2f}",
+                            observed_value=f"{grand_total:.2f}",
+                            difference=f"{diff_std:.2f}",
+                            message=(
+                                f"Grand total reconciliation failed: subtotal ({subtotal:.2f}) + "
+                                f"tax ({tax_term:.2f}) + platform charges ({platform_charges:.2f}) - "
+                                f"discount ({discount_total:.2f}) + round_off ({round_off:.2f}) = {expected_std:.2f}, "
+                                f"but reported grand total is {grand_total:.2f} (diff: {diff_std:.2f})."
+                            ),
+                            requires_human_review=True,
+                        ))
         else:
             findings.append(ValidationFinding(
                 code=ReasonCode.VAL_MISSING_MANDATORY_FIELD,

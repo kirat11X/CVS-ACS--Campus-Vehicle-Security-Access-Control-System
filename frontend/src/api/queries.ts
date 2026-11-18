@@ -35,6 +35,7 @@ export const qk = {
   delivery: (orderId: string) => ["delivery", orderId] as const,
   alerts: (limit: number) => ["alerts", limit] as const,
   whatsapp: ["whatsapp"] as const,
+  streamSettings: ["stream-settings"] as const,
 };
 
 /** Invalidate every query whose key starts with one of `roots` after a write. */
@@ -157,4 +158,13 @@ export function useAlerts(limit = 100, refetchInterval = 20_000) {
 export function useWhatsAppStatus() {
   const { token } = useSession();
   return useQuery({ queryKey: qk.whatsapp, queryFn: () => api.whatsappStatus(token), staleTime: 60_000, refetchInterval: 60_000 });
+}
+
+export function useStreamSettings(refetchInterval: number | false = 5000) {
+  const { token } = useSession();
+  return useQuery({
+    queryKey: qk.streamSettings,
+    queryFn: () => api.streamSettings(token),
+    refetchInterval,
+  });
 }

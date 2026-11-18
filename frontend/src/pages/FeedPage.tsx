@@ -1,7 +1,7 @@
-import { AlertCircle, Building2, FlaskConical, LayoutGrid, List, Package, Plus, Radio, Unlink } from "lucide-react";
+import { AlertCircle, Building2, Camera, FlaskConical, LayoutGrid, List, Package, Plus, Radio, Unlink } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
-import { useDashboard, useGates } from "../api/queries";
+import { useDashboard, useGates, useStreamSettings } from "../api/queries";
 import type { LinkStatus, PersonType, ResolvedObservation } from "../api/types";
 import { useSession } from "../auth/AuthContext";
 import { DeliveryScreeningPanel } from "../components/delivery/DeliveryScreeningPanel";
@@ -57,6 +57,7 @@ export function FeedPage() {
   const { cards, connection, lastSyncAt, upsertItem } = useFeed();
   const notify = useToast();
   const gatesQuery = useGates();
+  const { data: streamSettings } = useStreamSettings(5000);
   const [params, setParams] = useSearchParams();
   const [dialog, setDialog] = useState<Dialog>(null);
   const [plateFilter, setPlateFilter] = useState(params.get("plate") ?? "");
@@ -128,6 +129,18 @@ export function FeedPage() {
         description="Plates read at every gate as they arrive, matched against the registry. The software never moves a barrier; you decide at the gate."
         actions={
           <>
+            {streamSettings && streamSettings.active_gates_count > 0 && (
+              <a
+                href="#/settings"
+                className="hidden items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 sm:inline-flex"
+                title={`Adaptive FPS budget: ${streamSettings.total_fps_budget} FPS divided across ${streamSettings.active_gates_count} active gate(s)`}
+              >
+                <Camera className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400" />
+                <span>
+                  {streamSettings.active_gates_count} Gate{streamSettings.active_gates_count === 1 ? "" : "s"} · {streamSettings.per_gate_target_fps.toFixed(1)} FPS
+                </span>
+              </a>
+            )}
             <ConnectionIndicator state={connection} lastSyncAt={lastSyncAt} />
             {user.role === "ADMIN" && (
               <Button icon={<FlaskConical className="h-4 w-4" />} onClick={() => setDialog({ type: "simulate" })}>

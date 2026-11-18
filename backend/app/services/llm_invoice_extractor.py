@@ -52,6 +52,16 @@ ACCOUNTING_ITEM_NAMES = re.compile(
 )
 
 
+def strip_ocr_formatting_tokens(text: str) -> str:
+    """Strips line tags '[L01]' and confidence tags '(conf:0.95)' and separators '|' for plain regex processing."""
+    if not text:
+        return ""
+    t = re.sub(r"\[L\d+\]\s*", "", text)
+    t = re.sub(r"\s*\(conf:[^)]+\)", "", t)
+    t = re.sub(r"\s*\|\s*", "  ", t)
+    return t
+
+
 def clean_vendor_name(vendor: Optional[str], raw_text: str = "") -> Optional[str]:
     """Cleans up vendor string, filtering out phone status bar text and accurately identifying platforms."""
     import re
@@ -168,6 +178,7 @@ class LLMInvoiceExtractor:
         model_name = self.get_active_model()
         system_prompt = (
             "You are a strict, precise invoice extraction assistant for delivery orders and receipts.\n"
+            "The receipt lines are formatted with spatial line-by-line structure: [L01] <token> (conf:0.xx) | ... where (conf:0.xx) represents OCR confidence score (0.00 to 1.00).\n"
             "Your task is to extract:\n"
             "1. 'platform': The delivery platform or service app (e.g. 'Swiggy', 'Zomato', 'Blinkit', 'Zepto', 'Instamart', 'Amazon'). "
             "Set platform to 'Zepto' if order ID matches format '#SNKRJSISE59003', '#JKSVKRPRN67992', or if text contains 'Credit Note', 'Order Again', 'Total Bill', or 'Zepto'.\n"
@@ -180,8 +191,13 @@ class LLMInvoiceExtractor:
             "   - 'unit_price': Actual unit price paid in INR.\n"
             "   - 'total_price': Total price for this line in INR.\n"
             "   STRICT EXCLUSION RULE: DO NOT include summary, fee, or accounting rows in 'items'! (NO 'Item Total', 'Platform fee', 'Packaging', 'Discount Applied', 'Taxes', 'Bill Total').\n"
-            "   IMPORTANT PRICING RULE: When a row or bill shows two prices (e.g. 184 and 165, 223 and 174, 499 and 130, 741 and 130), the higher number is the crossed-out MRP, and the LOWER number is the actual discounted price paid. Always extract the lower paid price as the unit_price/total_price/total. Never use the crossed-out MRP!\n"
-            "   IMPORTANT OCR ARTIFACT RULE: OCR often misreads the Indian Rupee symbol '₹' as the digit '3', '2', '#', or '7' (e.g. ₹130 read as 2130, ₹180 read as 3180). Always extract the genuine item price.\n"
+            "   INDIAN QUICK-COMMERCE / RECEIPT ARTIFACT RULES:\n"
+            "   (a) PHANTOM RUPEE (₹) GLYPHS / DIGITS:\n"
+            "       OCR engines frequently misread the Indian Rupee symbol '₹' as the digit '3', '2', '7', or symbols '#', '?', '弄', '¥', 'F' directly prepended to the number (e.g. ₹149 read as 3149, ₹180 read as 3180, ₹130 read as 2130, ₹49 read as 749).\n"
+            "       ALWAYS check against qty * unit_price and the invoice grand_total / bill total, and STRIP the phantom prefix digit (e.g., return 149.0 instead of 3149.0, return 180.0 instead of 3180.0).\n"
+            "   (b) SLASHED / STRIKETHROUGH MRP vs. DISCOUNTED SELLING PRICE:\n"
+            "       When an item line contains two prices (e.g. an original MRP/strikethrough price often with lower OCR confidence, followed by a discounted selling price such as 184 and 165, 223 and 174, 499 and 130, 220 and 180), ALWAYS select the actual discounted/paid selling price for total_price and unit_price.\n"
+            "       NEVER sum both prices together, and NEVER select the higher crossed-out MRP!\n"
             "6. 'subtotal': Total of items before taxes/discounts.\n"
             "7. 'delivery_fee': Delivery or handling fee.\n"
             "8. 'total': Final payable amount paid by customer ('Bill Total' or 'You pay').\n\n"
@@ -252,6 +268,7 @@ class LLMInvoiceExtractor:
     ) -> ParsedInvoice:
         """Converts raw LLM JSON response into a typed ParsedInvoice with arithmetic verification."""
         parsed = ParsedInvoice()
+        clean_plain_text = strip_ocr_formatting_tokens(raw_text)
         raw_rest = data.get("restaurant")
         raw_plat = data.get("platform")
         raw_loc = data.get("outlet_location")
@@ -261,16 +278,16 @@ class LLMInvoiceExtractor:
         parsed.outlet_location = raw_loc.strip() if raw_loc and isinstance(raw_loc, str) else None
 
         raw_vendor = parsed.restaurant or parsed.platform or data.get("vendor") or (fallback.vendor if fallback else None)
-        parsed.vendor = clean_vendor_name(raw_vendor, raw_text)
+        parsed.vendor = clean_vendor_name(raw_vendor, clean_plain_text)
 
-        low_text = (raw_text or "").lower()
+        low_text = (clean_plain_text or "").lower()
         is_zepto = (
             "zepto" in low_text
             or "credit note" in low_text
             or "creditnote" in low_text
             or "order again" in low_text
             or "orderagain" in low_text
-            or bool(re.search(r"#[A-Z]{8,15}\d{4,6}\b", raw_text))
+            or bool(re.search(r"#[A-Z]{8,15}\d{4,6}\b", clean_plain_text))
         )
         if is_zepto:
             parsed.platform = "Zepto"
@@ -287,7 +304,7 @@ class LLMInvoiceExtractor:
             parsed.order_number = fallback.order_number if fallback else None
 
         if not parsed.order_number:
-            m_oid = re.search(r"#?([A-Z]{8,15}\d{4,6})\b", raw_text)
+            m_oid = re.search(r"#?([A-Z]{8,15}\d{4,6})\b", clean_plain_text)
             if m_oid:
                 parsed.order_number = m_oid.group(1)
 
@@ -301,7 +318,7 @@ class LLMInvoiceExtractor:
         # Check explicit Total Bill, Bill Total, or You Pay in raw text
         m_bt = re.search(
             r"(?i)(?:total\s*bill|bill\s*total|you\s*pay)\s*[:\s]*[₹￥#Rz]?\s*(\d{2,5}(?:\.\d{2})?)(?:\s+[₹￥#Rz]?\s*(\d{2,5}(?:\.\d{2})?))?",
-            raw_text,
+            clean_plain_text,
         )
         if m_bt:
             amt1 = to_decimal(m_bt.group(1))

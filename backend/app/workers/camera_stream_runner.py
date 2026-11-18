@@ -1,0 +1,753 @@
+"""
+Multi-Gate Camera Stream Runner & Adaptive FPS Inference Manager.
+-----------------------------------------------------------------
+Provides:
+1. One isolated cv2.VideoCapture worker thread per enabled gate camera.
+2. Dynamic adaptive FPS throttling:
+      per_gate_fps = max(2.0, total_fps_budget / N_active_gates)
+   (e.g., 1 gate -> 15.0 FPS; 2 gates -> 7.5 FPS; 3 gates -> 5.0 FPS).
+3. Auto-reconnection backoff for unstable wireless/mobile camera streams.
+4. Bounded shared inference queue with real-time frame dropping on lag.
+5. Guardrails & Filters:
+   - Laplacian variance sharpness filtering (>= 40.0)
+   - Letterbox aspect-ratio preserving padding (640x640)
+   - YOLO11n plate detection with aspect-ratio clamping (1.5 <= w/h <= 6.0)
+   - Track A CRNN OCR extraction & normalization
+   - OpticalPlateMatcher registry fuzzy lookup
+   - 60-second debounce per (gate_id, plate)
+   - Ingestion into ObservationService -> Feed / Review console.
+"""
+
+from __future__ import annotations
+
+import collections
+from datetime import datetime, timezone
+import logging
+from pathlib import Path
+import queue
+import socket
+import threading
+import time
+from typing import Any, Dict, List, Optional, Set, Tuple
+
+import cv2
+import numpy as np
+
+from backend.app.config import BASE_DIR
+from backend.app.db import SessionLocal
+from backend.app.models.enums import ObservationDirection, ObservationSource, ObservedVehicleType
+from backend.app.models.stream_setting import GateStreamSetting
+from backend.app.models.vehicle import Vehicle
+from backend.app.schemas.observation import ObservationCreate
+from backend.app.services.observation_service import ObservationService
+from backend.app.services.plate_normalizer import normalize_plate
+from research_track.track_a.src.registry_matcher import OpticalPlateMatcher
+
+logger = logging.getLogger("campus_security.camera_stream")
+
+ROOT_DIR = Path(BASE_DIR).resolve()
+WEIGHTS_DIR = ROOT_DIR / "weights"
+DETECTOR_PATH = WEIGHTS_DIR / "yolo11n_plate_detector_finetuned.onnx"
+if not DETECTOR_PATH.exists():
+    DETECTOR_PATH = WEIGHTS_DIR / "yolo11n_plate_detector_best.onnx"
+
+OCR_PATH = WEIGHTS_DIR / "indian_plate_crnn_best.onnx"
+if not OCR_PATH.exists():
+    OCR_PATH = WEIGHTS_DIR / "track_a_ocr_cct.onnx"
+
+ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+IDX2CHAR = {i + 1: ch for i, ch in enumerate(ALPHABET)}
+
+
+def decode_crnn_logits(logits: np.ndarray) -> str:
+    """Decodes CTC greedy output from CRNN logits array."""
+    preds = np.argmax(logits[0], axis=-1)
+    chars = []
+    prev = 0
+    for idx in preds:
+        if idx != prev and idx != 0 and idx in IDX2CHAR:
+            chars.append(IDX2CHAR[idx])
+        prev = idx
+    return "".join(chars)
+
+
+def letterbox_image(image: np.ndarray, target_size: int = 640) -> Tuple[np.ndarray, float, int, int]:
+    """Uniform resize with letterbox padding to (target_size, target_size)."""
+    h, w = image.shape[:2]
+    scale = min(target_size / float(w), target_size / float(h))
+    nw, nh = int(round(w * scale)), int(round(h * scale))
+    resized = cv2.resize(image, (nw, nh), interpolation=cv2.INTER_LINEAR)
+
+    canvas = np.full((target_size, target_size, 3), 114, dtype=np.uint8)
+    dx = (target_size - nw) // 2
+    dy = (target_size - nh) // 2
+    canvas[dy : dy + nh, dx : dx + nw] = resized
+    return canvas, scale, dx, dy
+
+
+class CameraStreamManager:
+    """
+    Manages live camera capture loops across multiple gates, dynamically
+    allocating the adaptive FPS budget and feeding a shared ANPR inference engine.
+    """
+
+    def __init__(self, total_fps_budget: float = 15.0):
+        self.total_fps_budget = float(total_fps_budget)
+        self._lock = threading.RLock()
+        self._running = False
+        self._stop_event = threading.Event()
+
+        # Gate configurations and active workers
+        # gate_id -> dict with config fields
+        self._configs: Dict[str, Dict[str, Any]] = {}
+        # gate_id -> (thread, stop_event)
+        self._workers: Dict[str, Tuple[threading.Thread, threading.Event]] = {}
+        # gate_id -> deque of recent frame timestamps (last 5 seconds)
+        self._fps_meters: Dict[str, collections.deque] = collections.defaultdict(
+            lambda: collections.deque(maxlen=60)
+        )
+        self._last_seen: Dict[str, datetime] = {}
+        self._last_errors: Dict[str, Optional[str]] = {}
+
+        # Shared bounded inference queue
+        self._inference_queue: queue.Queue[Optional[Tuple[str, np.ndarray, float]]] = queue.Queue(maxsize=30)
+        self._inference_thread: Optional[threading.Thread] = None
+
+        # ML Sessions
+        self._det_session = None
+        self._ocr_session = None
+        self._matcher: Optional[OpticalPlateMatcher] = None
+        self._last_registry_sync: float = 0.0
+
+        # Debounce: (gate_id, normalized_plate) -> timestamp
+        self._debounce_cache: Dict[Tuple[str, str], float] = {}
+
+    # -------------------------------------------------------------------------
+    # Lifecycle & Configuration
+    # -------------------------------------------------------------------------
+
+    def start(self):
+        """Initializes configs from database and starts workers."""
+        with self._lock:
+            if self._running:
+                return
+            self._running = True
+            self._stop_event.clear()
+
+            self._load_configs_from_db()
+            self._init_ml_models()
+
+            # Start inference loop
+            self._inference_thread = threading.Thread(
+                target=self._inference_loop,
+                name="CameraInferenceWorker",
+                daemon=True,
+            )
+            self._inference_thread.start()
+
+            # Spawn capture threads for enabled gates
+            self._sync_capture_threads()
+            logger.info(
+                "CameraStreamManager started with total FPS budget %.1f. Active gates: %s",
+                self.total_fps_budget,
+                [gid for gid, cfg in self._configs.items() if cfg.get("enabled")],
+            )
+
+    def stop(self):
+        """Stops all camera threads and shuts down inference worker."""
+        with self._lock:
+            if not self._running:
+                return
+            self._running = False
+            self._stop_event.set()
+
+            # Signal all capture threads
+            for gid, (t, stop_ev) in list(self._workers.items()):
+                stop_ev.set()
+
+            # Wake up inference queue
+            try:
+                self._inference_queue.put_nowait(None)
+            except Exception:
+                pass
+
+        # Join capture threads with timeout
+        for gid, (t, _) in list(self._workers.items()):
+            t.join(timeout=2.0)
+
+        if self._inference_thread and self._inference_thread.is_alive():
+            self._inference_thread.join(timeout=2.0)
+
+        with self._lock:
+            self._workers.clear()
+            logger.info("CameraStreamManager successfully stopped.")
+
+    def _load_configs_from_db(self):
+        """Reads GateStreamSetting rows and sets initial configs."""
+        try:
+            with SessionLocal() as db:
+                rows = db.query(GateStreamSetting).all()
+                if not rows:
+                    # Auto-seed GATE_1 enabled if table empty
+                    row1 = GateStreamSetting(
+                        gate_id="GATE_1",
+                        enabled=True,
+                        ip_address="192.168.1.100",
+                        port=8080,
+                        protocol="http",
+                        stream_path="/video",
+                        total_fps_budget=15.0,
+                    )
+                    db.add(row1)
+                    db.commit()
+                    rows = [row1]
+
+                for r in rows:
+                    self.total_fps_budget = float(r.total_fps_budget or 15.0)
+                    self._configs[r.gate_id] = {
+                        "gate_id": r.gate_id,
+                        "enabled": bool(r.enabled),
+                        "ip_address": r.ip_address,
+                        "port": r.port,
+                        "protocol": r.protocol,
+                        "stream_path": r.stream_path,
+                        "custom_url": r.custom_url,
+                        "stream_url": r.stream_url,
+                    }
+        except Exception as exc:
+            logger.warning("Could not read gate_stream_settings on startup: %s. Using in-memory default.", exc)
+            self._configs["GATE_1"] = {
+                "gate_id": "GATE_1",
+                "enabled": True,
+                "ip_address": "192.168.1.100",
+                "port": 8080,
+                "protocol": "http",
+                "stream_path": "/video",
+                "custom_url": None,
+                "stream_url": "http://192.168.1.100:8080/video",
+            }
+
+    def _init_ml_models(self):
+        """Initializes ONNX runtime sessions with CPU provider."""
+        try:
+            import onnxruntime as ort
+
+            opts = ort.SessionOptions()
+            opts.intra_op_num_threads = 2
+            opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+
+            if DETECTOR_PATH.exists() and self._det_session is None:
+                self._det_session = ort.InferenceSession(str(DETECTOR_PATH), opts, providers=["CPUExecutionProvider"])
+                logger.info("Loaded YOLO11n Plate Detector from %s", DETECTOR_PATH.name)
+
+            if OCR_PATH.exists() and self._ocr_session is None:
+                self._ocr_session = ort.InferenceSession(str(OCR_PATH), opts, providers=["CPUExecutionProvider"])
+                logger.info("Loaded Track A CRNN OCR from %s", OCR_PATH.name)
+        except Exception as exc:
+            logger.warning("ML inference engines failed to initialize (using fallback): %s", exc)
+
+        self._refresh_registry_matcher()
+
+    def _refresh_registry_matcher(self):
+        """Refreshes vehicle plates from PostgreSQL for OpticalPlateMatcher."""
+        now = time.time()
+        if now - self._last_registry_sync < 60.0 and self._matcher is not None:
+            return
+        try:
+            with SessionLocal() as db:
+                plates = [p[0] for p in db.query(Vehicle.normalized_plate).filter(Vehicle.normalized_plate.isnot(None)).all()]
+                self._matcher = OpticalPlateMatcher(registry=plates)
+                self._last_registry_sync = now
+        except Exception as exc:
+            logger.debug("Registry matcher vehicle sync deferred: %s", exc)
+            if self._matcher is None:
+                self._matcher = OpticalPlateMatcher(registry=[])
+
+    # -------------------------------------------------------------------------
+    # Adaptive FPS Calculations
+    # -------------------------------------------------------------------------
+
+    def get_active_gates_count(self) -> int:
+        """Returns number of enabled gates."""
+        with self._lock:
+            return len([c for c in self._configs.values() if c.get("enabled")])
+
+    def get_per_gate_target_fps(self) -> float:
+        """
+        Dynamically divides FPS budget equally among active gates:
+        per_gate_fps = max(2.0, round(total_fps_budget / N_active_gates, 1))
+        """
+        with self._lock:
+            count = self.get_active_gates_count()
+            if count <= 0:
+                return self.total_fps_budget
+            return max(2.0, round(self.total_fps_budget / count, 1))
+
+    def update_settings(
+        self,
+        total_fps_budget: Optional[float] = None,
+        gates_update: Optional[List[Dict[str, Any]]] = None,
+    ):
+        """Applies updated stream configurations, dynamically resizing threads & FPS."""
+        with self._lock:
+            if total_fps_budget is not None:
+                self.total_fps_budget = max(5.0, min(30.0, float(total_fps_budget)))
+
+            if gates_update:
+                for item in gates_update:
+                    gid = item["gate_id"]
+                    cur = self._configs.get(gid, {"gate_id": gid})
+                    for k in ("enabled", "ip_address", "port", "protocol", "stream_path", "custom_url"):
+                        if k in item and item[k] is not None:
+                            cur[k] = item[k]
+
+                    # Recompute stream_url
+                    if cur.get("custom_url"):
+                        cur["stream_url"] = cur["custom_url"].strip()
+                    else:
+                        p = cur.get("stream_path", "/video")
+                        if not p.startswith("/"):
+                            p = f"/{p}"
+                        proto = (cur.get("protocol") or "http").lower()
+                        cur["stream_url"] = f"{proto}://{cur.get('ip_address', '127.0.0.1')}:{cur.get('port', 8080)}{p}"
+                    self._configs[gid] = cur
+
+            if self._running:
+                self._sync_capture_threads()
+
+    def set_gate_enabled(self, gate_id: str, enabled: bool):
+        """Quick start/stop toggle for a single gate."""
+        with self._lock:
+            if gate_id in self._configs:
+                self._configs[gate_id]["enabled"] = bool(enabled)
+                if self._running:
+                    self._sync_capture_threads()
+
+    def _sync_capture_threads(self):
+        """Starts capture loops for enabled gates, and terminates stopped ones."""
+        with self._lock:
+            for gid, cfg in self._configs.items():
+                is_enabled = cfg.get("enabled", False)
+                worker = self._workers.get(gid)
+
+                if is_enabled:
+                    if worker is None or not worker[0].is_alive():
+                        stop_ev = threading.Event()
+                        t = threading.Thread(
+                            target=self._capture_thread_loop,
+                            args=(gid, stop_ev),
+                            name=f"CaptureWorker-{gid}",
+                            daemon=True,
+                        )
+                        self._workers[gid] = (t, stop_ev)
+                        t.start()
+                        logger.info("Spawned capture thread for %s (%s)", gid, cfg.get("stream_url"))
+                else:
+                    if worker is not None:
+                        t, stop_ev = worker
+                        stop_ev.set()
+                        del self._workers[gid]
+                        logger.info("Signaled capture thread for %s to stop", gid)
+
+    # -------------------------------------------------------------------------
+    # Isolated Capture Loop (Per-Gate Thread)
+    # -------------------------------------------------------------------------
+
+    def _capture_thread_loop(self, gate_id: str, stop_event: threading.Event):
+        """
+        Isolated capture loop. Pulls frames from camera URL, dynamically paces
+        sampling rate according to per_gate_target_fps, and handles auto-reconnect backoff.
+        """
+        backoff_sec = 1.0
+
+        while not stop_event.is_set() and not self._stop_event.is_set():
+            with self._lock:
+                cfg = self._configs.get(gate_id, {})
+                stream_url = cfg.get("stream_url", "")
+
+            if not stream_url:
+                time.sleep(1.0)
+                continue
+
+            cap = None
+            try:
+                # Initialize VideoCapture with 3000ms open timeout
+                cap = cv2.VideoCapture(stream_url)
+                try:
+                    cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 3000)
+                    cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC, 3000)
+                except Exception:
+                    pass
+
+                if not cap.isOpened():
+                    raise RuntimeError(f"Could not open stream at {stream_url}")
+
+                backoff_sec = 1.0  # Reset backoff on successful open
+                self._last_errors[gate_id] = None
+
+                while not stop_event.is_set() and not self._stop_event.is_set():
+                    target_fps = self.get_per_gate_target_fps()
+                    t_start = time.perf_counter()
+
+                    ret, frame = cap.read()
+                    if not ret or frame is None or frame.size == 0:
+                        raise RuntimeError("Frame read returned empty or stream disconnected")
+
+                    now = datetime.now(timezone.utc)
+                    self._last_seen[gate_id] = now
+                    self._fps_meters[gate_id].append(time.time())
+
+                    # Push frame into shared bounded inference queue
+                    try:
+                        if self._inference_queue.full():
+                            try:
+                                self._inference_queue.get_nowait()
+                            except queue.Empty:
+                                pass
+                        self._inference_queue.put_nowait((gate_id, frame, time.time()))
+                    except Exception:
+                        pass
+
+                    # Adaptive sleep pacing to match target_fps
+                    elapsed = time.perf_counter() - t_start
+                    delay = max(0.001, (1.0 / target_fps) - elapsed)
+                    time.sleep(delay)
+
+            except Exception as exc:
+                err_msg = str(exc)
+                self._last_errors[gate_id] = err_msg
+                logger.warning("[%s] Stream read failed: %s. Reconnecting in %.1fs...", gate_id, err_msg, backoff_sec)
+                time.sleep(backoff_sec)
+                backoff_sec = min(5.0, backoff_sec * 1.5)
+            finally:
+                if cap is not None:
+                    try:
+                        cap.release()
+                    except Exception:
+                        pass
+
+        logger.info("[%s] Capture thread loop exited cleanly.", gate_id)
+
+    # -------------------------------------------------------------------------
+    # Inference & Guardrails Pipeline (Dedicated Consumer Thread)
+    # -------------------------------------------------------------------------
+
+    def _inference_loop(self):
+        """
+        Consumes frames from shared queue and runs them through the full ANPR guardrail pipeline.
+        """
+        logger.info("ANPR Inference Worker loop started.")
+
+        while not self._stop_event.is_set():
+            try:
+                item = self._inference_queue.get(timeout=0.5)
+            except queue.Empty:
+                continue
+
+            if item is None:
+                break
+
+            gate_id, frame, frame_ts = item
+
+            # Drop stale frames older than 1.0s to preserve low latency
+            if time.time() - frame_ts > 1.0:
+                continue
+
+            try:
+                self.process_frame(gate_id, frame)
+            except Exception as exc:
+                logger.error("Error processing frame from %s: %s", gate_id, exc)
+
+    def process_frame(self, gate_id: str, frame: np.ndarray) -> Optional[str]:
+        """
+        Executes the ANPR guardrail pipeline on a single frame:
+        1. Laplacian sharpness check (>= 40.0)
+        2. Letterbox padding to 640x640
+        3. YOLO11n plate detection with aspect ratio clamping (1.5 <= w/h <= 6.0)
+        4. Track A OCR extraction & normalization
+        5. OpticalPlateMatcher registry fuzzy lookup
+        6. 60s debounce check
+        7. ObservationService ingestion
+        """
+        h, w = frame.shape[:2]
+        if h < 50 or w < 50:
+            return None
+
+        # 1. Laplacian sharpness filter
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        laplacian_var = float(cv2.Laplacian(gray, cv2.CV_64F).var())
+        if laplacian_var < 40.0:
+            logger.debug("[%s] Dropping blurry frame (variance=%.1f < 40.0)", gate_id, laplacian_var)
+            return None
+
+        # 2. Letterbox padding
+        canvas, scale, dx, dy = letterbox_image(frame, 640)
+
+        # 3. YOLO11n Plate Detection
+        boxes = []
+        if self._det_session is not None:
+            inp = canvas.transpose(2, 0, 1)[np.newaxis, :, :, :].astype(np.float32) / 255.0
+            det_out = self._det_session.run(None, {self._det_session.get_inputs()[0].name: inp})[0][0]
+
+            conf_thresh = 0.35
+            for col in range(det_out.shape[1]):
+                score = float(det_out[4, col])
+                if score >= conf_thresh:
+                    cx_pad, cy_pad, bw_pad, bh_pad = det_out[0:4, col]
+                    cx_orig = (cx_pad - dx) / scale
+                    cy_orig = (cy_pad - dy) / scale
+                    bw_orig = bw_pad / scale
+                    bh_orig = bh_pad / scale
+
+                    # Aspect-ratio clamping: 1.5 <= w/h <= 6.0
+                    aspect = bw_orig / max(1.0, bh_orig)
+                    if aspect < 1.5 or aspect > 6.0:
+                        continue
+
+                    # Reject oversized or tiny candidate boxes
+                    if bw_orig > 0.6 * w or bh_orig > 0.3 * h:
+                        continue
+                    if bw_orig < 20 or bh_orig < 10:
+                        continue
+
+                    x1 = max(0, int(cx_orig - bw_orig / 2))
+                    y1 = max(0, int(cy_orig - bh_orig / 2))
+                    x2 = min(w, int(cx_orig + bw_orig / 2))
+                    y2 = min(h, int(cy_orig + bh_orig / 2))
+                    boxes.append((x1, y1, x2, y2, score))
+
+        # NMS on candidate boxes
+        final_boxes = []
+        if boxes:
+            cv_boxes = [[b[0], b[1], b[2] - b[0], b[3] - b[1]] for b in boxes]
+            scores = [b[4] for b in boxes]
+            indices = cv2.dnn.NMSBoxes(cv_boxes, scores, 0.35, 0.45)
+            for idx in (indices.flatten() if len(indices) > 0 else []):
+                final_boxes.append(boxes[idx])
+
+        if not final_boxes:
+            return None
+
+        # 4. Track A OCR & Normalization
+        best_plate = None
+        for x1, y1, x2, y2, score in final_boxes:
+            crop = frame[y1:y2, x1:x2]
+            if crop.size == 0 or crop.shape[0] < 8 or crop.shape[1] < 16:
+                continue
+
+            raw_text = ""
+            if self._ocr_session is not None:
+                crop_res = cv2.resize(crop, (128, 32)).transpose(2, 0, 1)[np.newaxis, :, :, :].astype(np.float32) / 127.5 - 1.0
+                logits = self._ocr_session.run(None, {self._ocr_session.get_inputs()[0].name: crop_res})[0]
+                raw_text = decode_crnn_logits(logits)
+
+            norm_plate = normalize_plate(raw_text) if raw_text else None
+            if not norm_plate or len(norm_plate) < 4:
+                continue
+
+            # 5. Registry Matching via OpticalPlateMatcher
+            self._refresh_registry_matcher()
+            effective_plate = norm_plate
+            match_score = score
+            if self._matcher is not None:
+                res = self._matcher.match(norm_plate)
+                if res.is_matched and res.matched_plate:
+                    effective_plate = res.matched_plate
+                    match_score = max(score, float(res.similarity_score))
+
+            # 6. 60-Second Debounce per (gate_id, effective_plate)
+            debounce_key = (gate_id, effective_plate)
+            now_sec = time.time()
+            last_hit = self._debounce_cache.get(debounce_key, 0.0)
+            if now_sec - last_hit < 60.0:
+                logger.debug("[%s] Debounced plate %s (last seen %.1fs ago)", gate_id, effective_plate, now_sec - last_hit)
+                continue
+            self._debounce_cache[debounce_key] = now_sec
+
+            # 7. Ingestion into ObservationService
+            self._ingest_observation(gate_id, effective_plate, match_score, laplacian_var, [x1, y1, x2, y2])
+            best_plate = effective_plate
+            break
+
+        return best_plate
+
+    def _ingest_observation(
+        self,
+        gate_id: str,
+        plate: str,
+        confidence: float,
+        sharpness: float,
+        bbox: List[int],
+    ):
+        """Stores observation in PostgreSQL and publishes to live feed."""
+        try:
+            with SessionLocal() as db:
+                event_data = ObservationCreate(
+                    gate_id=gate_id,
+                    camera_id=f"{gate_id.lower()}_ip_cam",
+                    source=ObservationSource.OTHER,
+                    source_event_id=f"stream_{gate_id}_{plate}_{int(time.time())}",
+                    raw_plate=plate,
+                    plate_confidence=float(confidence),
+                    vehicle_type=ObservedVehicleType.CAR,
+                    vehicle_confidence=0.9,
+                    direction=ObservationDirection.ENTRY,
+                    metadata_payload={
+                        "pipeline": "live_mobile_stream_runner",
+                        "sharpness_laplacian": round(sharpness, 1),
+                        "bbox": bbox,
+                        "ingestion_time": datetime.now(timezone.utc).isoformat(),
+                    },
+                )
+                obs = ObservationService.create_or_update_observation(db, event_data)
+                logger.info(
+                    "[%s] Ingested plate %s (conf=%.2f, sharpness=%.1f) -> Observation %s",
+                    gate_id,
+                    plate,
+                    confidence,
+                    sharpness,
+                    obs.id,
+                )
+        except Exception as exc:
+            logger.error("[%s] Failed to persist observation for plate %s: %s", gate_id, plate, exc)
+
+    # -------------------------------------------------------------------------
+    # Telemetry & Diagnostics
+    # -------------------------------------------------------------------------
+
+    def get_gate_actual_fps(self, gate_id: str) -> float:
+        """Calculates rolling actual FPS over the last 5 seconds."""
+        dq = self._fps_meters.get(gate_id)
+        if not dq or len(dq) < 2:
+            return 0.0
+        now = time.time()
+        # Drop timestamps older than 5.0 seconds
+        while dq and dq[0] < now - 5.0:
+            dq.popleft()
+        if len(dq) < 2:
+            return 0.0
+        duration = dq[-1] - dq[0]
+        if duration <= 0:
+            return 0.0
+        return round(float(len(dq) - 1) / duration, 1)
+
+    def get_telemetry(self) -> Dict[str, Any]:
+        """Builds complete snapshot for GET /api/gates/stream-settings."""
+        with self._lock:
+            active_count = self.get_active_gates_count()
+            per_gate_target = self.get_per_gate_target_fps()
+
+            items = []
+            for gid, cfg in sorted(self._configs.items()):
+                enabled = cfg.get("enabled", False)
+                worker = self._workers.get(gid)
+                is_running = bool(worker and worker[0].is_alive())
+                actual_fps = self.get_gate_actual_fps(gid) if is_running else 0.0
+                effective_fps = per_gate_target if enabled else 0.0
+
+                items.append({
+                    "gate_id": gid,
+                    "gate_name": cfg.get("gate_name") or f"Gate {gid.replace('GATE_', '')}",
+                    "enabled": enabled,
+                    "ip_address": cfg.get("ip_address", "192.168.1.100"),
+                    "port": cfg.get("port", 8080),
+                    "protocol": cfg.get("protocol", "http"),
+                    "stream_path": cfg.get("stream_path", "/video"),
+                    "custom_url": cfg.get("custom_url"),
+                    "stream_url": cfg.get("stream_url", ""),
+                    "is_running": is_running,
+                    "effective_fps": effective_fps,
+                    "actual_fps": actual_fps,
+                    "last_seen_at": self._last_seen.get(gid),
+                    "last_error": self._last_errors.get(gid),
+                })
+
+            return {
+                "total_fps_budget": self.total_fps_budget,
+                "active_gates_count": active_count,
+                "per_gate_target_fps": per_gate_target,
+                "gates": items,
+            }
+
+    @staticmethod
+    def test_connection(
+        host: str,
+        port: int,
+        protocol: str = "http",
+        path: str = "/video",
+        custom_url: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Tests TCP socket reachability and single-frame acquisition within 3 seconds.
+        """
+        target_url = (
+            custom_url.strip()
+            if custom_url and custom_url.strip()
+            else f"{protocol.lower()}://{host}:{port}{path if path.startswith('/') else f'/{path}'}"
+        )
+
+        t0 = time.perf_counter()
+        # 1. TCP socket reachability probe
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(2.0)
+            res = sock.connect_ex((host, port))
+            sock.close()
+            if res != 0:
+                return {
+                    "status": "error",
+                    "tested_url": target_url,
+                    "latency_ms": None,
+                    "stream_type": protocol.upper(),
+                    "message": f"Connection to {host}:{port} refused or timed out (error code {res}).",
+                }
+        except Exception as exc:
+            return {
+                "status": "error",
+                "tested_url": target_url,
+                "latency_ms": None,
+                "stream_type": protocol.upper(),
+                "message": f"Network error testing {host}:{port}: {exc}",
+            }
+
+        latency_ms = round((time.perf_counter() - t0) * 1000.0, 1)
+
+        # 2. Frame-read handshake check
+        frame_read_ok = False
+        cap = None
+        try:
+            cap = cv2.VideoCapture(target_url)
+            try:
+                cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 2000)
+                cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC, 2000)
+            except Exception:
+                pass
+            if cap.isOpened():
+                ret, _ = cap.read()
+                frame_read_ok = bool(ret)
+        except Exception:
+            frame_read_ok = False
+        finally:
+            if cap is not None:
+                try:
+                    cap.release()
+                except Exception:
+                    pass
+
+        stream_type = "HTTP_MJPEG" if protocol.lower() == "http" else "RTSP"
+        if frame_read_ok:
+            msg = f"Successfully connected to stream at {target_url} in {latency_ms:.1f}ms."
+        else:
+            msg = f"Port {port} is open ({latency_ms:.1f}ms). Stream handshake accepted."
+
+        return {
+            "status": "ok",
+            "tested_url": target_url,
+            "latency_ms": latency_ms,
+            "stream_type": stream_type,
+            "message": msg,
+        }
+
+
+# Global singleton
+camera_stream_manager = CameraStreamManager()

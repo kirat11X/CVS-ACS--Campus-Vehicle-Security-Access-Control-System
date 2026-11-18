@@ -615,3 +615,62 @@ export interface HealthAll {
   frigate_worker: { running: boolean; connected: boolean; topic: string; stats: Record<string, number> };
   whatsapp_mock?: { status: string; available: boolean };
 }
+
+// ---- Multi-Gate Camera Stream Settings (Phase 13 / Stage 1) ----
+
+export interface GateStreamConfigItem {
+  gate_id: string;
+  gate_name?: string | null;
+  enabled: boolean;
+  ip_address: string;
+  port: number;
+  protocol: "http" | "rtsp" | string;
+  stream_path: string;
+  custom_url?: string | null;
+  stream_url: string;
+  is_running: boolean;
+  effective_fps: number;
+  actual_fps: number;
+  last_seen_at?: string | null;
+  last_error?: string | null;
+}
+
+export interface GateStreamSettingsResponse {
+  total_fps_budget: number;
+  active_gates_count: number;
+  per_gate_target_fps: number;
+  gates: GateStreamConfigItem[];
+}
+
+export interface GateStreamConfigUpdateItem {
+  gate_id: string;
+  gate_name?: string | null;
+  enabled?: boolean;
+  ip_address?: string;
+  port?: number;
+  protocol?: string;
+  stream_path?: string;
+  custom_url?: string | null;
+}
+
+export interface GateStreamSettingsUpdate {
+  total_fps_budget?: number;
+  gates?: GateStreamConfigUpdateItem[];
+}
+
+export interface StreamTestRequest {
+  ip_address?: string;
+  port?: number;
+  protocol?: string;
+  stream_path?: string;
+  custom_url?: string | null;
+}
+
+export interface StreamTestResponse {
+  status: "ok" | "error";
+  gate_id?: string | null;
+  tested_url: string;
+  latency_ms?: number | null;
+  stream_type?: string | null;
+  message: string;
+}

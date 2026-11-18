@@ -642,3 +642,187 @@ def test_cvs_acs_screener_word_boundary_safety():
         assert res["category"] == "PROHIBITED_CONTRABAND"
 
 
+def test_spatial_line_by_line_ocr_formatting():
+    """
+    Verifies that spatial line-by-line grouping bundles bounding box fragments
+    within vertical proximity and outputs '[L01] <token> (conf:0.xx) | ...' lines.
+    """
+    from backend.app.services.invoice_reader import _group_rows, OcrResult
+
+    # Simulate RapidOCR fragments: (x_left, y_center, height, text, score)
+    fragments = [
+        (10, 100, 20, "Tata Tea Gold", 0.95),
+        (200, 102, 20, "180.00", 0.92),
+        (300, 101, 20, "220.00", 0.65),  # Slashed MRP
+        (10, 150, 20, "Bill Total", 0.98),
+        (250, 152, 20, "180.00", 0.97),
+    ]
+
+    rows = _group_rows(fragments)
+    assert len(rows) == 2
+    assert rows[0].formatted_line is not None
+    assert rows[0].formatted_line.startswith("[L01] ")
+    assert "Tata Tea Gold (conf:0.95)" in rows[0].formatted_line
+    assert "180.00 (conf:0.92)" in rows[0].formatted_line
+    assert "220.00 (conf:0.65)" in rows[0].formatted_line
+
+    assert rows[1].formatted_line.startswith("[L02] ")
+    assert "Bill Total (conf:0.98)" in rows[1].formatted_line
+
+    ocr_res = OcrResult("RAPIDOCR", rows, 0.95)
+    formatted_text = ocr_res.formatted_text
+    assert "[L01]" in formatted_text
+    assert "[L02]" in formatted_text
+
+
+def test_phantom_rupee_3149_and_strikethrough_mrp_screening_reconciliation():
+    """
+    Verifies that:
+    1. A phantom Rupee '3' (e.g. ₹149 read as 3149, or ₹180 read as 3180) is healed
+       to achieve arithmetic balance with the grand total.
+    2. Slashed MRP vs. discounted price pair resolution in DeliveryScreeningService.
+    """
+    from backend.app.services.delivery_screening_service import DeliveryScreeningService
+    from backend.app.services.invoice_reader import ParsedInvoice, ParsedLine
+
+    # Receipt with Tata Tea Gold misread as 3180 instead of 180, total is 180
+    parsed = ParsedInvoice(
+        lines=[
+            ParsedLine(
+                line_no=1,
+                item_name="Tata Tea Gold, Assam Tea",
+                quantity=1,
+                unit_price=Decimal("3180.00"),
+                amount=Decimal("3180.00"),
+                confidence=0.92,
+                readable=True,
+                raw_text="Tata Tea Gold, Assam Tea 1unit  3180  220",
+            )
+        ],
+        subtotal=Decimal("180.00"),
+        delivery_fee=Decimal("0.00"),
+        total=Decimal("180.00"),
+        vendor="Blinkit",
+    )
+
+    scr = DeliveryScreeningService.screen(parsed, "TG-TEST3180")
+    assert scr.totals_match is True
+    assert scr.lines[0].amount == Decimal("180.00")
+    assert scr.lines[0].unit_price == Decimal("180.00")
+    assert scr.computed_total == Decimal("180.00")
+    assert scr.overall == ScreeningVerdict.ALLOW
+
+    # Case with Blinkit line having phantom 3149 (for ₹149 item)
+    parsed_149 = ParsedInvoice(
+        lines=[
+            ParsedLine(
+                line_no=1,
+                item_name="Amul Pure Ghee 500ml",
+                quantity=1,
+                unit_price=Decimal("3149.00"),
+                amount=Decimal("3149.00"),
+                confidence=0.94,
+                readable=True,
+                raw_text="Amul Pure Ghee 500ml 1unit  3149",
+            )
+        ],
+        subtotal=Decimal("149.00"),
+        delivery_fee=Decimal("0.00"),
+        total=Decimal("149.00"),
+        vendor="Blinkit",
+    )
+
+    scr_149 = DeliveryScreeningService.screen(parsed_149, "TG-TEST3149")
+    assert scr_149.totals_match is True
+    assert scr_149.lines[0].amount == Decimal("149.00")
+    assert scr_149.computed_total == Decimal("149.00")
+    assert scr_149.overall == ScreeningVerdict.ALLOW
+
+
+def test_strikethrough_mrp_pair_swapping_in_screening():
+    """
+    Verifies that if an extraction picked the higher strikethrough MRP instead of
+    discounted selling price, screening arithmetic heals it using the discounted price.
+    """
+    from backend.app.services.delivery_screening_service import DeliveryScreeningService
+    from backend.app.services.invoice_reader import ParsedInvoice, ParsedLine
+
+    # Line where MRP 455 was mistakenly stored in amount, but paid selling price was 43
+    parsed = ParsedInvoice(
+        lines=[
+            ParsedLine(
+                line_no=1,
+                item_name="Rajdhani Dalia",
+                quantity=1,
+                unit_price=Decimal("455.00"),
+                amount=Decimal("455.00"),
+                confidence=0.90,
+                readable=True,
+                raw_text="Rajdhani Dalia 500g 1unit  455  43",
+            )
+        ],
+        subtotal=Decimal("43.00"),
+        delivery_fee=Decimal("0.00"),
+        total=Decimal("43.00"),
+        vendor="Blinkit",
+    )
+
+    scr = DeliveryScreeningService.screen(parsed, "TG-TESTMRP")
+    assert scr.totals_match is True
+    assert scr.lines[0].amount == Decimal("43.00")
+    assert scr.computed_total == Decimal("43.00")
+    assert scr.overall == ScreeningVerdict.ALLOW
+
+
+def test_track_b_reconciler_phantom_3_repair():
+    """
+    Verifies Track B InvoiceReconciler strips phantom '3' (e.g. 3149 -> 149)
+    from line items or grand total to achieve complete reconciliation.
+    """
+    from research_track.track_b.src.reconciliation import InvoiceReconciler, ReconciliationStatus
+
+    reconciler = InvoiceReconciler()
+    invoice_payload = {
+        "document_id": "INV-PHANTOM-3-TEST",
+        "supplier_name": "Quick Commerce Blinkit",
+        "invoice_number": "INV-2026-3149",
+        "invoice_date": "2026-11-18",
+        "line_items": [
+            {
+                "line_item_id": "line-1",
+                "description": "Tata Tea Gold 250g",
+                "quantity": "1",
+                "unit_price": "180.00",
+                "line_total": "3180.00",  # Misread with phantom leading 3
+            }
+        ],
+        "totals": {
+            "subtotal": "180.00",
+            "grand_total": "180.00",
+        }
+    }
+    report = reconciler.reconcile(invoice_payload, schema_valid=True)
+    assert report.status in (ReconciliationStatus.RECONCILED, ReconciliationStatus.RECONCILED_WITH_WARNINGS)
+    assert report.critical_count == 0
+    assert report.error_count == 0
+    assert invoice_payload["line_items"][0]["line_total"] == "180.00"
+
+
+def test_cvs_acs_screener_loads_45000_deliverables():
+    """
+    Verifies that CVSACSScreener defaults to the 45,000 deliverables CSV
+    and matches expanded franchise items like La Pino'z.
+    """
+    from backend.app.services.cvs_acs_screener import cvs_acs_screener
+
+    assert "45000" in str(cvs_acs_screener.csv_path)
+    assert len(cvs_acs_screener.exact_map) > 20000
+
+    # Match franchise item from 45000 master list
+    res = cvs_acs_screener.screen_item("La Pino'z Giant Slice")
+    assert res["matched_from_list"] is True
+    assert res["verdict"] == "ALLOW"
+    assert res["canonical_root"] == "giant slice"
+
+
+

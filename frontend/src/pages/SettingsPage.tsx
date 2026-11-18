@@ -12,6 +12,7 @@ import { describeServer, isNativeApp, platformName } from "../lib/platform";
 import { humanize } from "../lib/format";
 import { useTheme, type ThemePreference } from "../lib/theme";
 import { ServerSettings } from "./LoginPage";
+import { GateCamerasSection } from "../components/settings/GateCamerasSection";
 
 function ChangePassword() {
   const { token } = useSession();
@@ -95,6 +96,8 @@ export function SettingsPage() {
             />
           </div>
         </Section>
+
+        <GateCamerasSection />
 
         <Section title="Password">
           <ChangePassword />

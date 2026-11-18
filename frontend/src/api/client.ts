@@ -36,6 +36,10 @@ import type {
   VehicleLinkRequest,
   VehicleLinkResponse,
   VehicleUpdate,
+  GateStreamSettingsResponse,
+  GateStreamSettingsUpdate,
+  StreamTestRequest,
+  StreamTestResponse,
 } from "./types";
 
 export class ApiError extends Error {
@@ -173,6 +177,17 @@ export const api = {
   lanes: (token: string) => request<Lane[]>("/lanes", { token }),
   upsertLane: (token: string, cameraId: string, body: LaneUpsert) =>
     request<Lane>(`/lanes/${enc(cameraId)}`, { method: "PUT", token, body }),
+
+  // ---- Gate Stream Settings (Multi-Gate & Adaptive FPS) ----
+  streamSettings: (token?: string) => request<GateStreamSettingsResponse>("/gates/stream-settings", { token }),
+  updateStreamSettings: (token: string, body: GateStreamSettingsUpdate) =>
+    request<GateStreamSettingsResponse>("/gates/stream-settings", { method: "PUT", token, body }),
+  testGateStream: (token: string, gateId: string, body?: StreamTestRequest) =>
+    request<StreamTestResponse>(`/gates/stream-settings/${enc(gateId)}/test`, { method: "POST", token, body }),
+  startGateStream: (token: string, gateId: string) =>
+    request<GateStreamSettingsResponse>(`/gates/stream-settings/${enc(gateId)}/start`, { method: "POST", token }),
+  stopGateStream: (token: string, gateId: string) =>
+    request<GateStreamSettingsResponse>(`/gates/stream-settings/${enc(gateId)}/stop`, { method: "POST", token }),
 
   // ---- Owners ----
   searchOwners: (token: string, q: string, signal?: AbortSignal, personType?: string | null) =>

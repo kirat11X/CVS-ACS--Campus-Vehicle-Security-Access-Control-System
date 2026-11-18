@@ -2,7 +2,9 @@
 ## Punjab Engineering College (PEC), Chandigarh
 
 > **Academic & Research Scope:** B.Tech Honors Thesis / Applied Distributed Systems  
-> **Authoritative Intelligence Layer & Distributed Gate Observation Network**
+> **Authoritative Intelligence Layer & Distributed Gate Observation Network**  
+> 
+> 🤖 **Live Telegram Delivery & Invoice Intake Bot:** [@KritanshCampusbot](https://t.me/KritanshCampusbot) (`https://t.me/KritanshCampusbot`)
 
 ---
 
@@ -56,6 +58,8 @@ Every subsystem and API endpoint preserves the following foundational invariants
 | **Message Broker** | Mosquitto MQTT 2.1.2 | Port `1883` | Asynchronous sensor event bus (`frigate/#`) |
 | **Computer Vision / LPR** | Frigate NVR 0.18.0 | Port `5000` (Web/API), `8554` (RTSP) | Intel VAAPI iGPU hardware acceleration active |
 | **Document OCR** | RapidOCR (PP-OCRv4) + Tesseract 5.5 | Python 3.14 virtualenv | Dual-engine fallback for delivery invoices |
+| **Telegram Intake Bot** | `python-telegram-bot` 21+ | Polling / Webhook (`/telegram/webhook`) | Bot handle: [@KritanshCampusbot](https://t.me/KritanshCampusbot) — PEC resident onboarding & invoice intake |
+| **CVS-ACS Screener & LLM** | Ollama (`qwen3:4b-instruct-2507-q4_K_M`) + 26,172 deliverables CSV | Local daemon (port `11434`) | Rule 1 (master list) + Rule 2 (Golden Prompt Screener) + zero-VRAM leak (`keep_alive: 0`) |
 | **Workflow Automation** | n8n 1.82+ | Port `5678` | External webhook ingestion & WhatsApp routing |
 | **Web & Mobile Console** | React 19 + Vite 6 + Tailwind 3; Capacitor 7 (Android / iOS) | Port `5173` (dev), `4173` (preview) | One codebase: website, installable web app and native app ([`frontend/README.md`](frontend/README.md)) |
 
@@ -117,11 +121,50 @@ The app has no proxy: on first launch enter the backend address (e.g. `http://19
 
 ---
 
+## 4.1. Telegram Intake & CVS-ACS Campus Screener (`@KritanshCampusbot`)
+
+> 🔗 **Telegram Bot Link:** [https://t.me/KritanshCampusbot](https://t.me/KritanshCampusbot) (Handle: `@KritanshCampusbot`)
+
+The system integrates an autonomous, human-in-the-loop Telegram Bot gateway operating as the primary invoice intake and institutional identity verification mechanism for Punjab Engineering College (PEC).
+
+### 1. Interactive PEC Resident Onboarding
+When users access the bot via `/start`:
+* **Name Prompt:** Requests user's full name with zero pre-filled suggestion buttons.
+* **Institutional ID Verification:** Validates Student ID (SID, e.g. `24103999`), Security Guard ID (`GRD-...`), Faculty/Staff ID (`FAC-...`, `STF-...`), or Residence ID without gate pre-fills.
+* **PEC Hostels & Campus Venues (8 Options):**
+  - **4 Boys' Hostels:** *Shivalik*, *Aravali*, *Kurukshetra*, *Himalaya*
+  - **2 Girls' Hostels:** *Kalpana Chawla*, *Vindhya*
+  - **Residence Number:** For campus faculty and staff housing
+  - **Others:** Free-text location entry (e.g. *NAB / New Academic Block*, specific departmental buildings, or Designated Gates `Gate 1`, `Gate 2`, `Gate 3`)
+* **Returning Member Pop-up:** Existing residents are recognized upon opening the bot with a prompt: *"Do you want to edit something?"* presenting interactive inline actions: `[📍 Change Location]`, `[✏️ Edit Profile]`, and `[✅ Keep As Is / Ready]`. All member profiles persist in the PostgreSQL `telegram_users` table.
+
+### 2. CVS-ACS Campus Security Screener
+Screens courier deliveries in real time using `cvs_acs_master_20000_deliverables.csv` (26,172 indexed products):
+* **Rule 1 (Strict Master List Compliance):** Matches invoice line items against canonical roots and deliverable items (ignoring pack sizes like `[500g]`, `1L`, `Half/Full`), strictly enforcing the catalog's `category`, `verdict` (`ALLOW`, `REVIEW`, `ALERT`), and `risk_tag`.
+* **Rule 2 (Golden Prompt LLM Screener):** If unlisted, queries the local mini LLM (`qwen3:4b-instruct-2507-q4_K_M`) via Ollama with strict conservative safety rules (safe food/groceries $\to$ `ALLOW`, weapons/flammables/chemicals/tobacco $\to$ `ALERT`, unknown/OTC $\to$ `REVIEW`).
+* **Zero VRAM Footprint:** Enforces `"keep_alive": 0` on inference to immediately evict LLM weights from memory, preserving GPU/RAM for Frigate computer vision.
+
+### 3. Dual-Engine Invoice Extraction Pipeline
+* **Digital PDFs:** Extracted via `pdftotext -layout` for 100% artifact-free digital text.
+* **Photos & Screenshots (Swiggy, Zomato, Blinkit):** Runs through an OCR $\to$ LLM pickup pipeline that strips platform fee and tax rows (`Item Total`, `Platform fee with GST`, `Packaging`, `Discount Applied`, `Bill Total`), isolating *only* deliverable items.
+* **Phantom Rupee Digit Reconciliation:** Automatically reconciles OCR glyph artifacts (`₹` misread as `3`, `7`, `#`, e.g., ₹180 misread as 3180, or ₹850 misread as 7850) with discount-aware bound checks.
+* **Merchant & Location Intelligence:** Extracts merchant/restaurant name (*Roll Nation, Theobroma, La Pino'z Pizza, Blinkit, Zepto*) and outlet locality, storing them in PostgreSQL (`delivery_orders` and `access_decisions.context_data`) for campus delivery trends.
+
+---
+
 ## 5. Verification Test Suites
 
 Every phase is validated by a dedicated automated test script:
 
 ```bash
+# Telegram Connector & Onboarding Test Suite (11/11 PASS)
+PYTHONPATH=. .venv/bin/pytest backend/tests/test_telegram_connector.py
+
+# Stage 1 Invoice Screening & OCR Tests (6/6 PASS)
+PYTHONPATH=. .venv/bin/pytest backend/tests/test_stage1_invoice_screening_and_ocr.py
+
+# Check Telegram Bot Gateway Status
+curl -s http://localhost:8000/telegram/status
 # Phase 1: Database Models & Relationships (11/11 PASS)
 PYTHONPATH=. .venv/bin/python scripts/test_phase1_models.py
 
@@ -186,7 +229,7 @@ The project has completed its core architecture, database migrations, security h
 - [x] **Phase 7:** Delivery invoice screening: dual-engine OCR (RapidOCR + Tesseract fallback) $\rightarrow$ line-item extraction $\rightarrow$ arithmetic check $\rightarrow$ deterministic policy table $\rightarrow$ append-only guard decisions (`/deliveries`, `/alerts`); mobile LAN intake page (`/intake`); edit-distance `registry_match` on feed; demo seed (11/11 scenarios PASS).
 - [x] **Phase 8:** Invoice Processing API — delivered as `POST /deliveries/process` and `POST /intake/upload` (multimodal VLM fine-tuning queued for AWS EC2).
 - [ ] **Phase 9:** Automated Delivery Order Matching (`DeliveryVerificationService` connecting courier invoices to hostel resident room rosters).
-- [x] **Phase 10:** WhatsApp Integration — provider abstraction (`local`, `mock`, `meta` stub, `POST /webhooks/whatsapp`) active; production Meta Business Cloud API credentials to be provisioned.
+- [x] **Phase 10:** Telegram & WhatsApp Integration — live interactive Telegram bot ([@KritanshCampusbot](https://t.me/KritanshCampusbot)) with PEC resident onboarding (8 campus venues), CVS-ACS screener over 26,172 deliverables, photo OCR $\to$ LLM pickup pipeline, phantom Rupee digit reconciliation, and merchant intelligence extraction (11/11 tests PASS); WhatsApp provider abstraction (`local`, `mock`, `meta` stub, `POST /webhooks/whatsapp`) active.
 - [ ] **Phase 11:** Multi-gate Security Review Queue (`GET /security/reviews`, `POST /security/reviews/{id}/resolve`).
 - [ ] **Phase 12:** Standardized Immutable Audit Reason Codes.
 - [x] **Phase 13:** FastAPI OpenAPI Documentation grouping (16 modular routers with OpenAPI tags).

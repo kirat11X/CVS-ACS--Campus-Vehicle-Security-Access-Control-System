@@ -364,10 +364,28 @@ class CameraStreamManager:
             with self._lock:
                 cfg = self._configs.get(gate_id, {})
                 stream_url = cfg.get("stream_url", "")
+                host = cfg.get("ip_address")
+                port = cfg.get("port", 8080)
+                custom_url = cfg.get("custom_url")
 
             if not stream_url:
                 time.sleep(1.0)
                 continue
+
+            # Quick pre-flight socket probe (0.5s) to avoid 30s C++ ffmpeg connect freeze on offline cameras
+            if host and not custom_url:
+                try:
+                    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    s.settimeout(0.5)
+                    s_res = s.connect_ex((host, int(port)))
+                    s.close()
+                    if s_res != 0:
+                        raise RuntimeError(f"Camera endpoint {host}:{port} is unreachable (code {s_res})")
+                except Exception as exc:
+                    self._last_errors[gate_id] = str(exc)
+                    time.sleep(backoff_sec)
+                    backoff_sec = min(5.0, backoff_sec * 1.5)
+                    continue
 
             cap = None
             try:
@@ -690,7 +708,7 @@ class CameraStreamManager:
         # 1. TCP socket reachability probe
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.settimeout(2.0)
+            sock.settimeout(1.0)
             res = sock.connect_ex((host, port))
             sock.close()
             if res != 0:

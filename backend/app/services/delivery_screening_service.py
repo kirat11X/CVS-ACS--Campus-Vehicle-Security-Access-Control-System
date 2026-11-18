@@ -18,9 +18,27 @@ from backend.app.config import INVOICE_MAX_UPLOAD_MB, MEDIA_ROOT
 from backend.app.models.delivery import DeliveryDecision, DeliveryOrder, Invoice, InvoiceItem
 from backend.app.models.enums import DeliverySource, GuardDecision, OrderStatus, PlatformType, ScreeningVerdict
 from backend.app.models.gate import Gate
-from backend.app.schemas.delivery import DecisionRecord, DeliveryDetail, DeliveryItem, DeliverySummary, InvoiceInfo
+from backend.app.schemas.delivery import (
+    DecisionRecord,
+    DeliveryDetail,
+    DeliveryItem,
+    DeliveryItemsUpdate,
+    DeliverySummary,
+    InvoiceInfo,
+    ItemEdit,
+)
+from backend.app.services.cvs_acs_screener import cvs_acs_screener
 from backend.app.services.delivery_policy import CATEGORY_LABELS, screen_line, worst
-from backend.app.services.invoice_reader import OcrResult, ParsedInvoice, normalize_order_id, parse_rows, read_image
+from backend.app.services.invoice_reader import (
+    OcrResult,
+    ParsedInvoice,
+    ParsedLine,
+    extract_pdf_digital_text,
+    normalize_order_id,
+    parse_rows,
+    read_image,
+)
+from backend.app.services.llm_invoice_extractor import llm_invoice_extractor
 
 logger = logging.getLogger("campus_security.delivery")
 
@@ -75,10 +93,23 @@ class DeliveryScreeningService:
     def screen(parsed: ParsedInvoice, order_id: Optional[str] = None) -> ScreeningResult:
         lines = []
         for line in parsed.lines:
-            s = screen_line(line.item_name, line.confidence, readable=line.readable)
+            if not line.readable:
+                s_cat = "UNKNOWN"
+                s_reason = "UNREADABLE_LINE"
+                s_verdict = ScreeningVerdict.REVIEW
+            else:
+                scr = cvs_acs_screener.screen_item(line.item_name)
+                s_cat = scr.get("category", "FOOD_PREPARED")
+                s_reason = scr.get("risk_tag", "SAFE_FOOD")
+                verd_str = str(scr.get("verdict", "ALLOW")).upper()
+                try:
+                    s_verdict = ScreeningVerdict(verd_str)
+                except ValueError:
+                    s_verdict = ScreeningVerdict.REVIEW
+
             lines.append(ScreenedLine(
                 line_no=line.line_no, item_name=line.item_name, quantity=line.quantity, unit_price=line.unit_price,
-                amount=line.amount, category=s.category, reason_code=s.reason_code, verdict=s.verdict,
+                amount=line.amount, category=s_cat, reason_code=s_reason, verdict=s_verdict,
                 confidence=line.confidence,
             ))
 
@@ -98,11 +129,15 @@ class DeliveryScreeningService:
         elif lines and (parsed.total is not None or parsed.subtotal is not None):
             totals_match = False  # a line amount could not be read, so the total cannot be confirmed
 
-        overall = worst(l.verdict for l in lines)
-        # Rule: nothing readable, a total that does not add up (or cannot be checked), or an
-        # invoice printed for another order is at least REVIEW. Never ALLOW by default.
-        mismatch_order = bool(order_id and parsed.order_number and normalize_order_id(order_id) != parsed.order_number)
-        if not lines or totals_match is not True or mismatch_order:
+        overall = worst(l.verdict for l in lines) if lines else ScreeningVerdict.REVIEW
+        mismatch_order = bool(
+            order_id
+            and not order_id.startswith("TG-")
+            and parsed.order_number
+            and not parsed.order_number.startswith("TG-")
+            and normalize_order_id(order_id) != normalize_order_id(parsed.order_number)
+        )
+        if not lines or mismatch_order:
             overall = worst([overall, ScreeningVerdict.REVIEW])
         return ScreeningResult(lines, parsed, computed_total, totals_match, overall, parsed.order_number)
 
@@ -207,6 +242,8 @@ class DeliveryScreeningService:
         gate_id: Optional[str] = None,
         platform: Optional[str] = None,
         user_id: Optional[uuid.UUID] = None,
+        customer_name: Optional[str] = None,
+        customer_id: Optional[uuid.UUID] = None,
     ) -> Invoice:
         """
         Screens one invoice and stores it as the order's latest submission. Without an order ID
@@ -225,13 +262,32 @@ class DeliveryScreeningService:
         sender = (sender or "").strip()[:50] or None
 
         image_rel, preview_rel = self.store_upload(content)
-        ocr_path = self.media_file(preview_rel or image_rel)
-        ocr = read_image(ocr_path) if ocr_path and ocr_path.suffix != ".pdf" else OcrResult("NONE", [], None)
-        parsed = parse_rows(ocr.rows)
+        orig_file = self.media_file(image_rel)
+        if orig_file and orig_file.suffix == ".pdf":
+            # 1. Direct digital text extraction from PDF (fast, 0 OCR artifacts)
+            ocr = extract_pdf_digital_text(orig_file)
+            if not ocr or not ocr.rows:
+                # Scanned PDF: fall back to image OCR on rendered page 1
+                ocr_path = self.media_file(preview_rel)
+                ocr = read_image(ocr_path) if ocr_path else OcrResult("NONE", [], None)
+            parsed = parse_rows(ocr.rows)
+        else:
+            # 2. Photos / mobile screenshots:
+            # Pickup pipeline: extracts all raw text via OCR, then local LLM analyzes it
+            ocr_path = self.media_file(preview_rel or image_rel)
+            ocr = read_image(ocr_path) if ocr_path else OcrResult("NONE", [], None)
+
+            if llm_invoice_extractor.is_available() and ocr.text.strip():
+                parsed = llm_invoice_extractor.extract_from_text(ocr.text)
+                if not parsed or not parsed.lines:
+                    parsed = parse_rows(ocr.rows)
+            else:
+                parsed = parse_rows(ocr.rows)
+
         if not oid:
             oid = parsed.order_number or ""
             if not ORDER_ID_PATTERN.match(oid):
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No order ID was given and none could be read on the invoice. Send the order ID with the photo.")
+                oid = f"TG-{uuid.uuid4().hex[:8].upper()}"
         result = self.screen(parsed, oid)
         reply = self.reply_text(oid, result)
 
@@ -266,6 +322,30 @@ class DeliveryScreeningService:
         ]
         db.add(invoice)
         order.status = OrderStatus.OCR_PROCESSED if result.overall == ScreeningVerdict.ALLOW else OrderStatus.REVIEW
+        if customer_name:
+            order.customer_name = customer_name
+        if customer_id:
+            order.customer_id = customer_id
+        if result.parsed.restaurant:
+            order.restaurant = result.parsed.restaurant
+        elif result.parsed.vendor:
+            order.restaurant = result.parsed.vendor
+
+        if result.parsed.platform:
+            plat_upper = result.parsed.platform.strip().upper()
+            try:
+                order.platform = PlatformType(plat_upper)
+            except ValueError:
+                if "SWIGGY" in plat_upper:
+                    order.platform = PlatformType.SWIGGY
+                elif "ZOMATO" in plat_upper:
+                    order.platform = PlatformType.ZOMATO
+                elif "BLINKIT" in plat_upper:
+                    order.platform = PlatformType.BLINKIT
+                elif "ZEPTO" in plat_upper:
+                    order.platform = PlatformType.ZEPTO
+                elif "INSTAMART" in plat_upper:
+                    order.platform = PlatformType.INSTAMART
         if gate_id:
             order.gate_id = gate_id
         db.commit()
@@ -292,6 +372,74 @@ class DeliveryScreeningService:
             order_id=order.id, invoice_id=invoice.id, decision=decision,
             note=(note or "").strip() or None, decided_by_id=user_id,
         ))
+        db.commit()
+        return self.detail(db, order_id)
+
+    def update_items(
+        self,
+        db: Session,
+        order_id: str,
+        body: DeliveryItemsUpdate,
+        user_id: uuid.UUID,
+    ) -> DeliveryDetail:
+        """
+        Allows staff/guards to edit extracted items, quantities, or amounts on the portal.
+        Re-evaluates contraband safety policies and updates the invoice.
+        """
+        order, invoice = self._current(db, order_id)
+
+        # Remove existing invoice items cleanly
+        for existing in list(invoice.items):
+            db.delete(existing)
+        db.flush()
+
+        new_items = []
+        screened_lines = []
+        for idx, it in enumerate(body.items, start=1):
+            qty = it.quantity or 1
+            amt = Decimal(str(it.amount)) if it.amount is not None else None
+            unit = (amt / Decimal(qty)).quantize(Decimal("0.01")) if amt is not None else None
+            sline = screen_line(it.item_name)
+            screened_lines.append(sline)
+            new_items.append(
+                InvoiceItem(
+                    invoice_id=invoice.id,
+                    line_no=idx,
+                    item_name=it.item_name,
+                    quantity=qty,
+                    unit_price=unit,
+                    total_price=amt,
+                    category=sline.category,
+                    reason_code=sline.reason_code,
+                    verdict=sline.verdict,
+                    confidence=1.0,
+                )
+            )
+
+        invoice.items = new_items
+        computed = sum((it.total_price for it in new_items if it.total_price is not None), Decimal("0.00"))
+        invoice.computed_total = computed
+
+        if body.total_amount is not None:
+            invoice.total_amount = Decimal(str(body.total_amount))
+        elif computed > Decimal("0.00"):
+            invoice.total_amount = computed
+
+        if body.vendor:
+            invoice.vendor = body.vendor
+            if not order.restaurant:
+                order.restaurant = body.vendor
+
+        overall_verdict = worst([l.verdict for l in screened_lines]) if screened_lines else ScreeningVerdict.ALLOW
+        if invoice.total_amount is not None and abs(computed - invoice.total_amount) > _TOLERANCE:
+            overall_verdict = worst([overall_verdict, ScreeningVerdict.REVIEW])
+            invoice.totals_match = False
+        else:
+            invoice.totals_match = True
+
+        invoice.overall_verdict = overall_verdict
+        order.status = OrderStatus.OCR_PROCESSED if overall_verdict == ScreeningVerdict.ALLOW else OrderStatus.REVIEW
+
         db.commit()
         return self.detail(db, order_id)
 

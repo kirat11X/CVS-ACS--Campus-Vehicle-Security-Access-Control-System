@@ -43,6 +43,9 @@ class ParsedLine:
 class ParsedInvoice:
     lines: List[ParsedLine] = field(default_factory=list)
     vendor: Optional[str] = None
+    restaurant: Optional[str] = None
+    platform: Optional[str] = None
+    outlet_location: Optional[str] = None
     order_number: Optional[str] = None
     subtotal: Optional[Decimal] = None
     delivery_fee: Optional[Decimal] = None
@@ -128,6 +131,32 @@ def run_tesseract(image_path: Path) -> OcrResult:
         rows.append(OcrRow(text=text, confidence=round(mean(scores), 4) if scores else None))
     return OcrResult("TESSERACT", rows, round(mean(all_scores), 4) if all_scores else None)
 
+def extract_pdf_digital_text(pdf_path: Path) -> Optional[OcrResult]:
+    """
+    Extracts selectable digital text directly from a PDF invoice using pdftotext.
+    Returns an OcrResult with confidence=1.0 and engine='PDF_DIGITAL' if digital text
+    is found (eliminates OCR noise completely). Returns None if the PDF is scanned/empty.
+    """
+    import subprocess
+    try:
+        res = subprocess.run(
+            ["pdftotext", "-layout", str(pdf_path), "-"],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=5,
+        )
+        raw = res.stdout
+        lines = [line.rstrip() for line in raw.splitlines() if line.strip()]
+        # Check if it has genuine digital text (> 2 lines and >= 25 chars)
+        if len(lines) >= 2 and sum(len(l) for l in lines) >= 25:
+            rows = [OcrRow(text=l, confidence=1.0) for l in lines]
+            return OcrResult("PDF_DIGITAL", rows, confidence=1.0)
+    except Exception as exc:
+        logger.debug("pdftotext extraction not available or failed for %s: %s", pdf_path, exc)
+    return None
+
+
 def read_image(image_path: Path) -> OcrResult:
     """RapidOCR first; Tesseract when RapidOCR fails, reads nothing, or yields no item line."""
     primary: Optional[OcrResult] = None
@@ -182,11 +211,12 @@ def to_decimal(text: Optional[str]) -> Optional[Decimal]:
     if not text:
         return None
     # Strip currency symbols and artifacts only when directly preceding digits
-    clean = re.sub(r"(?i)(?:rs\.?|inr|[₹弄Ff¥?])(?=\s*\d)", "", text)
+    clean = re.sub(r"(?i)(?:rs\.?|inr|[₹弄Ff¥?#Rrz])(?=\s*\d)", "", text)
     clean = re.sub(r"\s", "", clean)
     if re.fullmatch(r"\d+,\d{2}", clean):  # 56,00 decimal comma
         clean = clean.replace(",", ".")
     clean = clean.replace(",", "")
+    clean = re.sub(r"^[^\d]+", "", clean)
     try:
         return Decimal(clean).quantize(Decimal("0.01"))
     except InvalidOperation:
@@ -248,18 +278,39 @@ def parse_item_text(text: str) -> Optional[dict]:
 
 def reconcile_phantom_currency_digits(parsed: ParsedInvoice) -> ParsedInvoice:
     """
-    Arithmetic sanity check to detect and strip phantom leading '2' or '7' digits
-    caused by Rupee (₹) OCR misreads when line arithmetic (qty * unit_price) or
-    subtotal / grand total reconciliation confirms it.
+    Arithmetic sanity check to detect and strip phantom leading '2', '3', or '7' digits
+    caused by Rupee (₹) OCR misreads when line arithmetic (qty * unit_price), grand total,
+    or subtotal reconciliation confirms it.
     """
+    # 0. Sanity check: individual item amount cannot exceed the entire invoice bill total!
+    ref_total = parsed.total or parsed.subtotal
+    if ref_total is not None and ref_total > Decimal("0.00"):
+        max_plausible = max(ref_total * Decimal("1.6"), ref_total + (parsed.discount or Decimal("500.00")))
+        for line in parsed.lines:
+            if line.amount is not None and line.amount > ref_total:
+                s_amt = f"{line.amount:.2f}"
+                if s_amt[0] in ("2", "3", "7") and len(s_amt) > 4:
+                    try:
+                        cand_amt = Decimal(s_amt[1:])
+                        if cand_amt <= max_plausible:
+                            logger.info(
+                                "Stripped phantom leading '%s' because amount %s exceeded bill total %s: %s -> %s",
+                                s_amt[0], line.amount, ref_total, line.amount, cand_amt
+                            )
+                            line.amount = cand_amt
+                            if line.unit_price is None or line.unit_price == line.amount or line.unit_price > ref_total:
+                                line.unit_price = (cand_amt / Decimal(line.quantity or 1)).quantize(Decimal("0.01"))
+                    except Exception:
+                        pass
+
     # 1. Line-item arithmetic verification: qty * unit_price == amount
     for line in parsed.lines:
         if line.quantity is not None and line.unit_price is not None and line.amount is not None:
             expected = (Decimal(line.quantity) * line.unit_price).quantize(Decimal("0.01"))
             if abs(line.amount - expected) > Decimal("0.02"):
-                # Check if amount has a phantom leading 2 or 7 (e.g. ₹20.00 read as 220.00)
+                # Check if amount has a phantom leading 2, 3, or 7 (e.g. ₹20.00 read as 320.00 or 220.00)
                 s_amt = f"{line.amount:.2f}"
-                if s_amt[0] in ("2", "7") and len(s_amt) > 4:
+                if s_amt[0] in ("2", "3", "7") and len(s_amt) > 4:
                     try:
                         cand_amt = Decimal(s_amt[1:])
                         if abs(cand_amt - expected) <= Decimal("0.02"):
@@ -268,9 +319,9 @@ def reconcile_phantom_currency_digits(parsed: ParsedInvoice) -> ParsedInvoice:
                             line.amount = cand_amt
                     except Exception:
                         pass
-                # Check if unit_price has a phantom leading 2 or 7
+                # Check if unit_price has a phantom leading 2, 3, or 7
                 s_up = f"{line.unit_price:.2f}"
-                if abs(line.amount - expected) > Decimal("0.02") and s_up[0] in ("2", "7") and len(s_up) > 4:
+                if abs(line.amount - expected) > Decimal("0.02") and s_up[0] in ("2", "3", "7") and len(s_up) > 4:
                     try:
                         cand_up = Decimal(s_up[1:])
                         if abs(Decimal(line.quantity) * cand_up - line.amount) <= Decimal("0.02"):
@@ -295,11 +346,11 @@ def reconcile_phantom_currency_digits(parsed: ParsedInvoice) -> ParsedInvoice:
         if len(amounts) == len(parsed.lines):
             current_sum = sum(amounts, Decimal("0.00"))
             if abs(current_sum - target_subtotal) > Decimal("0.02"):
-                # Search for a single line with a phantom leading 2 or 7 that resolves the mismatch
+                # Search for a single line with a phantom leading 2, 3, or 7 that resolves the mismatch
                 repaired = False
                 for line in parsed.lines:
                     s_amt = f"{line.amount:.2f}"
-                    if s_amt[0] in ("2", "7") and len(s_amt) > 4:
+                    if s_amt[0] in ("2", "3", "7") and len(s_amt) > 4:
                         try:
                             cand_amt = Decimal(s_amt[1:])
                             new_sum = current_sum - line.amount + cand_amt
@@ -317,7 +368,7 @@ def reconcile_phantom_currency_digits(parsed: ParsedInvoice) -> ParsedInvoice:
                 if not repaired:
                     if parsed.subtotal is not None:
                         s_sub = f"{parsed.subtotal:.2f}"
-                        if s_sub[0] in ("2", "7") and len(s_sub) > 4:
+                        if s_sub[0] in ("2", "3", "7") and len(s_sub) > 4:
                             try:
                                 cand_sub = Decimal(s_sub[1:])
                                 if abs(cand_sub - current_sum) <= Decimal("0.02"):
@@ -334,7 +385,7 @@ def reconcile_phantom_currency_digits(parsed: ParsedInvoice) -> ParsedInvoice:
                             - (parsed.discount or Decimal("0.00"))
                         )
                         s_tot = f"{parsed.total:.2f}"
-                        if s_tot[0] in ("2", "7") and len(s_tot) > 4:
+                        if s_tot[0] in ("2", "3", "7") and len(s_tot) > 4:
                             try:
                                 cand_tot = Decimal(s_tot[1:])
                                 if abs(cand_tot - expected_total) <= Decimal("0.02"):
@@ -345,6 +396,122 @@ def reconcile_phantom_currency_digits(parsed: ParsedInvoice) -> ParsedInvoice:
                                 pass
 
     return parsed
+
+def parse_mobile_order_layout(rows: List[OcrRow]) -> ParsedInvoice:
+    """
+    Parser for modern Indian mobile app delivery screenshots (Blinkit, Swiggy Instamart,
+    Zepto, Zomato) where items span 2 rows without traditional column headers:
+      Row 1: <Item Name>  <Price>
+      Row 2: <Weight/Specification> · <Quantity>unit
+    Followed by a Bill summary block ('Items total', 'Handling fee', 'Delivery fee', 'You pay').
+    """
+    parsed = ParsedInvoice()
+    raw_texts = [r.text.strip() for r in rows if r.text.strip()]
+    if not raw_texts:
+        return parsed
+
+    # 1. Detect platform/vendor from app UI markers
+    for r in raw_texts[:7]:
+        low = r.lower()
+        if "blinkit" in low or re.search(r"delivered\s*in|deliveredin|\bminutes?\b", low):
+            parsed.vendor = "Blinkit"
+            break
+        elif "swiggy" in low or "instamart" in low:
+            parsed.vendor = "Swiggy Instamart"
+            break
+        elif "zepto" in low:
+            parsed.vendor = "Zepto"
+            break
+        elif "zomato" in low:
+            parsed.vendor = "Zomato"
+            break
+
+    if not parsed.vendor:
+        all_low = " ".join(raw_texts).lower()
+        if "blinkit" in all_low or "delivered" in all_low or "items in order" in all_low:
+            parsed.vendor = "Blinkit"
+        elif "swiggy" in all_low or "instamart" in all_low:
+            parsed.vendor = "Swiggy Instamart"
+        elif "zepto" in all_low:
+            parsed.vendor = "Zepto"
+        elif "zomato" in all_low:
+            parsed.vendor = "Zomato"
+
+    # 2. Identify Bill summary section
+    summary_idx = next(
+        (i for i, r in enumerate(raw_texts) if re.search(r"(?i)bill\s+summary|order\s+summary|payment\s+details", r)),
+        len(raw_texts),
+    )
+    items_start = next(
+        (i for i, r in enumerate(raw_texts[:summary_idx]) if re.search(r"(?i)\b\d+\s+items?\s+in\s+order\b", r)),
+        -1,
+    )
+    start_i = items_start + 1 if items_start != -1 else 0
+
+    i = start_i
+    while i < summary_idx:
+        line = raw_texts[i]
+        if re.search(r"(?i)order\s*details|delivered in|arrived at", line):
+            i += 1
+            continue
+
+        # Skip summary lines if they appear early
+        if re.search(r"(?i)^(?:sub\s*-?total|total|grand\s+total|tax|delivery|handling|items?\s+total|you\s+pay)", line.strip()):
+            i += 1
+            continue
+
+        # Match Item Name followed by Price at line end: e.g. TataTeaGold-AssamTea  180 or Saffola  #20
+        m = re.search(r"^(.*?)\s+([₹￥弄F#Rz\?]?\s*r?s?\.?\s*\d{1,5}(?:\.\d{2})?)$", line, re.IGNORECASE)
+        if m and re.search(r"[A-Za-z]", m.group(1)):
+            name = m.group(1).strip(" -:·")
+            price_dec = to_decimal(m.group(2))
+            qty = 1
+
+            # Check next line for variant, unit quantity, or struck-out MRP
+            if i + 1 < summary_idx:
+                next_l = raw_texts[i + 1]
+                m_q = re.search(r"(\d+)\s*(?:unit|piece|item|x|qty)s?\b", next_l, re.IGNORECASE)
+                if m_q:
+                    qty = int(m_q.group(1))
+                    i += 1
+                elif not re.search(r"\d{2,}", next_l) and len(next_l) < 30:
+                    i += 1  # packaging / unit weight line
+
+            parsed.lines.append(
+                ParsedLine(
+                    line_no=len(parsed.lines) + 1,
+                    item_name=name,
+                    quantity=qty,
+                    unit_price=price_dec,
+                    amount=price_dec,
+                    confidence=1.0,
+                    readable=True,
+                    raw_text=line,
+                )
+            )
+        i += 1
+
+    # 3. Bill summary totals
+    for r in raw_texts[summary_idx:]:
+        clean = normalize_currency_artifacts(r)
+        if re.search(r"(?i)you\s+pay|grand\s+total|final\s+total|\btotal\b", clean):
+            amts = re.findall(r"\d+(?:\.\d{2})?", clean)
+            if amts:
+                parsed.total = Decimal(amts[-1])
+        elif re.search(r"(?i)items?\s+total|sub\s*-?total", clean):
+            amts = re.findall(r"\d+(?:\.\d{2})?", clean)
+            if amts:
+                parsed.subtotal = Decimal(amts[-1])
+        elif re.search(r"(?i)delivery\s+fee", clean):
+            if "free" in clean.lower():
+                parsed.delivery_fee = Decimal("0.00")
+            else:
+                amts = re.findall(r"\d+(?:\.\d{2})?", clean)
+                if amts:
+                    parsed.delivery_fee = Decimal(amts[-1])
+
+    return reconcile_phantom_currency_digits(parsed)
+
 
 def parse_rows(rows: List[OcrRow]) -> ParsedInvoice:
     """
@@ -361,6 +528,9 @@ def parse_rows(rows: List[OcrRow]) -> ParsedInvoice:
     header_idx = next((i for i, r in enumerate(rows) if _HEADER_ITEM.search(r.text) and _HEADER_COLS.search(r.text)), None)
     for r in rows[: header_idx if header_idx is not None else len(rows)]:
         t = _single_space(r.text)
+        # Avoid phone status bar junk like '8:48... 中 B.ll Ve 54%'
+        if re.search(r"^\d{1,2}:\d{2}|\b(?:am|pm)\b|\b\d{1,2}%\b|\.ll\b", t, re.IGNORECASE):
+            continue
         if (re.search(r"[A-Za-z]{3}", t) and not re.search(r"(?i)invoice|order|date|bill|gstin|phone|tel", t)
                 and not _ANY_AMOUNT.search(t)):
             parsed.vendor = t[:100]
@@ -401,6 +571,13 @@ def parse_rows(rows: List[OcrRow]) -> ParsedInvoice:
                     unit_price=None, amount=to_decimal(amounts[-1]) if amounts else None,
                     confidence=r.confidence, readable=False, raw_text=text,
                 ))
+
+    readable_count = sum(1 for l in parsed.lines if l.readable)
+    if header_idx is None or readable_count == 0:
+        mobile_parsed = parse_mobile_order_layout(rows)
+        if len(mobile_parsed.lines) > readable_count:
+            return mobile_parsed
+
     return reconcile_phantom_currency_digits(parsed)
 
 def parse_text(text: str) -> ParsedInvoice:

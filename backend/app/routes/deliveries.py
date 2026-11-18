@@ -10,7 +10,7 @@ from backend.app.config import INVOICE_MAX_UPLOAD_MB, MEDIA_ROOT
 from backend.app.dependencies import CurrentUser, get_db, require_admin, require_staff
 from backend.app.models.delivery import DeliveryDecision, DeliveryOrder, Invoice, InvoiceItem
 from backend.app.models.enums import DeliverySource, ScreeningVerdict
-from backend.app.schemas.delivery import DecisionCreate, DeliveryDetail, DeliverySummary
+from backend.app.schemas.delivery import DecisionCreate, DeliveryDetail, DeliveryItemsUpdate, DeliverySummary
 from backend.app.services.delivery_screening_service import delivery_screening_service
 
 router = APIRouter(prefix="/deliveries", tags=["Delivery Screening"])
@@ -72,6 +72,16 @@ def record_decision(
 ):
     """Appends the guard's decision (CLEARED / HELD / ESCALATED). Earlier decisions are kept."""
     return delivery_screening_service.record_decision(db, order_id, body.decision, body.note, user.id)
+
+@router.put("/{order_id}/items", response_model=DeliveryDetail)
+def update_delivery_items(
+    order_id: str,
+    body: DeliveryItemsUpdate,
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(require_staff),
+):
+    """Allows staff/guards to manually edit or correct extracted items, quantities, or prices on the portal."""
+    return delivery_screening_service.update_items(db, order_id, body, user.id)
 
 @router.delete("/{order_id}", status_code=status.HTTP_200_OK)
 def delete_delivery(

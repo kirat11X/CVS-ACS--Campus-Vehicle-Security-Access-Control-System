@@ -29,7 +29,7 @@ from backend.app.models.enums import (
     GuardDecision,
     DeliverySource
 )
-from backend.app.models.identity import User, VehicleOwner, Visitor
+from backend.app.models.identity import User, VehicleOwner, Visitor, TelegramUser
 from backend.app.models.vehicle import Vehicle, DeliveryVehicle
 from backend.app.models.gate import Gate, AccessDecision, EntryExitLog, SecurityAlert
 from backend.app.models.delivery import DeliveryOrder, Invoice, InvoiceItem, DeliveryDecision

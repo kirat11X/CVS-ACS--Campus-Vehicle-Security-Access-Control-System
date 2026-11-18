@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Text, Enum as SQLEnum
+from sqlalchemy import BigInteger, Column, String, Boolean, DateTime, ForeignKey, Integer, Text, Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from backend.app.models.base import Base, TimestampMixin, utc_now
@@ -63,3 +63,16 @@ class Visitor(Base, TimestampMixin):
     host_owner = relationship("VehicleOwner", back_populates="visitors_hosted")
     allowed_gate = relationship("Gate", back_populates="visitors_allowed")
     vehicles = relationship("Vehicle", back_populates="visitor")
+
+
+class TelegramUser(Base, TimestampMixin):
+    __tablename__ = "telegram_users"
+
+    chat_id = Column(BigInteger, primary_key=True)
+    user_id = Column(BigInteger, nullable=True)
+    username = Column(String(100), nullable=True)
+    full_name = Column(String(100), nullable=False)
+    identifier = Column(String(50), nullable=False, index=True)
+    location = Column(String(150), nullable=False)
+    visit_count = Column(Integer, default=1, nullable=False)
+

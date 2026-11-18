@@ -4,6 +4,8 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, Header, HTTPException, Request, status
 
 from backend.app.config import TELEGRAM_BOT_TOKEN, TELEGRAM_MODE
+from backend.app.db import SessionLocal
+from backend.app.models.identity import TelegramUser
 from backend.app.telegram.bot_service import telegram_service
 
 logger = logging.getLogger("campus_security.telegram.routes")
@@ -51,3 +53,28 @@ def telegram_status() -> Dict[str, Any]:
         "is_running": telegram_service.is_running,
         "allowed_chat_ids": telegram_service.allowed_chat_ids,
     }
+
+
+@router.get("/telegram/users", status_code=status.HTTP_200_OK)
+@router.get("/api/telegram/users", status_code=status.HTTP_200_OK)
+def list_telegram_users() -> Dict[str, Any]:
+    """Returns all verified Telegram users and their venue/hostel destinations stored in PostgreSQL."""
+    with SessionLocal() as db:
+        users = db.query(TelegramUser).order_by(TelegramUser.updated_at.desc()).all()
+        return {
+            "count": len(users),
+            "users": [
+                {
+                    "chat_id": u.chat_id,
+                    "user_id": u.user_id,
+                    "username": u.username,
+                    "full_name": u.full_name,
+                    "identifier": u.identifier,
+                    "location": u.location,
+                    "visit_count": u.visit_count,
+                    "updated_at": u.updated_at.isoformat() if u.updated_at else None,
+                }
+                for u in users
+            ],
+        }
+

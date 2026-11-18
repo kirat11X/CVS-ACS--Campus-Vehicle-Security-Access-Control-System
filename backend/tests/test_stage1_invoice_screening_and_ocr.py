@@ -163,3 +163,47 @@ def test_stage1_track_b_reconciler_phantom_digit_handling():
     assert report.status in (ReconciliationStatus.RECONCILED, ReconciliationStatus.RECONCILED_WITH_WARNINGS)
     assert report.critical_count == 0
     assert report.error_count == 0
+
+
+def test_mobile_app_screenshot_layout_parsing():
+    """
+    Verifies that modern quick-commerce app screenshots (e.g. Blinkit/Swiggy/Zepto)
+    with multi-line item layouts, struck-out MRPs, and phantom Rupee OCR artifacts
+    are parsed and reconciled to the exact total.
+    """
+    rows = [
+        OcrRow("Order details"),
+        OcrRow("Delivered in 10 minutes"),
+        OcrRow("5 items in order"),
+        OcrRow("TataTeaGold-AssamTea  180"),
+        OcrRow("250 g · 1unit"),
+        OcrRow("SaffolaClassicMasalaOats  320"),  # ₹20 misread with phantom leading 3
+        OcrRow("38 g · 1 unit"),
+        OcrRow("Rajdhani Dalia  43"),
+        OcrRow("500 g - 1 unit  455"),  # Crossed-out MRP
+        OcrRow("Fresh Hybrid Tomato  23"),
+        OcrRow("500 g · 1 unit  58"),
+        OcrRow("Farmley Smokey BBQ Party Mix  45"),
+        OcrRow("28 g - 1 unit  50"),
+        OcrRow("Bill summary"),
+        OcrRow("Items total  1363  311"),
+        OcrRow("Handling fee  10  FREE"),
+        OcrRow("Delivery fee  30  FREE"),
+        OcrRow("You pay  ￥403  311"),
+    ]
+
+    parsed = parse_rows(rows)
+    assert len(parsed.lines) == 5
+    assert parsed.total == Decimal("311.00")
+    assert parsed.lines[0].item_name == "TataTeaGold-AssamTea"
+    assert parsed.lines[0].amount == Decimal("180.00")
+    # Saffola Oats: 320.00 repaired to 20.00 via phantom '3' removal
+    assert parsed.lines[1].amount == Decimal("20.00")
+    assert parsed.lines[2].amount == Decimal("43.00")
+    assert parsed.lines[3].amount == Decimal("23.00")
+    assert parsed.lines[4].amount == Decimal("45.00")
+
+    # Complete arithmetic matches total
+    sum_lines = sum(l.amount for l in parsed.lines)
+    assert sum_lines == parsed.total == Decimal("311.00")
+

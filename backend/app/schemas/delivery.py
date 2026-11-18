@@ -58,6 +58,16 @@ class DecisionCreate(BaseModel):
     decision: GuardDecision
     note: Optional[str] = Field(None, max_length=1000)
 
+class ItemEdit(BaseModel):
+    item_name: str = Field(..., max_length=150)
+    quantity: Optional[int] = Field(1, ge=1)
+    amount: Optional[float] = Field(None, ge=0)
+
+class DeliveryItemsUpdate(BaseModel):
+    items: List[ItemEdit]
+    total_amount: Optional[float] = None
+    vendor: Optional[str] = None
+
 class AlertItem(BaseModel):
     """Something that needs a guard's attention. Not a threat label and not an access decision."""
     kind: Literal["PLATE_REVIEW", "PLATE_UNLINKED", "DELIVERY_REVIEW", "DELIVERY_ALERT", "OVERSTAY_UNLINKED"]

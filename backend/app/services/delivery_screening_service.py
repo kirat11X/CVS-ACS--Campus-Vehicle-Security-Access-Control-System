@@ -99,8 +99,28 @@ class DeliveryScreeningService:
                 s_verdict = ScreeningVerdict.REVIEW
             else:
                 scr = cvs_acs_screener.screen_item(line.item_name)
-                s_cat = scr.get("category", "FOOD_PREPARED")
-                s_reason = scr.get("risk_tag", "SAFE_FOOD")
+                raw_cat = str(scr.get("category", "FOOD")).upper()
+                if "ELECTRONIC" in raw_cat or "ACCESSOR" in raw_cat:
+                    s_cat = "ELECTRONICS"
+                elif "FOOD" in raw_cat or "GROCERY" in raw_cat:
+                    s_cat = "FOOD"
+                elif "BEVERAGE" in raw_cat:
+                    s_cat = "BEVERAGE"
+                elif "MEDIC" in raw_cat or "PHARM" in raw_cat:
+                    s_cat = "MEDICINE"
+                elif "CLEAN" in raw_cat or "CHEM" in raw_cat:
+                    s_cat = "HAZMAT"
+                elif "TOBACCO" in raw_cat or "SMOK" in raw_cat:
+                    s_cat = "TOBACCO"
+                elif "ALCOHOL" in raw_cat or "LIQUOR" in raw_cat:
+                    s_cat = "ALCOHOL"
+                elif "STATION" in raw_cat:
+                    s_cat = "STATIONERY"
+                elif "SERVICE" in raw_cat:
+                    s_cat = "SERVICE"
+                else:
+                    s_cat = raw_cat[:30]
+                s_reason = str(scr.get("risk_tag", "SAFE_FOOD"))[:40]
                 verd_str = str(scr.get("verdict", "REVIEW")).upper()
                 try:
                     s_verdict = ScreeningVerdict(verd_str)
@@ -333,12 +353,13 @@ class DeliveryScreeningService:
         elif result.parsed.vendor:
             order.restaurant = result.parsed.vendor
 
-        if result.parsed.platform:
-            plat_upper = result.parsed.platform.strip().upper()
+        detected_plat = result.parsed.platform or (result.parsed.vendor if result.parsed.vendor in ("Zepto", "Blinkit", "Swiggy Instamart", "Zomato", "Amazon") else None)
+        if detected_plat:
+            plat_upper = detected_plat.strip().upper()
             try:
                 order.platform = PlatformType(plat_upper)
             except ValueError:
-                if "SWIGGY" in plat_upper:
+                if "SWIGGY" in plat_upper or "INSTAMART" in plat_upper:
                     order.platform = PlatformType.SWIGGY
                 elif "ZOMATO" in plat_upper:
                     order.platform = PlatformType.ZOMATO
@@ -346,8 +367,8 @@ class DeliveryScreeningService:
                     order.platform = PlatformType.BLINKIT
                 elif "ZEPTO" in plat_upper:
                     order.platform = PlatformType.ZEPTO
-                elif "INSTAMART" in plat_upper:
-                    order.platform = PlatformType.INSTAMART
+                elif "AMAZON" in plat_upper:
+                    order.platform = PlatformType.AMAZON
         if gate_id:
             order.gate_id = gate_id
         db.commit()

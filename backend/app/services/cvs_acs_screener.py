@@ -80,10 +80,21 @@ ALLOW_KEYWORDS = {
 
 
 def clean_text_for_matching(text: str) -> str:
-    """Strips pack sizes, weights, and non-alphanumeric noise to yield a clean base title."""
-    s = PACK_SIZE_PATTERN.sub(" ", text or "")
+    """Strips pack sizes, weights, and non-alphanumeric noise, and splits CamelCase to yield a clean base title."""
+    s = re.sub(r"(?<=[a-z])(?=[A-Z])|(?<=[A-Za-z])(?=\d)|(?<=\d)(?=[A-Za-z])", " ", text or "")
+    s = PACK_SIZE_PATTERN.sub(" ", s)
     s = re.sub(r"[^a-zA-Z0-9\s]", " ", s)
     return re.sub(r"\s+", " ", s).strip().lower()
+
+
+def _matches_keyword(kw: str, cleaned_text: str, tokens: set[str]) -> bool:
+    """Checks whether a keyword matches text using strict word boundaries to avoid substring false positives."""
+    clean_kw = clean_text_for_matching(kw)
+    if not clean_kw:
+        return False
+    if " " in clean_kw:
+        return bool(re.search(r"\b" + re.escape(clean_kw) + r"\b", cleaned_text))
+    return clean_kw in tokens
 
 
 class CVSACSScreener:
@@ -240,9 +251,11 @@ class CVSACSScreener:
             is_match = False
             if cand_clean == cleaned:
                 is_match = True
-            elif cand_root and (cand_root == cleaned or cand_root in tokens):
+            elif cand_root and _matches_keyword(cand_root, cleaned, tokens):
                 is_match = True
-            elif cand_clean and (cand_clean in cleaned or (len(cand_clean) >= 3 and cleaned in cand_clean)):
+            elif cand_clean and _matches_keyword(cand_clean, cleaned, tokens):
+                is_match = True
+            elif cand_clean and len(cand_clean.split()) >= 2 and re.search(r"\b" + re.escape(cand_clean) + r"\b", cleaned):
                 is_match = True
 
             if is_match:
@@ -259,7 +272,7 @@ class CVSACSScreener:
         # Check if an ALERT keyword is present in the line item even if an ALLOW matched from list
         alert_kw_match = None
         for alert_kw in ALERT_KEYWORDS:
-            if alert_kw in cleaned or alert_kw in tokens:
+            if _matches_keyword(alert_kw, cleaned, tokens):
                 alert_kw_match = alert_kw
                 break
 
@@ -373,7 +386,7 @@ class CVSACSScreener:
         tokens = set(cleaned.split())
 
         for alert_kw in ALERT_KEYWORDS:
-            if alert_kw in cleaned or alert_kw in tokens:
+            if _matches_keyword(alert_kw, cleaned, tokens):
                 return {
                     "item_name": line_item,
                     "matched_from_list": False,
@@ -386,7 +399,7 @@ class CVSACSScreener:
                 }
 
         for allow_kw in ALLOW_KEYWORDS:
-            if allow_kw in cleaned or allow_kw in tokens:
+            if _matches_keyword(allow_kw, cleaned, tokens):
                 return {
                     "item_name": line_item,
                     "matched_from_list": False,

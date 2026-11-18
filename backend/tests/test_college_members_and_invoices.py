@@ -105,7 +105,7 @@ def test_1000_multivendor_invoices_with_qr_codes(db):
         assert abs_img.exists(), f"Invoice image file {abs_img} does not exist on disk"
         assert abs_img.stat().st_size > 1000, f"Invoice image {abs_img} is suspiciously small"
         # Check raw OCR text contains QR or valid receipt content
-        assert "TOTAL" in (inv.raw_ocr_text or ""), f"Invoice {inv.id} raw OCR missing TOTAL"
+        assert "total" in (inv.raw_ocr_text or "").lower(), f"Invoice {inv.id} raw OCR missing total"
 
 def test_unlinked_overstay_alert_detection(db):
     """Verify unlinked overstay alert (>1.5h) activates on the unlinked vehicles currently inside campus."""

@@ -75,7 +75,7 @@ class InvoiceItem(Base, TimestampMixin):
 
     # Phase 7: deterministic screening of the line (policy table, not ML)
     line_no = Column(Integer, nullable=True)
-    category = Column(String(30), nullable=True)
+    category = Column(String(50), nullable=True)
     reason_code = Column(String(40), nullable=True)
     verdict = Column(SQLEnum(ScreeningVerdict, name="screening_verdict_enum"), nullable=True)
     confidence = Column(Float, nullable=True)  # OCR confidence of the line, if the engine gave one

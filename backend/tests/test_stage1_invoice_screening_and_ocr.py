@@ -494,3 +494,151 @@ def test_profile_manager_concurrency_and_thread_safety(tmp_path):
         except Exception:
             pass
 
+
+def test_zepto_platform_detection_and_discounted_pricing_snk():
+    """
+    Regression test for order SNKRJSISE59003:
+    1. Splits fused summary numbers: 184165 -> 184 165, 223174 -> 223 174.
+    2. Identifies Zepto platform from receipt UI signatures (Download Invoice/CreditNote, OrderAgain).
+    3. Handles handling fee R9 -> 9.00 and calculates computed total (165 + 9 = 174).
+    4. Evaluates items (Verka Paneer and Eggoz Eggs) as ALLOW.
+    """
+    from backend.app.services.invoice_reader import parse_mobile_order_layout, OcrRow
+    from backend.app.services.delivery_screening_service import DeliveryScreeningService
+
+    raw_snk = """1:04M  64
+Order#SNKRJSISE59003  Get Help
+2items
+Delivered
+2itemsinorder
+VerkaPaneerVacuumPack  #95
+1pack(200g)·1unit
+EggozEverydayWhiteFarmFreshEggs  70
+1pack(6pcs)1unit  68至
+图Bill Summary
+Item Total  184165
+Delivery Fee  30FREE
+Handling Fee  R9
+Total Bill  223174
+Download Invoice/CreditNote
+OrderDetails
+Order ID
+#SNKRJSISE59003
+ReceiverDetails
+KritanshUppal,+919815000709
+RateOrder  OrderAgain"""
+
+    rows = [OcrRow(text=l, confidence=1.0) for l in raw_snk.splitlines()]
+    parsed = parse_mobile_order_layout(rows)
+
+    assert parsed.platform == "Zepto"
+    assert parsed.vendor == "Zepto"
+    assert parsed.order_number == "SNKRJSISE59003"
+    assert parsed.subtotal == Decimal("165.00")
+    assert parsed.delivery_fee == Decimal("9.00")
+    assert parsed.total == Decimal("174.00")
+
+    assert len(parsed.lines) == 2
+    assert "Paneer" in parsed.lines[0].item_name
+    assert parsed.lines[0].amount == Decimal("95.00")
+    assert "Eggs" in parsed.lines[1].item_name
+    assert parsed.lines[1].amount == Decimal("70.00")
+
+    scr = DeliveryScreeningService.screen(parsed, "SNKRJSISE59003")
+    assert scr.totals_match is True
+    assert scr.computed_total == Decimal("174.00")
+    assert scr.overall == ScreeningVerdict.ALLOW
+
+
+def test_zepto_charging_cable_phantom_digit_and_word_boundary_jks():
+    """
+    Regression test for order JKSVKRPRN67992:
+    1. Detects and strips systematic phantom Rupee digit '2' (2130 -> 130, 2741 -> 741).
+    2. Correctly assigns platform Zepto and order number JKSVKRPRN67992.
+    3. Categorizes charging cable as ELECTRONICS with verdict ALLOW.
+    4. Guarantees 'charGINg' never matches 'gin' (contraband alcohol).
+    """
+    from backend.app.services.invoice_reader import parse_mobile_order_layout, OcrRow
+    from backend.app.services.delivery_screening_service import DeliveryScreeningService
+    from backend.app.services.cvs_acs_screener import cvs_acs_screener
+
+    raw_jks = """1:03 M  oo Ball Wi SE
+Order #JKSVKRPRN67992 (3.
+Cl  ee  @ Get Help
+v Delivered
+litem in order
+Portronics Konnect B+ 1m Long Charging 2130
+if  Cable | USB-A to Lightning for 8 Pin US...  2499
+Tpe » Vunit
+&) Bill Summary
+Item Total  2699 2130
+Delivery Fee  230 FREE
+Handling Fee  212 FREE
+Total Bill  2741 2130
+Download Invoice / Credit Note
+Order Details
+Order ID
+#JKSVKRPRN67992
+Delivery Address
+Rs academy, XGHQ+3PR, Hussainpur, Rupnagar, Punjab 140001,
+India
+Order Placed at
+15 Nov 2026, 7:21 PM"""
+
+    rows = [OcrRow(text=l, confidence=1.0) for l in raw_jks.splitlines()]
+    parsed = parse_mobile_order_layout(rows)
+
+    assert parsed.platform == "Zepto"
+    assert parsed.vendor == "Zepto"
+    assert parsed.order_number == "JKSVKRPRN67992"
+    assert parsed.total == Decimal("130.00")
+    assert parsed.subtotal == Decimal("130.00")
+    assert parsed.delivery_fee == Decimal("0.00")
+
+    assert len(parsed.lines) == 1
+    assert "Charging" in parsed.lines[0].item_name
+    assert parsed.lines[0].amount == Decimal("130.00")
+
+    scr = DeliveryScreeningService.screen(parsed, "JKSVKRPRN67992")
+    assert scr.totals_match is True
+    assert scr.computed_total == Decimal("130.00")
+    assert scr.overall == ScreeningVerdict.ALLOW
+
+    # Verify cvs_acs_screener word boundary isolation
+    cable_res = cvs_acs_screener.screen_item("Portronics Konnect B+ 1m Long Charging Cable")
+    assert cable_res["verdict"] == "ALLOW"
+    assert "gin" not in cable_res.get("canonical_root", "")
+
+
+def test_cvs_acs_screener_word_boundary_safety():
+    """
+    Verifies that substring keyword traps (gin in charging, rum in drumstick/serum)
+    are strictly avoided using word boundaries, while real contraband is always flagged ALERT.
+    """
+    from backend.app.services.cvs_acs_screener import cvs_acs_screener
+
+    # Safe items containing contraband substrings
+    safe_substring_items = [
+        "Portronics Konnect B+ Charging Cable",
+        "Chicken Drumsticks 500g",
+        "Ginger Garlic Paste 200g",
+        "Vitamin C Face Serum 30ml",
+    ]
+    for safe_item in safe_substring_items:
+        res = cvs_acs_screener.screen_item(safe_item)
+        assert res["verdict"] in ("ALLOW", "REVIEW"), f"Item '{safe_item}' was wrongly flagged as {res['verdict']}"
+        assert res["category"] != "PROHIBITED_CONTRABAND"
+
+    # Actual contraband must strictly trigger ALERT
+    contraband_items = [
+        "Bombay Sapphire Gin 750ml",
+        "Old Monk Dark Rum 750ml",
+        "Marlboro Light Cigarettes",
+        "Red Tobacco Leaves",
+    ]
+    for bad_item in contraband_items:
+        res = cvs_acs_screener.screen_item(bad_item)
+        assert res["verdict"] == "ALERT", f"Contraband '{bad_item}' expected ALERT, got {res['verdict']}"
+        assert res["category"] == "PROHIBITED_CONTRABAND"
+
+

@@ -101,7 +101,7 @@ class DeliveryScreeningService:
                 scr = cvs_acs_screener.screen_item(line.item_name)
                 s_cat = scr.get("category", "FOOD_PREPARED")
                 s_reason = scr.get("risk_tag", "SAFE_FOOD")
-                verd_str = str(scr.get("verdict", "ALLOW")).upper()
+                verd_str = str(scr.get("verdict", "REVIEW")).upper()
                 try:
                     s_verdict = ScreeningVerdict(verd_str)
                 except ValueError:
@@ -130,6 +130,8 @@ class DeliveryScreeningService:
             totals_match = False  # a line amount could not be read, so the total cannot be confirmed
 
         overall = worst(l.verdict for l in lines) if lines else ScreeningVerdict.REVIEW
+        if totals_match is False or parsed.total is None:
+            overall = worst([overall, ScreeningVerdict.REVIEW])
         mismatch_order = bool(
             order_id
             and not order_id.startswith("TG-")

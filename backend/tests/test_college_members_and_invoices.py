@@ -88,7 +88,13 @@ def test_1000_multivendor_invoices_with_qr_codes(db):
     # Verify generated invoice image files exist on disk
     sample_invoices = (
         db.query(Invoice)
-        .filter(Invoice.image_path != "invoices/test_inv.png")
+        .join(DeliveryOrder)
+        .filter(
+            Invoice.image_path != "invoices/test_inv.png",
+            DeliveryOrder.platform != PlatformType.OTHER,
+            ~DeliveryOrder.order_id.like("FAC-%"),
+            ~DeliveryOrder.order_id.like("TG-%"),
+        )
         .order_by(Invoice.created_at.desc())
         .limit(20)
         .all()

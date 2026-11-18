@@ -13,6 +13,7 @@ from backend.app.models.enums import ScreeningVerdict
 from backend.app.services.delivery_policy import (
     CategoryRule, LineScreening, classify_item, screen_line, worst, RULES, REASON_VERDICTS
 )
+from backend.app.services.delivery_screening_service import DeliveryScreeningService
 from backend.app.services.invoice_reader import (
     OcrRow, ParsedInvoice, ParsedLine, normalize_currency_artifacts, parse_item_text, parse_rows, to_decimal
 )
@@ -206,4 +207,290 @@ def test_mobile_app_screenshot_layout_parsing():
     # Complete arithmetic matches total
     sum_lines = sum(l.amount for l in parsed.lines)
     assert sum_lines == parsed.total == Decimal("311.00")
+
+
+def test_multi_word_allow_plus_alert_items():
+    """
+    Verifies that multi-word compound line items combining safe food (ALLOW)
+    and restricted contraband (ALERT) always resolve to ALERT.
+    Contraband must NEVER be downgraded by companion food words.
+    """
+    from backend.app.services.cvs_acs_screener import cvs_acs_screener
+
+    mixed_items = [
+        "Egg Roll and Beer",
+        "Harvest Gold Bread and Kingfisher Beer 650ml",
+        "White Bread with Kitchen Knife",
+        "Blueberry Cake with Marlboro Cigarettes",
+        "Amul Milk and Classic Milds Cigarettes",
+        "Tata Tea Gold with Country Liquor",
+        "Chicken Biryani and Vodka",
+        "Blueberry Cake with Lighter Fluid",
+    ]
+
+    for item in mixed_items:
+        # 1. Test deterministic delivery policy
+        rule, kw = classify_item(item)
+        assert rule.verdict == ScreeningVerdict.ALERT, (
+            f"Policy failed for '{item}': expected ALERT, got {rule.verdict} (keyword: {kw})"
+        )
+
+        # 2. Test CVS-ACS candidate retriever & screener
+        scr = cvs_acs_screener.screen_item(item)
+        assert scr["verdict"] == "ALERT", (
+            f"CVS-ACS screener failed for '{item}': expected ALERT, got {scr['verdict']}"
+        )
+
+    # Mixed items with HAZMAT/review keywords should resolve to REVIEW over ALLOW
+    hazmat_items = [
+        "White Bread with Harpic 500ml",
+        "Tata Tea Gold with Rat Poison",
+        "Amul Milk with Crocin Tablets",
+    ]
+    for item in hazmat_items:
+        rule, kw = classify_item(item)
+        assert rule.verdict == ScreeningVerdict.REVIEW, (
+            f"Policy failed for '{item}': expected REVIEW, got {rule.verdict} (keyword: {kw})"
+        )
+
+    # Verify candidate retrieval collects matches across ALL tokens
+    cands = cvs_acs_screener.retrieve_candidate_matches("Egg Roll and Beer")
+    cand_verdicts = [c.get("verdict") for c in cands]
+    assert "ALERT" in cand_verdicts, f"Expected ALERT candidate in matches across all tokens: {cands}"
+
+
+def test_totals_match_false_escalation_to_review():
+    """
+    Verifies that whenever totals_match is False (arithmetic discrepancy or missing line price),
+    the overall screening verdict is escalated to REVIEW even if every individual line is ALLOW.
+    """
+    # Case 1: All items are ALLOW, but sum(lines) != total printed -> overall escalates to REVIEW
+    lines_allow = [
+        ParsedLine(
+            line_no=1,
+            item_name="Harvest Gold White Bread 400g",
+            quantity=1,
+            unit_price=Decimal("40.00"),
+            amount=Decimal("40.00"),
+            confidence=1.0,
+            readable=True,
+        ),
+        ParsedLine(
+            line_no=2,
+            item_name="Amul Taaza Homogenised Milk 1L",
+            quantity=1,
+            unit_price=Decimal("60.00"),
+            amount=Decimal("60.00"),
+            confidence=1.0,
+            readable=True,
+        ),
+    ]
+    parsed_mismatch = ParsedInvoice(
+        lines=lines_allow,
+        subtotal=Decimal("100.00"),
+        total=Decimal("250.00"),  # Mismatches items sum of 100.00!
+        order_number="D-9901",
+    )
+    result = DeliveryScreeningService.screen(parsed_mismatch, "D-9901")
+    assert result.totals_match is False
+    assert result.overall == ScreeningVerdict.REVIEW, (
+        f"Expected overall to escalate to REVIEW on totals mismatch, got {result.overall}"
+    )
+
+    # Case 2: One item is ALERT, and totals_match is False -> overall remains ALERT (ALERT > REVIEW)
+    lines_with_alert = [
+        ParsedLine(
+            line_no=1,
+            item_name="Amul Taaza Milk 1L",
+            quantity=1,
+            unit_price=Decimal("60.00"),
+            amount=Decimal("60.00"),
+            confidence=1.0,
+            readable=True,
+        ),
+        ParsedLine(
+            line_no=2,
+            item_name="Classic Milds Cigarettes",
+            quantity=1,
+            unit_price=Decimal("350.00"),
+            amount=Decimal("350.00"),
+            confidence=1.0,
+            readable=True,
+        ),
+    ]
+    parsed_alert = ParsedInvoice(
+        lines=lines_with_alert,
+        subtotal=Decimal("410.00"),
+        total=Decimal("600.00"),  # Discrepancy
+        order_number="D-9902",
+    )
+    result_alert = DeliveryScreeningService.screen(parsed_alert, "D-9902")
+    assert result_alert.totals_match is False
+    assert result_alert.overall == ScreeningVerdict.ALERT, (
+        f"Expected overall ALERT to be preserved over REVIEW, got {result_alert.overall}"
+    )
+
+    # Case 3: Line amount is missing (None) with a printed total -> totals_match is False, overall is REVIEW
+    lines_unreadable_amount = [
+        ParsedLine(
+            line_no=1,
+            item_name="Harvest Gold Bread",
+            quantity=1,
+            unit_price=None,
+            amount=None,
+            confidence=0.5,
+            readable=True,
+        ),
+    ]
+    parsed_missing_amt = ParsedInvoice(
+        lines=lines_unreadable_amount,
+        total=Decimal("40.00"),
+        order_number="D-9903",
+    )
+    result_missing = DeliveryScreeningService.screen(parsed_missing_amt, "D-9903")
+    assert result_missing.totals_match is False
+    assert result_missing.overall == ScreeningVerdict.REVIEW
+
+
+def test_missing_verdict_failsafe_behavior():
+    """
+    Verifies that missing, None, or invalid verdicts from screener or items
+    fail-safe to REVIEW rather than ALLOW.
+    """
+    from unittest.mock import patch
+    from backend.app.services.cvs_acs_screener import cvs_acs_screener
+
+    # Case 1: Missing verdict key in screener response
+    with patch.object(cvs_acs_screener, "screen_item", return_value={"item_name": "Mystery Box", "category": "PARCEL"}):
+        parsed = ParsedInvoice(
+            lines=[
+                ParsedLine(
+                    line_no=1,
+                    item_name="Mystery Box",
+                    quantity=1,
+                    unit_price=Decimal("100.00"),
+                    amount=Decimal("100.00"),
+                    confidence=1.0,
+                    readable=True,
+                )
+            ],
+            total=Decimal("100.00"),
+            order_number="D-9904",
+        )
+        res = DeliveryScreeningService.screen(parsed, "D-9904")
+        assert res.lines[0].verdict == ScreeningVerdict.REVIEW
+        assert res.overall == ScreeningVerdict.REVIEW
+
+    # Case 2: Invalid verdict string in screener response
+    with patch.object(cvs_acs_screener, "screen_item", return_value={"item_name": "Mystery Box", "verdict": "INVALID_VAL"}):
+        parsed = ParsedInvoice(
+            lines=[
+                ParsedLine(
+                    line_no=1,
+                    item_name="Mystery Box",
+                    quantity=1,
+                    unit_price=Decimal("100.00"),
+                    amount=Decimal("100.00"),
+                    confidence=1.0,
+                    readable=True,
+                )
+            ],
+            total=Decimal("100.00"),
+            order_number="D-9905",
+        )
+        res = DeliveryScreeningService.screen(parsed, "D-9905")
+        assert res.lines[0].verdict == ScreeningVerdict.REVIEW
+        assert res.overall == ScreeningVerdict.REVIEW
+
+    # Case 3: Empty string passed to cvs_acs_screener
+    res_empty = cvs_acs_screener.screen_item("")
+    assert res_empty["verdict"] == "REVIEW"
+    assert res_empty["is_uncertain"] is True
+
+
+def test_ollama_keep_alive_and_async_wrappers():
+    """
+    Verifies that OLLAMA_KEEP_ALIVE defaults to '5m' and is configurable,
+    and that async wrappers execute properly via asyncio.to_thread.
+    """
+    import asyncio
+    from backend.app.services.cvs_acs_screener import cvs_acs_screener, CVSACSScreener
+    from backend.app.services.llm_invoice_extractor import llm_invoice_extractor, LLMInvoiceExtractor
+
+    assert cvs_acs_screener.keep_alive == "5m"
+    assert llm_invoice_extractor.keep_alive == "5m"
+
+    custom_screener = CVSACSScreener(keep_alive="10m")
+    assert custom_screener.keep_alive == "10m"
+
+    custom_extractor = LLMInvoiceExtractor(keep_alive="10m")
+    assert custom_extractor.keep_alive == "10m"
+
+    # Async wrapper tests
+    async def run_async_tests():
+        res = await cvs_acs_screener.screen_item_async("Amul Milk 1L")
+        assert res["verdict"] == "ALLOW"
+
+        extracted = await llm_invoice_extractor.extract_from_text_async("")
+        assert extracted is not None
+
+    asyncio.run(run_async_tests())
+
+
+def test_profile_manager_concurrency_and_thread_safety(tmp_path):
+    """
+    Verifies that TelegramProfileManager guards _profiles and _save with a lock
+    under concurrent read/write stress without race conditions or data corruption.
+    """
+    import concurrent.futures
+    from backend.app.telegram.profile_manager import TelegramProfileManager
+    from backend.app.db import SessionLocal
+    from backend.app.models.identity import TelegramUser, VehicleOwner
+
+    temp_storage = tmp_path / "concurrent_profiles.json"
+    pm = TelegramProfileManager(storage_path=temp_storage)
+
+    base_chat_id = 991000
+
+    def worker(offset: int):
+        cid = base_chat_id + offset
+        pm.save_profile(
+            cid,
+            full_name=f"User {cid}",
+            identifier=f"P7-STU{cid}",
+            location="Aravali Hostel",
+            username=f"user_{cid}",
+        )
+        pm.record_visit(cid)
+        pm.update_location(cid, "Kurukshetra Hostel")
+        assert pm.is_registered(cid) is True
+        prof = pm.get_profile(cid)
+        assert prof is not None
+        assert prof["location"] == "Kurukshetra Hostel"
+
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+            futures = [executor.submit(worker, i) for i in range(20)]
+            for f in concurrent.futures.as_completed(futures):
+                f.result()
+
+        # Verify all 20 profiles persisted correctly
+        for i in range(20):
+            cid = base_chat_id + i
+            prof = pm.get_profile(cid)
+            assert prof is not None
+            assert prof["full_name"] == f"User {cid}"
+    finally:
+        try:
+            with SessionLocal() as db:
+                db.query(TelegramUser).filter(
+                    TelegramUser.chat_id >= base_chat_id,
+                    TelegramUser.chat_id < base_chat_id + 100,
+                ).delete(synchronize_session=False)
+                db.query(VehicleOwner).filter(
+                    VehicleOwner.identifier.like(f"P7-STU{base_chat_id}%")
+                ).delete(synchronize_session=False)
+                db.commit()
+        except Exception:
+            pass
 

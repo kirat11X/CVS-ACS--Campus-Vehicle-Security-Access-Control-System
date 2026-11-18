@@ -231,8 +231,9 @@ def classify_item(name: str) -> Tuple[CategoryRule, Optional[str]]:
     norm = re.sub(r"[^a-z0-9]+", " ", name.lower()).strip()
 
     # Tier 1: exact / normalized match
-    if norm in _TAXONOMY_EXACT:
-        return _TAXONOMY_EXACT[norm]
+    tier1_match = _TAXONOMY_EXACT.get(norm)
+    if tier1_match and tier1_match[0].verdict == ScreeningVerdict.ALERT:
+        return tier1_match
 
     # Tier 2: canonical root-noun extraction and keyword matching
     split = re.sub(r"(?<=[a-z])(?=[A-Z])|(?<=[A-Za-z])(?=\d)|(?<=\d)(?=[A-Za-z])", " ", name)
@@ -251,12 +252,30 @@ def classify_item(name: str) -> Tuple[CategoryRule, Optional[str]]:
             candidates.append((_SEVERITY[rule.verdict], len(root), rule, kw))
 
     if candidates:
-        # Prune sub-phrase matches when a longer compound keyword matched (e.g. 'lighter' vs 'lighter fluid')
-        kw_strings = [c[3] for c in candidates]
-        pruned = [c for c in candidates if not any(c[3] != other and c[3] in other for other in kw_strings)]
+        # Prune sub-phrase matches only when a longer compound keyword matched of equal or higher severity
+        # Never prune a higher-severity match (ALERT > REVIEW > ALLOW)
+        pruned = [
+            c for c in candidates
+            if not any(
+                c[3] != other[3]
+                and c[3] in other[3]
+                and other[0] >= c[0]
+                for other in candidates
+            )
+        ]
         candidates = pruned or candidates
         best = max(candidates, key=lambda c: (c[0], c[1]))
+
+        # Always evaluate ALERT/REVIEW rules before accepting a Tier-1 ALLOW match
+        if tier1_match:
+            if best[0] > _SEVERITY[tier1_match[0].verdict]:
+                return best[2], best[3]
+            return tier1_match
+
         return best[2], best[3]
+
+    if tier1_match:
+        return tier1_match
 
     # Tier 3: Unmapped fallback
     return UNKNOWN, None

@@ -45,6 +45,11 @@ TELEGRAM_ALLOWED_CHAT_IDS = [
     for cid in os.getenv("TELEGRAM_ALLOWED_CHAT_IDS", "").split(",")
     if cid.strip() and (cid.strip().isdigit() or (cid.strip().startswith("-") and cid.strip()[1:].isdigit()))
 ]
+TELEGRAM_GUARD_CHAT_IDS = [
+    int(cid.strip())
+    for cid in os.getenv("TELEGRAM_GUARD_CHAT_IDS", "").split(",")
+    if cid.strip() and (cid.strip().isdigit() or (cid.strip().startswith("-") and cid.strip()[1:].isdigit()))
+]
 TELEGRAM_WEBHOOK_URL = os.getenv("TELEGRAM_WEBHOOK_URL", "").strip()
 TELEGRAM_WEBHOOK_SECRET = os.getenv("TELEGRAM_WEBHOOK_SECRET", "").strip()
 

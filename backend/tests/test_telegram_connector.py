@@ -411,6 +411,7 @@ def test_handle_incoming_invoice_student_photo(db: Session, sample_invoice_bytes
             token="123456:FAKE_TOKEN_FOR_TESTING",
             mode="polling",
             allowed_chat_ids=[1001],
+            guard_chat_ids=[1001],
         )
 
         profile_manager.delete_profile(1001)
@@ -611,6 +612,7 @@ def test_handle_callback_guard_triage(db: Session, sample_invoice_bytes):
             token="123456:FAKE_TOKEN_FOR_TESTING",
             mode="polling",
             allowed_chat_ids=[1001],
+            guard_chat_ids=[1001],
         )
 
         # 1. Seed a delivery order & invoice
@@ -704,5 +706,347 @@ def test_telegram_webhook_processing():
         result = await bot_service.process_webhook_update(raw_payload)
         assert result is True
         mock_app.process_update.assert_called_once()
+
+    asyncio.run(_run())
+
+
+def test_handle_callback_guard_triage_unauthorized(db: Session, sample_invoice_bytes):
+    """
+    Verifies that when a non-guard chat_id clicks a triage action,
+    it is strictly rejected with 'Unauthorized: Guard role required'.
+    """
+    async def _run():
+        bot_service = TelegramBotService(
+            token="123456:FAKE_TOKEN_FOR_TESTING",
+            mode="polling",
+            allowed_chat_ids=[1001, 2002],
+            guard_chat_ids=[1001],  # 2002 is NOT a guard!
+        )
+
+        test_oid = f"TG-DEC-{uuid.uuid4().hex[:6].upper()}"
+        inv = delivery_screening_service.process(
+            db,
+            order_id=test_oid,
+            content=sample_invoice_bytes,
+            source=DeliverySource.TELEGRAM,
+            sender="@rider_bob",
+        )
+        review_id = f"cargo_{inv.id}"
+
+        mock_msg = AsyncMock()
+        mock_msg.text = "📦 Delivery Cargo Screening\nOrder ID: " + test_oid
+
+        mock_query = AsyncMock(spec=CallbackQuery)
+        mock_query.data = f"triage:ALLOW:{review_id}"
+        mock_query.from_user = TgUser(id=2002, first_name="Student", is_bot=False, username="student_user")
+        mock_query.message = mock_msg
+        mock_query.answer = AsyncMock()
+        mock_query.edit_message_text = AsyncMock()
+
+        mock_chat = Chat(id=2002, type="private")
+
+        update = MagicMock(spec=Update)
+        update.effective_chat = mock_chat
+        update.callback_query = mock_query
+
+        context = MagicMock()
+
+        await bot_service.handle_callback(update, context)
+
+        # Must reject with alert
+        mock_query.answer.assert_called_once_with("Unauthorized: Guard role required", show_alert=True)
+        # Must not edit message or record decision
+        mock_query.edit_message_text.assert_not_called()
+
+    asyncio.run(_run())
+
+
+def test_handle_incoming_invoice_duplicate_file_unique_id(db: Session, sample_invoice_bytes):
+    """
+    Verifies that uploading the exact same file_unique_id twice is detected and rejected.
+    """
+    async def _run():
+        bot_service = TelegramBotService(
+            token="123456:FAKE_TOKEN_FOR_TESTING",
+            mode="polling",
+            allowed_chat_ids=[1001],
+        )
+
+        profile_manager.delete_profile(1001)
+        profile_manager.save_profile(
+            1001,
+            full_name="Kirat Singh",
+            identifier="24103001",
+            location="Shivalik Hostel",
+        )
+
+        mock_file = AsyncMock()
+        mock_file.file_size = len(sample_invoice_bytes)
+        mock_file.download_as_bytearray = AsyncMock(return_value=bytearray(sample_invoice_bytes))
+
+        mock_bot = AsyncMock()
+        mock_bot.get_file = AsyncMock(return_value=mock_file)
+
+        mock_status_msg = AsyncMock()
+        mock_status_msg.edit_text = AsyncMock()
+
+        # 1. First upload
+        mock_msg1 = AsyncMock()
+        mock_msg1.caption = "Order Test-Dup-1"
+        mock_msg1.text = None
+        photo1 = PhotoSize(file_id="p_dup_1", file_unique_id="pu_unique_same_123", width=100, height=100, file_size=len(sample_invoice_bytes))
+        mock_msg1.photo = [photo1]
+        mock_msg1.document = None
+        mock_msg1.reply_text = AsyncMock(return_value=mock_status_msg)
+
+        mock_chat = Chat(id=1001, type="private")
+        mock_user = TgUser(id=5001, first_name="Kirat", is_bot=False)
+
+        update1 = MagicMock(spec=Update)
+        update1.update_id = 10001
+        update1.effective_chat = mock_chat
+        update1.effective_message = mock_msg1
+        update1.effective_user = mock_user
+
+        context = MagicMock()
+        context.bot = mock_bot
+
+        await bot_service.handle_incoming_invoice(update1, context)
+        mock_msg1.reply_text.assert_called_once()
+        mock_status_msg.edit_text.assert_called_once()
+
+        # 2. Second upload with identical file_unique_id
+        mock_msg2 = AsyncMock()
+        mock_msg2.caption = "Order Test-Dup-2"
+        mock_msg2.text = None
+        photo2 = PhotoSize(file_id="p_dup_2", file_unique_id="pu_unique_same_123", width=100, height=100, file_size=len(sample_invoice_bytes))
+        mock_msg2.photo = [photo2]
+        mock_msg2.document = None
+        mock_msg2.reply_text = AsyncMock()
+
+        update2 = MagicMock(spec=Update)
+        update2.update_id = 10002
+        update2.effective_chat = mock_chat
+        update2.effective_message = mock_msg2
+        update2.effective_user = mock_user
+
+        await bot_service.handle_incoming_invoice(update2, context)
+        mock_msg2.reply_text.assert_called_once()
+        dup_reply = mock_msg2.reply_text.call_args[0][0]
+        assert "Duplicate Invoice Detected" in dup_reply
+
+    asyncio.run(_run())
+
+
+def test_handle_incoming_invoice_oversized_file(db: Session):
+    """
+    Verifies that files exceeding 10 MB are rejected before download.
+    """
+    async def _run():
+        bot_service = TelegramBotService(
+            token="123456:FAKE_TOKEN_FOR_TESTING",
+            mode="polling",
+            allowed_chat_ids=[1001],
+        )
+
+        profile_manager.delete_profile(1001)
+        profile_manager.save_profile(
+            1001,
+            full_name="Kirat Singh",
+            identifier="24103001",
+            location="Shivalik Hostel",
+        )
+
+        mock_bot = AsyncMock()
+        mock_bot.get_file = AsyncMock()
+
+        mock_msg = AsyncMock()
+        mock_msg.caption = None
+        mock_msg.text = None
+        photo = PhotoSize(
+            file_id="p_large",
+            file_unique_id="pu_large_1",
+            width=1000,
+            height=1000,
+            file_size=11 * 1024 * 1024,  # 11 MB > 10 MB limit
+        )
+        mock_msg.photo = [photo]
+        mock_msg.document = None
+        mock_msg.reply_text = AsyncMock()
+
+        mock_chat = Chat(id=1001, type="private")
+        mock_user = TgUser(id=5001, first_name="Kirat", is_bot=False)
+
+        update = MagicMock(spec=Update)
+        update.update_id = 10003
+        update.effective_chat = mock_chat
+        update.effective_message = mock_msg
+        update.effective_user = mock_user
+
+        context = MagicMock()
+        context.bot = mock_bot
+
+        await bot_service.handle_incoming_invoice(update, context)
+
+        # get_file must NOT be called for oversized file
+        mock_bot.get_file.assert_not_called()
+        mock_msg.reply_text.assert_called_once()
+        reply_text = mock_msg.reply_text.call_args[0][0]
+        assert "File Too Large" in reply_text
+
+    asyncio.run(_run())
+
+
+def test_handle_incoming_invoice_unsupported_document_type(db: Session):
+    """
+    Verifies that uploading an unsupported document type (e.g. zip, exe)
+    replies with an explicit error instead of silently returning.
+    """
+    async def _run():
+        bot_service = TelegramBotService(
+            token="123456:FAKE_TOKEN_FOR_TESTING",
+            mode="polling",
+            allowed_chat_ids=[1001],
+        )
+
+        profile_manager.delete_profile(1001)
+        profile_manager.save_profile(
+            1001,
+            full_name="Kirat Singh",
+            identifier="24103001",
+            location="Shivalik Hostel",
+        )
+
+        mock_bot = AsyncMock()
+        mock_bot.get_file = AsyncMock()
+
+        mock_doc = MagicMock(spec=Document)
+        mock_doc.file_id = "doc_unsupp"
+        mock_doc.file_unique_id = "doc_u_1"
+        mock_doc.file_name = "archive.zip"
+        mock_doc.mime_type = "application/zip"
+        mock_doc.file_size = 1024
+
+        mock_msg = AsyncMock()
+        mock_msg.caption = None
+        mock_msg.text = None
+        mock_msg.photo = []
+        mock_msg.document = mock_doc
+        mock_msg.reply_text = AsyncMock()
+
+        mock_chat = Chat(id=1001, type="private")
+        mock_user = TgUser(id=5001, first_name="Kirat", is_bot=False)
+
+        update = MagicMock(spec=Update)
+        update.update_id = 10004
+        update.effective_chat = mock_chat
+        update.effective_message = mock_msg
+        update.effective_user = mock_user
+
+        context = MagicMock()
+        context.bot = mock_bot
+
+        await bot_service.handle_incoming_invoice(update, context)
+
+        # Must NOT attempt to download
+        mock_bot.get_file.assert_not_called()
+        mock_msg.reply_text.assert_called_once()
+        reply_text = mock_msg.reply_text.call_args[0][0]
+        assert "Unsupported Document Format" in reply_text
+
+    asyncio.run(_run())
+
+
+def test_telegram_users_endpoint_auth(db: Session, staff_headers):
+    """
+    Verifies that GET /telegram/users and /api/telegram/users require
+    staff/admin bearer authentication.
+    """
+    client = TestClient(app)
+
+    # 1. Unauthenticated request -> 401 Unauthorized
+    resp_unauth = client.get("/telegram/users")
+    assert resp_unauth.status_code == 401
+
+    resp_api_unauth = client.get("/api/telegram/users")
+    assert resp_api_unauth.status_code == 401
+
+    # 2. Authenticated request with staff_headers -> 200 OK
+    resp_auth = client.get("/telegram/users", headers=staff_headers)
+    assert resp_auth.status_code == 200
+    data = resp_auth.json()
+    assert "count" in data
+    assert "users" in data
+    assert isinstance(data["users"], list)
+
+
+def test_telegram_webhook_secret_enforcement():
+    """
+    Verifies that when TELEGRAM_MODE=webhook, TELEGRAM_WEBHOOK_SECRET is strictly validated.
+    """
+    client = TestClient(app)
+
+    with patch("backend.app.routes.telegram.TELEGRAM_MODE", "webhook"), \
+         patch("backend.app.routes.telegram.TELEGRAM_WEBHOOK_SECRET", "super_secret_webhook_token_123"):
+
+        # 1. Missing secret token header -> 403 Forbidden
+        resp_no_secret = client.post(
+            "/telegram/webhook",
+            json={"update_id": 1234},
+        )
+        assert resp_no_secret.status_code == 403
+
+        # 2. Invalid secret token header -> 403 Forbidden
+        resp_wrong_secret = client.post(
+            "/telegram/webhook",
+            json={"update_id": 1234},
+            headers={"X-Telegram-Bot-Api-Secret-Token": "wrong_secret"},
+        )
+        assert resp_wrong_secret.status_code == 403
+
+        # 3. Valid secret token header -> 200 OK
+        with patch.object(telegram_service, "process_webhook_update", new=AsyncMock(return_value=True)):
+            resp_valid = client.post(
+                "/telegram/webhook",
+                json={"update_id": 1234},
+                headers={"X-Telegram-Bot-Api-Secret-Token": "super_secret_webhook_token_123"},
+            )
+            assert resp_valid.status_code == 200
+            assert resp_valid.json() == {"ok": True}
+
+
+def test_handle_edit_and_profile_chat_allowed_enforcement():
+    """
+    Verifies that /edit and /profile strictly enforce _is_chat_allowed
+    when allowed_chat_ids is configured.
+    """
+    async def _run():
+        bot_service = TelegramBotService(
+            token="123456:FAKE_TOKEN_FOR_TESTING",
+            mode="polling",
+            allowed_chat_ids=[1001],  # Only 1001 allowed
+        )
+
+        mock_msg_unauth = AsyncMock()
+        mock_msg_unauth.reply_text = AsyncMock()
+        mock_chat_unauth = Chat(id=9999, type="private")
+
+        update_unauth = MagicMock(spec=Update)
+        update_unauth.effective_chat = mock_chat_unauth
+        update_unauth.effective_message = mock_msg_unauth
+
+        context = MagicMock()
+
+        # 1. /edit from unauthorized chat
+        await bot_service.handle_edit_command(update_unauth, context)
+        mock_msg_unauth.reply_text.assert_called_once()
+        assert "Unauthorized" in mock_msg_unauth.reply_text.call_args[0][0]
+
+        mock_msg_unauth.reply_text.reset_mock()
+
+        # 2. /profile from unauthorized chat
+        await bot_service.handle_profile(update_unauth, context)
+        mock_msg_unauth.reply_text.assert_called_once()
+        assert "Unauthorized" in mock_msg_unauth.reply_text.call_args[0][0]
 
     asyncio.run(_run())

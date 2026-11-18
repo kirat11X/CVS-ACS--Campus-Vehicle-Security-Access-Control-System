@@ -28,6 +28,7 @@ import io
 import logging
 import re
 import uuid
+from collections import OrderedDict
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -47,8 +48,10 @@ from telegram.ext import (
 )
 
 from backend.app.config import (
+    INVOICE_MAX_UPLOAD_MB,
     TELEGRAM_ALLOWED_CHAT_IDS,
     TELEGRAM_BOT_TOKEN,
+    TELEGRAM_GUARD_CHAT_IDS,
     TELEGRAM_MODE,
     TELEGRAM_WEBHOOK_SECRET,
 )
@@ -173,15 +176,21 @@ class TelegramBotService:
         token: Optional[str] = None,
         mode: Optional[str] = None,
         allowed_chat_ids: Optional[List[int]] = None,
+        guard_chat_ids: Optional[List[int]] = None,
     ) -> None:
         self.token: str = (token if token is not None else TELEGRAM_BOT_TOKEN).strip()
         self.mode: str = (mode if mode is not None else TELEGRAM_MODE).strip().lower()
         self.allowed_chat_ids: List[int] = (
-            allowed_chat_ids if allowed_chat_ids is not None else TELEGRAM_ALLOWED_CHAT_IDS
+            allowed_chat_ids if allowed_chat_ids is not None else list(TELEGRAM_ALLOWED_CHAT_IDS)
+        )
+        self.guard_chat_ids: List[int] = (
+            guard_chat_ids if guard_chat_ids is not None else list(TELEGRAM_GUARD_CHAT_IDS)
         )
         self.application: Optional[Application] = None
         self._is_running: bool = False
         self._lock = asyncio.Lock()
+        self._processed_update_ids: OrderedDict[int, float] = OrderedDict()
+        self._processed_file_unique_ids: OrderedDict[str, float] = OrderedDict()
 
     @property
     def is_configured(self) -> bool:
@@ -277,6 +286,43 @@ class TelegramBotService:
             return True
         return chat_id in self.allowed_chat_ids
 
+    def _is_guard_chat(self, chat_id: int) -> bool:
+        """
+        Verifies if chat_id belongs to an authorized security guard.
+        If guard_chat_ids is configured, chat_id must match.
+        Otherwise, checks if the registered Telegram profile has a Guard identifier.
+        """
+        if self.guard_chat_ids:
+            return chat_id in self.guard_chat_ids
+        prof = profile_manager.get_profile(chat_id)
+        if prof and profile_manager.is_registered(chat_id):
+            ident = (prof.get("identifier") or "").upper()
+            if ident.startswith(("GUARD", "GRD", "G_")):
+                return True
+        return False
+
+    def _is_duplicate_update(self, update_id: Optional[int]) -> bool:
+        """Returns True if update_id has already been processed within the LRU window."""
+        if update_id is None:
+            return False
+        if update_id in self._processed_update_ids:
+            return True
+        self._processed_update_ids[update_id] = datetime.now(timezone.utc).timestamp()
+        if len(self._processed_update_ids) > 10000:
+            self._processed_update_ids.popitem(last=False)
+        return False
+
+    def _is_duplicate_file(self, file_unique_id: Optional[str]) -> bool:
+        """Returns True if file_unique_id has already been processed within the LRU window."""
+        if not file_unique_id:
+            return False
+        if file_unique_id in self._processed_file_unique_ids:
+            return True
+        self._processed_file_unique_ids[file_unique_id] = datetime.now(timezone.utc).timestamp()
+        if len(self._processed_file_unique_ids) > 10000:
+            self._processed_file_unique_ids.popitem(last=False)
+        return False
+
     # ------------------------------------------------------------------
     # Command & Lifecycle Handlers
     # ------------------------------------------------------------------
@@ -348,6 +394,14 @@ class TelegramBotService:
     async def handle_edit_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Command /edit to restart or adjust profile."""
         chat_id = update.effective_chat.id if update.effective_chat else 0
+        if not self._is_chat_allowed(chat_id):
+            if update.effective_message:
+                await update.effective_message.reply_text(
+                    f"⛔ Unauthorized: Chat ID `{chat_id}` is not registered in TELEGRAM_ALLOWED_CHAT_IDS.",
+                    parse_mode="Markdown",
+                )
+            return
+
         msg = update.effective_message
         if not msg:
             return
@@ -392,6 +446,14 @@ class TelegramBotService:
     async def handle_profile(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Displays user's security profile and gives editing options."""
         chat_id = update.effective_chat.id if update.effective_chat else 0
+        if not self._is_chat_allowed(chat_id):
+            if update.effective_message:
+                await update.effective_message.reply_text(
+                    f"⛔ Unauthorized: Chat ID `{chat_id}` is not registered in TELEGRAM_ALLOWED_CHAT_IDS.",
+                    parse_mode="Markdown",
+                )
+            return
+
         msg = update.effective_message
         if not msg:
             return
@@ -716,10 +778,22 @@ class TelegramBotService:
             )
             return
 
+        # Check update_id deduplication
+        if update.update_id is not None and self._is_duplicate_update(update.update_id):
+            logger.info("Duplicate invoice update_id %s received, skipping.", update.update_id)
+            return
+
         # Identify photo or document
         file_id: Optional[str] = None
+        file_unique_id: Optional[str] = None
+        file_size: Optional[int] = None
+        is_unsupported_doc = False
+
         if message.photo:
-            file_id = message.photo[-1].file_id  # Highest resolution
+            best_photo = message.photo[-1]
+            file_id = best_photo.file_id
+            file_unique_id = getattr(best_photo, "file_unique_id", None)
+            file_size = getattr(best_photo, "file_size", None)
         elif message.document:
             doc = message.document
             mime = (doc.mime_type or "").lower()
@@ -730,8 +804,50 @@ class TelegramBotService:
                 or fname.endswith((".jpg", ".jpeg", ".png", ".webp", ".pdf"))
             ):
                 file_id = doc.file_id
+                file_unique_id = getattr(doc, "file_unique_id", None)
+                file_size = getattr(doc, "file_size", None)
+            else:
+                is_unsupported_doc = True
+
+        if is_unsupported_doc:
+            await message.reply_text(
+                "❌ *Unsupported Document Format*\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "Please upload a valid invoice photo (JPG, PNG, WEBP) or PDF document.",
+                parse_mode="Markdown",
+            )
+            return
 
         if not file_id:
+            await message.reply_text(
+                "❌ *Unsupported File*\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "Please send an image photo, screenshot, or PDF of your delivery invoice.",
+                parse_mode="Markdown",
+            )
+            return
+
+        # 10 MB cap before downloading
+        MAX_INVOICE_BYTES = int(INVOICE_MAX_UPLOAD_MB * 1024 * 1024)
+        if isinstance(file_size, int) and file_size > MAX_INVOICE_BYTES:
+            logger.warning("Incoming file size %s exceeds %s MB limit for chat %s", file_size, INVOICE_MAX_UPLOAD_MB, chat_id)
+            await message.reply_text(
+                f"❌ *File Too Large*\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"The maximum allowed invoice size is {int(INVOICE_MAX_UPLOAD_MB)} MB. Please upload a smaller or compressed file.",
+                parse_mode="Markdown",
+            )
+            return
+
+        # Deduplication on file_unique_id
+        if file_unique_id and self._is_duplicate_file(file_unique_id):
+            logger.warning("Duplicate invoice file_unique_id %s from chat %s rejected.", file_unique_id, chat_id)
+            await message.reply_text(
+                "⚠️ *Duplicate Invoice Detected*\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "This exact invoice file has already been received and processed by our servers.",
+                parse_mode="Markdown",
+            )
             return
 
         sender_name = profile.get("full_name", "Member")
@@ -745,8 +861,20 @@ class TelegramBotService:
 
         try:
             tg_file = await context.bot.get_file(file_id)
+            tg_size = getattr(tg_file, "file_size", None)
+            if isinstance(tg_size, int) and tg_size > MAX_INVOICE_BYTES:
+                await status_msg.edit_text(
+                    f"❌ File too large: Download size exceeds {int(INVOICE_MAX_UPLOAD_MB)} MB limit."
+                )
+                return
+
             file_bytes = await tg_file.download_as_bytearray()
             raw_bytes = bytes(file_bytes)
+            if len(raw_bytes) > MAX_INVOICE_BYTES:
+                await status_msg.edit_text(
+                    f"❌ File too large: File size ({len(raw_bytes)/(1024*1024):.1f} MB) exceeds {int(INVOICE_MAX_UPLOAD_MB)} MB limit."
+                )
+                return
 
             caption = message.caption or message.text or ""
             extracted_oid = order_id_from_text(caption)
@@ -792,25 +920,11 @@ class TelegramBotService:
                     # Student ID: Run automated OCR & cargo screening model
                     # ----------------------------------------------------------
                     try:
-                        invoice = delivery_screening_service.process(
-                            db,
-                            order_id=extracted_oid,
-                            content=raw_bytes,
-                            source=DeliverySource.TELEGRAM,
-                            sender=sender_tag,
-                            gate_id=assigned_gate,
-                            platform=None,
-                            user_id=None,
-                            customer_name=sender_name,
-                            customer_id=cust_id,
-                        )
-                    except Exception as proc_exc:
-                        # If no order ID was given and none could be read, auto-generate fallback ID
-                        if "No order ID was given" in str(proc_exc):
-                            fallback_oid = f"TG-{uuid.uuid4().hex[:8].upper()}"
-                            invoice = delivery_screening_service.process(
+                        invoice = await asyncio.wait_for(
+                            asyncio.to_thread(
+                                delivery_screening_service.process,
                                 db,
-                                order_id=fallback_oid,
+                                order_id=extracted_oid,
                                 content=raw_bytes,
                                 source=DeliverySource.TELEGRAM,
                                 sender=sender_tag,
@@ -819,7 +933,48 @@ class TelegramBotService:
                                 user_id=None,
                                 customer_name=sender_name,
                                 customer_id=cust_id,
-                            )
+                            ),
+                            timeout=30.0,
+                        )
+                    except asyncio.TimeoutError:
+                        logger.error("Invoice screening timed out after 30s for chat %s", chat_id)
+                        await status_msg.edit_text(
+                            "⏱️ *Processing Timeout*\n"
+                            "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                            "Invoice screening timed out on the server. Please try submitting again or upload a clearer screenshot.",
+                            parse_mode="Markdown",
+                        )
+                        return
+                    except Exception as proc_exc:
+                        # If no order ID was given and none could be read, auto-generate fallback ID
+                        if "No order ID was given" in str(proc_exc):
+                            fallback_oid = f"TG-{uuid.uuid4().hex[:8].upper()}"
+                            try:
+                                invoice = await asyncio.wait_for(
+                                    asyncio.to_thread(
+                                        delivery_screening_service.process,
+                                        db,
+                                        order_id=fallback_oid,
+                                        content=raw_bytes,
+                                        source=DeliverySource.TELEGRAM,
+                                        sender=sender_tag,
+                                        gate_id=assigned_gate,
+                                        platform=None,
+                                        user_id=None,
+                                        customer_name=sender_name,
+                                        customer_id=cust_id,
+                                    ),
+                                    timeout=30.0,
+                                )
+                            except asyncio.TimeoutError:
+                                logger.error("Fallback invoice screening timed out after 30s for chat %s", chat_id)
+                                await status_msg.edit_text(
+                                    "⏱️ *Processing Timeout*\n"
+                                    "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                                    "Invoice screening timed out on the server. Please try submitting again or upload a clearer screenshot.",
+                                    parse_mode="Markdown",
+                                )
+                                return
                         else:
                             raise proc_exc
 
@@ -1221,6 +1376,12 @@ class TelegramBotService:
             await query.answer()
             return
 
+        # Enforce Guard role: reject non-guard chat_ids with an alert
+        if not self._is_guard_chat(chat_id):
+            logger.warning("Unauthorized triage callback attempt by non-guard chat_id %s", chat_id)
+            await query.answer("Unauthorized: Guard role required", show_alert=True)
+            return
+
         parts = data.split(":", 2)
         if len(parts) != 3:
             await query.answer("Invalid callback data.", show_alert=True)
@@ -1237,9 +1398,14 @@ class TelegramBotService:
 
         db = SessionLocal()
         try:
-            guard = db.query(User).filter(User.username == "guard1").first()
+            prof = profile_manager.get_profile(chat_id)
+            guard = None
+            if prof:
+                guard = db.query(User).filter(User.username == prof.get("identifier")).first()
             if not guard:
                 guard = db.query(User).filter(User.role == "GUARD").first()
+            if not guard:
+                guard = db.query(User).filter(User.username == "guard1").first()
             if not guard:
                 guard = db.query(User).first()
 
@@ -1293,6 +1459,9 @@ class TelegramBotService:
 
         update = Update.de_json(raw_data, self.application.bot)
         if update:
+            if update.update_id is not None and self._is_duplicate_update(update.update_id):
+                logger.info("Ignoring duplicate webhook update_id %s", update.update_id)
+                return True
             await self.application.process_update(update)
             return True
         return False

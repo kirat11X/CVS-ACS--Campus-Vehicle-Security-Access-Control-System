@@ -135,37 +135,74 @@ export function DeliveryLines({ items, compact = false }: { items: DeliveryLine[
   );
 }
 
-/** "Lines add up: 675.00 + 25.00 = 700.00." or why they do not. */
+/** Guard Handover & System Approval Check */
 export function TotalsCheck({ detail }: { detail: DeliveryDetail }) {
   const inv = detail.invoice;
   const total = inv.total ?? detail.total_amount;
-  const base = inv.subtotal ?? inv.computed_total;
-  const parts = [base, inv.delivery_fee].filter((n): n is number => n !== null && n !== undefined);
-  const sum = parts.map(formatAmount).join(" + ");
+  const studentName = detail.sender || "Student";
+  const isApproved = detail.overall === "ALLOW";
+  const isAlert = detail.overall === "ALERT";
 
-  if (detail.totals_match === true) {
+  if (isApproved) {
     return (
-      <p className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
+      <div className="flex items-start gap-2.5 rounded-lg bg-emerald-500/10 p-3 text-sm ring-1 ring-emerald-500/30">
         <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
-        <span>
-          Lines add up: <span className="font-mono tabular-nums">{sum ? `${sum} = ${formatAmount(total)}` : formatAmount(total)}</span>.
-        </span>
-      </p>
+        <div className="min-w-0 flex-1 space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-semibold text-emerald-800 dark:text-emerald-200">
+              System Decision: Order Cleared & Approved
+            </span>
+            <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300">
+              Pass Allowed
+            </span>
+          </div>
+          <p className="text-xs text-slate-600 dark:text-slate-300">
+            <span className="font-medium text-slate-700 dark:text-slate-200">Guard Handover Verification:</span> When student arrives, match Name (<strong className="text-slate-900 dark:text-white">{studentName}</strong>) and Invoice Total (<strong className="font-mono text-slate-900 dark:text-white">{formatAmount(total)}</strong>) against physical order.
+          </p>
+        </div>
+      </div>
     );
   }
-  if (detail.totals_match === false) {
+
+  if (isAlert) {
     return (
-      <p className="flex items-start gap-2 text-sm text-slate-800 dark:text-slate-200">
-        <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
-        <span>
-          Lines do not add up: <span className="font-mono tabular-nums">{sum || "—"}</span> gives{" "}
-          <span className="font-mono tabular-nums">{formatAmount(inv.computed_total)}</span>, invoice total{" "}
-          <span className="font-mono tabular-nums">{formatAmount(total)}</span>. The delivery is at least REVIEW.
-        </span>
-      </p>
+      <div className="flex items-start gap-2.5 rounded-lg bg-rose-500/10 p-3 text-sm ring-1 ring-rose-500/30">
+        <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400" aria-hidden />
+        <div className="min-w-0 flex-1 space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-semibold text-rose-800 dark:text-rose-200">
+              System Decision: Contraband Flagged — Access Denied
+            </span>
+            <span className="rounded bg-rose-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-rose-800 dark:bg-rose-900/50 dark:text-rose-300">
+              Hold Delivery
+            </span>
+          </div>
+          <p className="text-xs text-slate-600 dark:text-slate-300">
+            Prohibited cargo identified. Do NOT release packet without physical inspection and supervisor escalation.
+          </p>
+        </div>
+      </div>
     );
   }
-  return <p className="text-sm text-slate-500 dark:text-slate-400">Totals could not be checked: the invoice total was not read.</p>;
+
+  return (
+    <div className="flex items-start gap-2.5 rounded-lg bg-amber-500/10 p-3 text-sm ring-1 ring-amber-500/30">
+      <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
+      <div className="min-w-0 flex-1 space-y-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-semibold text-amber-800 dark:text-amber-200">
+            System Decision: Flagged for Gate Physical Search (REVIEW)
+          </span>
+          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
+            Search Required
+          </span>
+        </div>
+        <p className="text-xs text-slate-600 dark:text-slate-300">
+          Uncertain items, restricted chemicals, or unverified lines detected. Guard must inspect physical package before allowing campus entry.
+        </p>
+      </div>
+    </div>
+  );
 }
 
 /** The reply the rider saw on chat / the intake page. */

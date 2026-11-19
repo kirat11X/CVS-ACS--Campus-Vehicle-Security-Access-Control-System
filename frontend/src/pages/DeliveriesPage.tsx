@@ -34,7 +34,7 @@ function DeliveryRow({ d, now }: { d: DeliverySummary; now: number }) {
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-mono text-sm font-semibold text-slate-900 dark:text-white">{d.order_id}</span>
             <VerdictBadge verdict={d.overall} />
-            {d.totals_match === false && (
+            {d.totals_match === false && d.overall !== "ALLOW" && (
               <span className="text-[11px] font-medium text-amber-700 dark:text-amber-300">totals do not add up</span>
             )}
           </div>

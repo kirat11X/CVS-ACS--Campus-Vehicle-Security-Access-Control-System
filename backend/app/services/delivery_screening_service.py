@@ -280,13 +280,20 @@ class DeliveryScreeningService:
         if result.totals_match is True:
             text += f" Total matches: {_money(p.total if p.total is not None else result.computed_total)}."
         elif result.totals_match is False:
-            if result.computed_total is None:
+            if result.overall == ScreeningVerdict.ALLOW:
+                tot_val = p.total if p.total is not None else result.computed_total
+                text += f" Invoice total: {_money(tot_val)}."
+            elif result.computed_total is None:
                 text += f" A line amount could not be read, so the total ({_money(p.total or p.subtotal)}) is not confirmed."
             else:
                 printed = p.total if p.total is not None else p.subtotal
                 text += f" Total does not add up: lines give {_money(result.computed_total)}, invoice says {_money(printed)}."
         else:
-            text += " No invoice total could be read to check."
+            tot_val = p.total if p.total is not None else result.computed_total
+            if tot_val:
+                text += f" Invoice total: {_money(tot_val)}."
+            else:
+                text += " No invoice total could be read to check."
         if result.order_id_on_invoice and result.order_id_on_invoice != normalize_order_id(order_id):
             text += f" The invoice shows order {result.order_id_on_invoice}."
         return text

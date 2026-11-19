@@ -265,9 +265,17 @@ function DeliveryVerificationDetail({
           <div className="font-mono text-lg font-bold text-slate-900 dark:text-white">
             {formatAmount(d.total_amount)}
           </div>
-          {d.totals_match === false && (
-            <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">
-              Total mismatch
+          {d.overall === "ALLOW" ? (
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+              <CheckCircle2 className="h-3 w-3" /> System Cleared
+            </span>
+          ) : d.overall === "ALERT" ? (
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+              <AlertCircle className="h-3 w-3" /> Contraband Flagged
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-600 dark:text-amber-400">
+              <AlertTriangle className="h-3 w-3" /> Flagged for Search
             </span>
           )}
         </div>

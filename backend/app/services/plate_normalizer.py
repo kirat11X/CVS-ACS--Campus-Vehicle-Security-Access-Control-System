@@ -161,6 +161,74 @@ CONFUSION_PAIRS: dict[str, str] = {
     "T": "7", "7": "T",
 }
 
+# Aliases adhering to contract specification
+TO_ALPHA = EXPANDED_DIGIT_TO_LETTER
+TO_DIGIT = EXPANDED_LETTER_TO_DIGIT
+
+
+def strip_ind_prefix(raw_text: str | None) -> str:
+    """
+    Strips leading 'IND' artifacts and non-alphanumeric noise from raw plate text.
+    """
+    if not raw_text:
+        return ""
+    t = normalize_plate(raw_text)
+    if t.startswith("IND") and len(t) >= 6:
+        t = t[3:]
+    elif t.startswith("1ND") and len(t) >= 7:
+        t = t[3:]
+    if t.endswith("IND") and len(t) >= 7:
+        t = t[:-3]
+    return t
+
+
+def classify_plate_format(plate: str) -> str:
+    """
+    Categorizes a plate string into statutory categories:
+    'STANDARD', 'BHARAT_SERIES', 'VINTAGE', 'DIPLOMATIC', 'MILITARY', or 'INVALID'.
+    """
+    if not plate:
+        return "INVALID"
+    p = normalize_plate(plate)
+
+    # 1. Bharat Series (BH): YY BH #### XX (year >= 21, no I or O in series, num != 0000)
+    m_bh = re.match(r"^([0-9]{2})BH([0-9]{4})([A-Z]{1,2})$", p)
+    if m_bh:
+        yy, num, series = m_bh.groups()
+        if int(yy) >= 21 and not any(c in series for c in "IO") and num != "0000":
+            return "BHARAT_SERIES"
+
+    # 2. Vintage: SS VA XX ####
+    m_va = re.match(r"^([A-Z]{2})VA([A-Z]{2})([0-9]{4})$", p)
+    if m_va:
+        state, series, num = m_va.groups()
+        if state in ALL_VALID_STATES and not any(c in series for c in "IO") and num != "0000":
+            return "VINTAGE"
+
+    # 3. Diplomatic: NNN (CD|CC|UN|IOD) NNNN
+    if re.match(r"^[0-9]{1,3}(CD|CC|UN|IOD)[0-9]{1,4}[A-Z]?$", p):
+        return "DIPLOMATIC"
+
+    # 4. Military: YY [A-Z] 6-digits [A-Z]
+    if re.match(r"^[0-9]{2}[A-Z][0-9]{6}[A-Z]$", p):
+        return "MILITARY"
+
+    # 5. Standard State: SS DD [L{1,3}] NNNN
+    m_std = re.match(r"^([A-Z]{2})([0-9]{1,2})([A-Z]{0,3})([0-9]{4})$", p)
+    if m_std:
+        state, rto, series, num = m_std.groups()
+        if (
+            state in ALL_VALID_STATES
+            and int(rto) != 0
+            and (len(rto) == 2 or (len(rto) == 1 and state == "DL"))
+            and not any(c in series for c in "IO")
+            and (len(series) > 0 or state == "KA")
+            and num != "0000"
+        ):
+            return "STANDARD"
+
+    return "INVALID"
+
 
 def _get_letter_candidates(ch: str) -> list[tuple[str, int]]:
     """Returns candidate letters for a letter slot: (char, swap_penalty)."""
@@ -184,7 +252,7 @@ def suggest_repairs(raw: str | None) -> list[str]:
     into a valid statutory Indian plate (Standard State or Bharat Series).
     Returns valid repaired plate candidates, fewest swaps first.
     """
-    text = normalize_plate(raw)
+    text = strip_ind_prefix(raw)
     if not text or is_valid_indian_plate(text):
         return []
 
@@ -287,11 +355,71 @@ def repair_plate_positional(raw: str | None) -> Optional[str]:
       (e.g. 'P810A81234' -> 'PB10AB1234', '0L01AB1234' -> 'DL01AB1234').
     - Returns None if the plate cannot be repaired to a valid statutory Indian format.
     """
-    text = normalize_plate(raw)
+    text = strip_ind_prefix(raw)
     if not text:
         return None
     if is_valid_indian_plate(text):
         return text
     candidates = suggest_repairs(text)
     return candidates[0] if candidates else None
+
+
+def correct_indian_plate(raw_text: str) -> tuple[str, float, str]:
+    """
+    CMVR Rule 50 statutory positional syntax repair:
+    - Strips leading 'IND' artifacts and non-alphanumeric noise.
+    - Evaluates Bharat Series (YYBH####XX) and Standard State (SS DD [L{1,3}] NNNN).
+    - Applies positional confusion mappings:
+      Slots 0-1: State letters (ALL_VALID_STATES)
+      Slots 2-3: RTO digits (supporting Delhi 1-digit RTO and Karnataka blank series)
+      Middle: Series letters (no I/O)
+      Tail: 4 digits (not 0000)
+    Returns: (canonical_plate, confidence_score, format_category)
+    where format_category in ('STANDARD', 'BHARAT_SERIES', 'VINTAGE', 'DIPLOMATIC', 'MILITARY', 'INVALID')
+    """
+    if not raw_text:
+        return ("", 0.0, "INVALID")
+
+    cleaned = strip_ind_prefix(raw_text)
+    if not cleaned:
+        return ("", 0.0, "INVALID")
+
+    # 1. Direct statutory format check
+    fmt = classify_plate_format(cleaned)
+    if fmt != "INVALID":
+        return (cleaned, 1.0, fmt)
+
+    # 2. Check phantom trailing 5th digit (e.g. GJ13UX35217 -> GJ13UX3521)
+    if len(cleaned) >= 11 and cleaned[-5:].isdigit():
+        trimmed = cleaned[:-1]
+        t_fmt = classify_plate_format(trimmed)
+        if t_fmt != "INVALID":
+            return (trimmed, 0.90, t_fmt)
+
+    # 3. Positional syntax-constrained repairs
+    candidates = suggest_repairs(cleaned)
+    if candidates:
+        best = candidates[0]
+        best_fmt = classify_plate_format(best)
+        if best_fmt != "INVALID":
+            swaps = sum(1 for a, b in zip(cleaned, best) if a != b)
+            if len(cleaned) != len(best):
+                swaps += abs(len(cleaned) - len(best))
+            conf = max(0.2, round(1.0 - 0.1 * swaps, 2))
+            return (best, conf, best_fmt)
+
+    # 4. Attempt repair on trimmed candidate if trailing phantom digit existed
+    if len(cleaned) >= 11 and cleaned[-5:].isdigit():
+        trimmed = cleaned[:-1]
+        t_cands = suggest_repairs(trimmed)
+        if t_cands:
+            best = t_cands[0]
+            best_fmt = classify_plate_format(best)
+            if best_fmt != "INVALID":
+                swaps = sum(1 for a, b in zip(trimmed, best) if a != b) + 1
+                conf = max(0.2, round(1.0 - 0.1 * swaps, 2))
+                return (best, conf, best_fmt)
+
+    # 5. Invalid / unrepairable non-statutory read
+    return (cleaned, 0.0, "INVALID")
 

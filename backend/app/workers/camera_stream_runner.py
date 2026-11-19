@@ -39,9 +39,26 @@ from backend.app.models.enums import ObservationDirection, ObservationSource, Ob
 from backend.app.models.stream_setting import GateStreamSetting
 from backend.app.models.vehicle import Vehicle
 from backend.app.schemas.observation import ObservationCreate
+from backend.app.services.anpr.color_remap import remap_to_yellow_black
+from backend.app.services.anpr.ocr_engine import (
+    deskew_plate,
+    is_plate_like_crop,
+    pad_plate_bbox,
+    run_dual_pass_ocr,
+    split_two_line_plate,
+)
+from backend.app.services.anpr.polarity_normalizer import normalize_plate_agnostic
+from backend.app.services.anpr.track_voter import TrackVoter
 from backend.app.services.multiframe_plate_consensus import decompose_indian_plate_slots, fuse_multiframe_plate_reads
 from backend.app.services.observation_service import ObservationService
-from backend.app.services.plate_normalizer import is_valid_indian_plate, normalize_plate, suggest_repairs
+from backend.app.services.plate_normalizer import (
+    classify_plate_format,
+    correct_indian_plate,
+    is_valid_indian_plate,
+    normalize_plate,
+    repair_plate_positional,
+    suggest_repairs,
+)
 from research_track.track_a.src.registry_matcher import OpticalPlateMatcher
 
 logger = logging.getLogger("campus_security.camera_stream")
@@ -123,28 +140,6 @@ def letterbox_image(image: np.ndarray, target_size: int = 640) -> Tuple[np.ndarr
     canvas[dy : dy + nh, dx : dx + nw] = resized
     return canvas, scale, dx, dy
 
-
-def is_plate_like_crop(crop: np.ndarray) -> bool:
-    """
-    Crop-level plate-likeness gate before OCR.
-    Rejects crops with low grayscale contrast (std < 22.0) or abnormal
-    Canny edge density (< 0.04 or > 0.55) so flat walls, shadows, and
-    uniform empty space never reach OCR.
-    """
-    if crop is None or crop.size == 0 or crop.shape[0] < 12 or crop.shape[1] < 30:
-        return False
-
-    gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY) if crop.ndim == 3 else crop
-    std = float(np.std(gray))
-    if std < 22.0:
-        return False
-
-    edges = cv2.Canny(gray, 50, 150)
-    edge_density = float(np.count_nonzero(edges)) / float(edges.size)
-    if edge_density < 0.04 or edge_density > 0.55:
-        return False
-
-    return True
 
 
 def preprocess_plate_crop(crop: np.ndarray) -> np.ndarray:
@@ -232,6 +227,107 @@ def sort_multiline_boxes(
     return sorted_items
 
 
+class TrackVoterList(list):
+    """
+    Enhanced temporal track buffer that behaves as a list of candidate dicts
+    while managing a TrackVoter instance for multi-frame consensus.
+    """
+
+    def __init__(
+        self,
+        gate_id: str = "",
+        min_consensus_frames: int = 5,
+        max_track_frames: int = 8,
+    ) -> None:
+        super().__init__()
+        self.gate_id = str(gate_id)
+        self.min_consensus_frames = min_consensus_frames
+        self.max_track_frames = max_track_frames
+        self.voter = TrackVoter(
+            min_consensus_frames=min_consensus_frames,
+            max_track_frames=max_track_frames,
+        )
+
+    def add_observation(
+        self,
+        track_id: str,
+        plate_text: str,
+        confidence: float,
+        bbox: List[int],
+        frame_ts: float,
+        frame_bgr: Optional[np.ndarray] = None,
+    ) -> None:
+        self.voter.add_observation(
+            track_id=track_id,
+            plate_text=plate_text,
+            confidence=confidence,
+            bbox=bbox,
+            frame_ts=frame_ts,
+            frame_bgr=frame_bgr,
+        )
+        cand = {
+            "raw_plate": plate_text,
+            "conf": confidence,
+            "bbox": bbox,
+            "frame": frame_bgr,
+            "timestamp": frame_ts,
+        }
+        super().append(cand)
+        if len(self) > self.max_track_frames:
+            del self[:-self.max_track_frames]
+
+    def get_consensus(self, track_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        return self.voter.get_consensus(track_id or self.gate_id)
+
+    def clear(self) -> None:
+        super().clear()
+        self.voter.clear_track(self.gate_id)
+
+    def clear_track(self, track_id: Optional[str] = None) -> None:
+        super().clear()
+        self.voter.clear_track(track_id or self.gate_id)
+
+    def get_track_frame_count(self, track_id: Optional[str] = None) -> int:
+        return self.voter.get_track_frame_count(track_id or self.gate_id)
+
+    def append(self, item: Any) -> None:
+        super().append(item)
+        if isinstance(item, dict):
+            p_text = str(item.get("raw_plate") or item.get("plate", ""))
+            p_conf = float(item.get("conf") or item.get("confidence", 0.9))
+            p_bbox = list(item.get("bbox", []))
+            p_frame = item.get("frame")
+            p_ts = float(item.get("timestamp", time.time()))
+            self.voter.add_observation(
+                track_id=self.gate_id,
+                plate_text=p_text,
+                confidence=p_conf,
+                bbox=p_bbox,
+                frame_ts=p_ts,
+                frame_bgr=p_frame,
+            )
+        if len(self) > self.max_track_frames:
+            del self[:-self.max_track_frames]
+
+
+class _TemporalTracksDict(dict):
+    """Default-instantiating dict mapping gate_id to TrackVoterList."""
+
+    def __missing__(self, gate_id: str) -> TrackVoterList:
+        val = TrackVoterList(gate_id=gate_id, min_consensus_frames=5, max_track_frames=8)
+        self[gate_id] = val
+        return val
+
+    def __setitem__(self, gate_id: str, val: Any) -> None:
+        if isinstance(val, list) and not isinstance(val, TrackVoterList):
+            new_val = TrackVoterList(gate_id=gate_id, min_consensus_frames=5, max_track_frames=8)
+            for item in val:
+                new_val.append(item)
+            super().__setitem__(gate_id, new_val)
+        else:
+            super().__setitem__(gate_id, val)
+
+
 class CameraStreamManager:
     """
     Manages live camera capture loops across multiple gates, dynamically
@@ -274,9 +370,17 @@ class CameraStreamManager:
         self._debounce_cache: Dict[Tuple[str, str], float] = {}
         # Gate-level burst debounce: gate_id -> (timestamp, plate)
         self._gate_last_ingest: Dict[str, Tuple[float, str]] = {}
-        # Temporal candidate tracks for multi-frame consensus: gate_id -> list of candidate frame dicts
-        self._temporal_tracks: Dict[str, List[Dict[str, Any]]] = collections.defaultdict(list)
+        # Temporal candidate tracks for multi-frame consensus: gate_id -> TrackVoterList
+        self._temporal_tracks: Dict[str, TrackVoterList] = _TemporalTracksDict()
         self._temporal_track_last_update: Dict[str, float] = {}
+
+    @property
+    def _track_voters(self) -> Dict[str, TrackVoter]:
+        return {gid: t.voter for gid, t in self._temporal_tracks.items()}
+
+    @property
+    def _track_voter(self) -> TrackVoter:
+        return self._temporal_tracks["GATE_1"].voter
 
     # -------------------------------------------------------------------------
     # Lifecycle & Configuration
@@ -644,9 +748,22 @@ class CameraStreamManager:
                 # If vehicle accumulated at least 3 frames and has now moved past (idle >= 0.8s)
                 if len(track) >= 3 and idle_sec >= 0.8:
                     candidates = list(track[:8])
+                    consensus = track.get_consensus(gid)
+                    if consensus is None and len(candidates) >= 3:
+                        temp_voter = TrackVoter(min_consensus_frames=len(candidates), max_track_frames=8)
+                        for c in candidates:
+                            temp_voter.add_observation(
+                                track_id=gid,
+                                plate_text=c.get("raw_plate", ""),
+                                confidence=float(c.get("conf", 0.8)),
+                                bbox=c.get("bbox", []),
+                                frame_ts=float(c.get("timestamp", now)),
+                                frame_bgr=c.get("frame"),
+                            )
+                        consensus = temp_voter.get_consensus(gid)
                     self._temporal_tracks[gid].clear()
                     try:
-                        self._fuse_and_ingest(gid, candidates)
+                        self._fuse_and_ingest(gid, consensus if consensus else candidates)
                     except Exception as exc:
                         logger.error("Error fusing flushed track for %s: %s", gid, exc)
                 elif len(track) < 3 and idle_sec >= 1.5:
@@ -721,15 +838,15 @@ class CameraStreamManager:
                     bw_orig = bw_pad / scale
                     bh_orig = bh_pad / scale
 
-                    # Aspect-ratio clamping: 1.8 <= w/h <= 5.5
+                    # Aspect-ratio clamping: 0.9 <= w/h <= 6.0
                     aspect = bw_orig / max(1.0, bh_orig)
-                    if aspect < 1.8 or aspect > 5.5:
+                    if aspect < 0.9 or aspect > 6.0:
                         continue
 
                     # Reject oversized or tiny candidate boxes
                     if bw_orig > 0.7 * w or bh_orig > 0.35 * h:
                         continue
-                    if bw_orig < 60 or bh_orig < 18:
+                    if bw_orig < 32 or bh_orig < 16:
                         continue
 
                     x1 = max(0, int(cx_orig - bw_orig / 2))
@@ -753,141 +870,108 @@ class CameraStreamManager:
         # 4. High-Accuracy OCR & Statutory Indian Plate Normalization
         best_plate = None
         for x1, y1, x2, y2, score in final_boxes:
-            bw = x2 - x1
-            bh = y2 - y1
-
-            # 8% bounding-box padding around plate crops (clamped to frame dimensions)
-            pad_w = int(round(bw * 0.08))
-            pad_h = int(round(bh * 0.08))
-            px1 = max(0, x1 - pad_w)
-            py1 = max(0, y1 - pad_h)
-            px2 = min(w, x2 + pad_w)
-            py2 = min(h, y2 + pad_h)
+            # Requirement 3: Geometry & Bounding Box Padding
+            px1, py1, px2, py2 = pad_plate_bbox(
+                [x1, y1, x2, y2],
+                frame.shape[:2],
+                pad_w_pct=0.08,
+                pad_h_pct=0.05,
+            )
 
             crop = frame[py1:py2, px1:px2]
-            if crop.size == 0 or crop.shape[0] < 12 or crop.shape[1] < 30:
+            if crop.size == 0 or crop.shape[0] < 12 or crop.shape[1] < 20:
                 continue
 
-            # Crop-level plate-likeness gate before OCR:
-            # Rejects crops with low grayscale contrast (std < 22.0) or abnormal Canny edge density (< 0.04 or > 0.55)
+            # Requirement 3: Filter candidate crop with is_plate_like_crop(crop) before OCR
             if not is_plate_like_crop(crop):
                 logger.debug("[%s] Dropping non-plate crop (failed contrast/edge texture gate)", gate_id)
                 continue
 
-            # Crop preprocessing before OCR: aspect-preserving bicubic upscale if height < 48px, LAB CLAHE if dark/low contrast
-            prep_crop = preprocess_plate_crop(crop)
-            prep_h, prep_w = prep_crop.shape[:2]
-            aspect_ratio = float(prep_w) / max(1.0, float(prep_h))
-            is_possible_multiline = aspect_ratio < 2.5
+            # Requirement 3: Apply deskew_plate(crop, min_angle=3.0, max_angle=25.0)
+            crop = deskew_plate(crop, min_angle=3.0, max_angle=25.0)
 
-            raw_text = ""
-            char_conf = 0.0
-            crnn_text = ""
-            crnn_conf = 0.0
-
-            # Step 1: Run plate-trained ONNX model FIRST (indian_plate_crnn_best.onnx / track_a_ocr_cct.onnx)
-            if self._ocr_session is not None:
-                try:
-                    crop_rgb = cv2.cvtColor(prep_crop, cv2.COLOR_BGR2RGB)
-                    crop_res = cv2.resize(crop_rgb, (128, 32)).transpose(2, 0, 1)[np.newaxis, :, :, :].astype(np.float32) / 127.5 - 1.0
-                    logits = self._ocr_session.run(None, {self._ocr_session.get_inputs()[0].name: crop_res})[0]
-                    crnn_text, crnn_conf = decode_crnn_logits(logits)
-                except Exception as crnn_err:
-                    logger.debug("[%s] CRNN inference error: %s", gate_id, crnn_err)
-
-            crnn_norm = normalize_plate(crnn_text) if crnn_text else ""
-            crnn_is_valid = is_valid_indian_plate(crnn_norm) or bool(suggest_repairs(crnn_norm))
-
-            # Step 2: RapidOCR fallback/tie-breaker when CRNN confidence is low (< 0.55) or for 2-line plates
-            need_rapid_ocr = (
-                self._rapid_ocr is not None and (
-                    crnn_conf < 0.55
-                    or is_possible_multiline
-                    or len(crnn_norm) < 7
-                    or not crnn_is_valid
-                )
+            # Requirement 4: Dual-Pass Multi-Color & EV OCR Execution
+            # Pass 1 (Primary - Color Agnostic):
+            norm_crop, was_inverted = normalize_plate_agnostic(crop)
+            text1, conf1, engine1 = run_dual_pass_ocr(
+                norm_crop,
+                ocr_session=self._ocr_session,
+                rapid_ocr=self._rapid_ocr,
             )
+            plate1, syntax_conf1, cat1 = correct_indian_plate(text1)
 
-            rapid_text = ""
-            rapid_conf = 0.0
-            if need_rapid_ocr:
-                try:
-                    res, _ = self._rapid_ocr(prep_crop)
-                    if res:
-                        # When RapidOCR returns multiple lines on 2-line plates, sort boxes top-to-bottom then left-to-right
-                        sorted_res = sort_multiline_boxes(res, prep_h)
-                        lines = []
-                        confs = []
-                        for box, txt, r_score in sorted_res:
-                            norm = normalize_plate(txt)
-                            if norm == "IND":
-                                continue
-                            if norm.startswith("IND") and len(norm) > 4:
-                                norm = norm[3:]
-                            if norm.endswith("IND") and len(norm) > 4:
-                                norm = norm[:-3]
-                            if norm:
-                                lines.append(norm)
-                                confs.append(float(r_score))
-                        if lines:
-                            rapid_text = "".join(lines)
-                            rapid_conf = float(np.mean(confs))
-                except Exception as ocr_err:
-                    logger.debug("[%s] RapidOCR fallback error: %s", gate_id, ocr_err)
+            chosen_text = text1
+            chosen_conf = conf1
+            chosen_plate = plate1
+            chosen_syntax_conf = syntax_conf1
+            chosen_cat = cat1
+            chosen_engine = engine1
 
-            rapid_norm = normalize_plate(rapid_text) if rapid_text else ""
-            rapid_is_valid = is_valid_indian_plate(rapid_norm) or bool(suggest_repairs(rapid_norm))
+            # Pass 2 (Fallback - Soft CIE LAB Color Remapping):
+            # If conf1 < 0.55 or cat1 == 'INVALID':
+            if conf1 < 0.55 or cat1 == "INVALID":
+                remapped_crop, detected_type = remap_to_yellow_black(crop)
+                text2, conf2, engine2 = run_dual_pass_ocr(
+                    remapped_crop,
+                    ocr_session=self._ocr_session,
+                    rapid_ocr=self._rapid_ocr,
+                )
+                plate2, syntax_conf2, cat2 = correct_indian_plate(text2)
+                # Pick Pass 2 if cat2 != 'INVALID' and (cat1 == 'INVALID' or conf2 > conf1)
+                # Else: Use Pass 1 result
+                if cat2 != "INVALID" and (cat1 == "INVALID" or conf2 > conf1):
+                    chosen_text = text2
+                    chosen_conf = conf2
+                    chosen_plate = plate2
+                    chosen_syntax_conf = syntax_conf2
+                    chosen_cat = cat2
+                    chosen_engine = engine2
 
-            # Tie-breaker selection
-            if crnn_text and not rapid_text:
-                raw_text, char_conf = crnn_text, crnn_conf
-            elif rapid_text and not crnn_text:
-                raw_text, char_conf = rapid_text, rapid_conf
-            elif crnn_text and rapid_text:
-                if rapid_is_valid and not crnn_is_valid:
-                    raw_text, char_conf = rapid_text, rapid_conf
-                elif crnn_is_valid and not rapid_is_valid:
-                    raw_text, char_conf = crnn_text, crnn_conf
-                elif is_possible_multiline and len(rapid_norm) >= 7:
-                    raw_text, char_conf = rapid_text, rapid_conf
-                elif crnn_conf >= 0.55 and crnn_is_valid:
-                    raw_text, char_conf = crnn_text, crnn_conf
-                elif rapid_conf > crnn_conf:
-                    raw_text, char_conf = rapid_text, rapid_conf
-                else:
-                    raw_text, char_conf = crnn_text, crnn_conf
-
-            # Reject OCR reads with low character confidence (< 0.45)
-            if char_conf < 0.45:
-                logger.debug("[%s] Dropping low-confidence OCR read '%s' (char_conf=%.2f < 0.45)", gate_id, raw_text, char_conf)
+            # If both passes fail to meet quality criteria, reject
+            if not chosen_text or (chosen_conf < 0.40 and chosen_syntax_conf < 0.40 and chosen_cat == "INVALID"):
+                logger.debug("[%s] Dropping low-confidence OCR read '%s' (conf=%.2f)", gate_id, chosen_text, chosen_conf)
                 continue
 
-            norm_plate = normalize_plate(raw_text) if raw_text else None
-            # Statutory Indian plates have 7 to 11 characters
-            if not norm_plate or len(norm_plate) < 7 or len(norm_plate) > 11:
+            plate_to_use = chosen_plate or normalize_plate(chosen_text)
+            if not plate_to_use or len(plate_to_use) < 6:
                 continue
+
+            now_ts = time.time()
+            candidate_conf = max(float(score), float(chosen_conf))
+            best_plate = plate_to_use
 
             candidate = {
-                "raw_plate": raw_text,
-                "conf": max(score, char_conf),
+                "raw_plate": plate_to_use,
+                "raw_text": chosen_text,
+                "conf": candidate_conf,
+                "syntax_conf": chosen_syntax_conf,
+                "format_category": chosen_cat,
+                "engine": chosen_engine,
                 "bbox": [px1, py1, px2, py2],
                 "frame": frame.copy(),
                 "sharpness": laplacian_var,
-                "timestamp": time.time(),
+                "timestamp": now_ts,
             }
 
             if not require_consensus:
                 return self._fuse_and_ingest(gate_id, [candidate])
 
-            # In live stream mode, accumulate candidates across 5-8 frames
-            self._temporal_tracks[gate_id].append(candidate)
-            self._temporal_track_last_update[gate_id] = time.time()
+            # Requirement 5: Accumulate observation into per-gate TrackVoter
+            track_voter = self._temporal_tracks[gate_id]
+            track_voter.add_observation(
+                track_id=gate_id,
+                plate_text=plate_to_use,
+                confidence=candidate_conf,
+                bbox=[px1, py1, px2, py2],
+                frame_ts=now_ts,
+                frame_bgr=frame.copy(),
+            )
+            self._temporal_track_last_update[gate_id] = now_ts
 
-            # When 5-8 frames are collected, trigger consensus fusion
-            if len(self._temporal_tracks[gate_id]) >= 5:
-                batch = self._temporal_tracks[gate_id][:8]
-                self._temporal_tracks[gate_id] = self._temporal_tracks[gate_id][8:]
-                return self._fuse_and_ingest(gate_id, batch)
+            consensus = track_voter.get_consensus(gate_id)
+            if consensus is not None:
+                track_voter.clear()
+                return self._fuse_and_ingest(gate_id, consensus)
 
             return None
 
@@ -896,37 +980,88 @@ class CameraStreamManager:
     def _fuse_and_ingest(
         self,
         gate_id: str,
-        candidates: List[Dict[str, Any]],
+        candidates: Union[List[Dict[str, Any]], Dict[str, Any]],
     ) -> Optional[str]:
         """
-        Fuses 5-8 temporal candidate frames for an approaching vehicle, validates decomposed
+        Fuses temporal candidate frames for an approaching vehicle, validates decomposed
         slots against statutory Indian plate rules, applies registry matching, enforces debounce,
         and ingests the highest-quality snapshot into ObservationService.
         """
         if not candidates:
             return None
 
-        fused_res = fuse_multiframe_plate_reads(candidates)
+        fused_res: Optional[Dict[str, Any]] = None
+        if isinstance(candidates, dict):
+            fused_res = candidates
+        elif isinstance(candidates, list):
+            if len(candidates) == 1:
+                c = candidates[0]
+                raw_p = c.get("raw_plate", "")
+                canon_plate, syntax_conf, fmt_cat = correct_indian_plate(raw_p)
+                is_val = fmt_cat in ("STANDARD", "BHARAT_SERIES", "VINTAGE")
+                req_manual = (fmt_cat in ("MILITARY", "DIPLOMATIC", "INVALID")) or (syntax_conf < 0.40)
+                fused_res = {
+                    "fused_plate": canon_plate or raw_p,
+                    "confidence": float(c.get("conf", 0.85)),
+                    "syntax_confidence": syntax_conf,
+                    "agreement_rate": 1.0,
+                    "format_category": fmt_cat,
+                    "requires_manual_check": req_manual,
+                    "action": "MANUAL_CHECK" if req_manual else "PROCEED",
+                    "best_bbox": c.get("bbox") or [],
+                    "best_frame": c.get("frame"),
+                    "voted_raw": raw_p,
+                    "frame_count": 1,
+                    "is_valid": is_val,
+                }
+            else:
+                temp_voter = TrackVoter(min_consensus_frames=min(5, len(candidates)), max_track_frames=max(8, len(candidates)))
+                for c in candidates:
+                    temp_voter.add_observation(
+                        track_id=gate_id,
+                        plate_text=c.get("raw_plate", ""),
+                        confidence=float(c.get("conf", 0.85)),
+                        bbox=c.get("bbox", []),
+                        frame_ts=float(c.get("timestamp", time.time())),
+                        frame_bgr=c.get("frame"),
+                    )
+                fused_res = temp_voter.get_consensus(gate_id)
+                if not fused_res:
+                    fused_res = fuse_multiframe_plate_reads(candidates)
+
         if not fused_res:
-            logger.debug("[%s] Multi-frame fusion returned None for %d candidates", gate_id, len(candidates))
+            logger.debug("[%s] Multi-frame fusion returned None for candidates", gate_id)
             return None
 
         fused_plate = fused_res["fused_plate"]
-        is_valid = fused_res["is_valid"]
+        is_valid = fused_res.get("is_valid", False)
         best_frame = fused_res.get("best_frame")
         best_bbox = fused_res.get("best_bbox") or []
-        confidence = fused_res.get("confidence", 0.85)
-        agreement_rate = fused_res.get("agreement_rate", 1.0)
+        confidence = float(fused_res.get("confidence", 0.85))
+        agreement_rate = float(fused_res.get("agreement_rate", 1.0))
         slot_breakdown = fused_res.get("slot_breakdown", {})
+        format_category = fused_res.get("format_category", "")
+
+        # Requirement 5: Non-standard plates (consensus['requires_manual_check'] is True or consensus['action'] == 'MANUAL_CHECK')
+        # are flagged with requires_manual_check=True in observation metadata.
+        requires_manual_check = bool(
+            fused_res.get("requires_manual_check") is True
+            or fused_res.get("action") == "MANUAL_CHECK"
+        )
 
         # 1. Statutory Indian Plate Validation & Positional Repair
         candidate_plate = fused_plate
         is_statutory = is_valid_indian_plate(candidate_plate)
-        if not is_statutory:
-            repairs = suggest_repairs(candidate_plate)
-            if repairs:
-                candidate_plate = repairs[0]
-                is_statutory = is_valid_indian_plate(candidate_plate)
+        if not is_statutory and not requires_manual_check:
+            repaired = repair_plate_positional(candidate_plate)
+            if repaired:
+                candidate_plate = repaired
+                is_statutory = True
+            else:
+                repairs = suggest_repairs(candidate_plate)
+                if repairs:
+                    candidate_plate = repairs[0]
+                    is_statutory = is_valid_indian_plate(candidate_plate)
 
         # 2. Registry Matching via OpticalPlateMatcher
         self._refresh_registry_matcher()
@@ -945,9 +1080,9 @@ class CameraStreamManager:
                     match_score = max(match_score, float(res.similarity_score))
                     registry_matched = True
 
-        # Tightened Gate: Never accept a static-noise fuzzy match unless is_valid_indian_plate(repaired) is True
-        # OR (similarity_score >= 0.85 with ambiguity margin >= 0.07).
-        if not is_statutory and not registry_matched:
+        # Tightened Gate: Never accept a static-noise fuzzy match unless is_valid_indian_plate is True
+        # OR registry matched OR explicitly flagged for manual check.
+        if not is_statutory and not registry_matched and not requires_manual_check:
             logger.info(
                 "[%s] Dropped non-statutory/noise candidate '%s' (not a valid Indian plate and failed strict registry threshold)",
                 gate_id,
@@ -987,14 +1122,33 @@ class CameraStreamManager:
         self._gate_last_ingest[gate_id] = (now_sec, effective_plate)
 
         # Ingestion into ObservationService with multi-frame metadata
+        frame_cnt = int(fused_res.get("frame_count") or (len(candidates) if isinstance(candidates, list) else 1))
         extra_meta = {
             "multiframe_consensus": True,
-            "frame_count": len(candidates),
+            "frame_count": frame_cnt,
             "agreement_rate": agreement_rate,
             "slot_breakdown": slot_breakdown,
-            "candidate_reads": [c.get("raw_plate", "") for c in candidates if c.get("raw_plate")],
+            "format_category": format_category,
+            "requires_manual_check": requires_manual_check,
+            "action": "MANUAL_CHECK" if requires_manual_check else "PROCEED",
+            "candidate_reads": (
+                [c.get("raw_plate", "") for c in candidates if c.get("raw_plate")]
+                if isinstance(candidates, list)
+                else [fused_plate]
+            ),
         }
-        sharpness = max([float(c.get("sharpness", 50.0)) for c in candidates]) if candidates else 50.0
+
+        if isinstance(candidates, list) and candidates:
+            sharpness = max([float(c.get("sharpness", 50.0)) for c in candidates])
+        elif best_frame is not None and getattr(best_frame, "size", 0) > 0:
+            try:
+                g_frame = cv2.cvtColor(best_frame, cv2.COLOR_BGR2GRAY)
+                sharpness = float(cv2.Laplacian(g_frame, cv2.CV_64F).var())
+            except Exception:
+                sharpness = 50.0
+        else:
+            sharpness = 50.0
+
         self._ingest_observation(
             gate_id=gate_id,
             plate=effective_plate,
@@ -1049,6 +1203,7 @@ class CameraStreamManager:
                     "bbox": bbox,
                     "has_snapshot": has_snap,
                     "ingestion_time": datetime.now(timezone.utc).isoformat(),
+                    "requires_manual_check": bool(extra_metadata.get("requires_manual_check", False) if extra_metadata else False),
                 }
                 if extra_metadata:
                     meta.update(extra_metadata)

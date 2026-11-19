@@ -11,6 +11,11 @@ Supports:
       * Prepared crops manifest and Roboflow CC BY 4.0 plate datasets
       * prepared/ocr_in_v1 (13,698 crops canonical manifest and splits)
       * Target PEC Gate crop collection template (GATE_1, GATE_2, GATE_3)
+      * umar1103/final-licence (Multi-region Indian vehicle license plates)
+      * dataclusterlabs Indian EV plates (Green EV plates dataset)
+      * Roboflow electric-vehicle-number-plate-bwvra (Indian EV plates)
+      * Awiros/anpr-ocr (Real Indian gate ANPR dataset)
+      * STRICT EXCLUSION: minalchoudhary/india-ev-dataset (tabular CSV, strictly excluded)
   - Track B: Delivery Invoice VLM Datasets
       * Hugging Face datasets: cord-v2 (naver-clova-ix/cord-v2) & invoices-donut-data-v1 (katanaml-org/invoices-donut-data-v1)
       * Synthetic Indian GST invoice collection + visual document suite (PDF, PNG, JPG)
@@ -144,6 +149,14 @@ ROBOFLOW_CC_BY_4_DATASETS = [
         "license": "CC BY 4.0",
         "purpose": "Commercial and private vehicle plate detection",
     },
+    {
+        "id": "rf-ev-bwvra",
+        "slug": "electric-vehicle-number-plate-bwvra",
+        "version": "v1",
+        "url": "https://universe.roboflow.com/ev-plates/electric-vehicle-number-plate-bwvra",
+        "license": "CC BY 4.0",
+        "purpose": "Indian Electric Vehicle (EV) green license plates (private white-on-green & commercial yellow-on-green)",
+    },
 ]
 
 KAGGLE_CC_DATASETS = [
@@ -177,7 +190,68 @@ KAGGLE_CC_DATASETS = [
         "license": "MIT",
         "purpose": "Indian vehicle number plate OCR labeled dataset",
     },
+    {
+        "id": "umar1103/final-licence",
+        "license": "Research / Permissive",
+        "purpose": "Multi-region Indian vehicle license plates dataset",
+    },
 ]
+
+# ---------------------------------------------------------------------------
+# Strict Exclusions & Multi-Color / EV Datasets Catalog
+# ---------------------------------------------------------------------------
+EXCLUDED_DATASETS = [
+    {
+        "id": "minalchoudhary/india-ev-dataset",
+        "reason": "Tabular CSV dataset of EV market specifications and vehicle sales; non-visual data with zero ANPR images or bounding boxes.",
+        "action": "STRICTLY_EXCLUDED",
+    }
+]
+
+
+def check_exclusion_policy(dataset_id: str) -> None:
+    """
+    Enforce strict exclusion of non-visual / tabular datasets from Track A ANPR pipeline.
+    Specifically rejects 'minalchoudhary/india-ev-dataset' which is a tabular CSV.
+    """
+    norm = dataset_id.lower().strip()
+    if "minalchoudhary" in norm or "india-ev-dataset" in norm:
+        msg = (
+            f"Dataset '{dataset_id}' is STRICTLY EXCLUDED from Track A: "
+            "it is a tabular CSV of EV market specifications and sales statistics, "
+            "not a visual ANPR/bounding-box dataset."
+        )
+        logger.error(f"{RED}[EXCLUSION ENFORCED] {msg}{RESET}")
+        raise ValueError(msg)
+
+
+TRACK_A_MULTI_COLOR_AND_EV_DATASETS = {
+    "umar1103_final_licence": {
+        "hf_id": "umar1103/final-licence",
+        "kaggle_id": "umar1103/final-licence",
+        "title": "Indian Vehicle License Plates (umar1103/final-licence)",
+        "license": "Research / Permissive",
+        "purpose": "Multi-region Indian vehicle license plates with bounding box annotations",
+    },
+    "datacluster_ev_plates": {
+        "slug": "dataclusterlabs-indian-ev-dataset",
+        "title": "DataCluster Labs Indian EV License Plates",
+        "license": "CC BY-NC-ND / Research",
+        "purpose": "Indian Electric Vehicle (EV) plates with statutory green backgrounds (private white-on-green & commercial yellow-on-green)",
+    },
+    "roboflow_ev_bwvra": {
+        "slug": "electric-vehicle-number-plate-bwvra",
+        "title": "Roboflow Indian EV Number Plate Dataset",
+        "license": "CC BY 4.0",
+        "purpose": "Green EV license plate detection & localization across Indian passenger & commercial vehicles",
+    },
+    "awiros_anpr_ocr": {
+        "hf_id": "Awiros/anpr-ocr",
+        "title": "Awiros Real Gate ANPR & OCR Dataset",
+        "license": "Research / Permissive",
+        "purpose": "Real-world Indian perimeter gate ANPR captures with multi-camera angles, lighting variations, and OCR ground truth",
+    },
+}
 
 
 # ---------------------------------------------------------------------------
@@ -419,11 +493,19 @@ class TrackADatasetManager:
         self.track_dir = self.target_dir / "track_a"
         self.prepared_ocr_dir = self.target_dir / "prepared" / "ocr_in_v1"
         self.pec_gate_dir = self.target_dir / "pec_gate_crops"
+        self.umar_dir = self.track_dir / "umar1103-final-licence"
+        self.datacluster_ev_dir = self.track_dir / "datacluster-ev-plates"
+        self.roboflow_ev_dir = self.track_dir / "roboflow-ev-bwvra"
+        self.awiros_dir = self.track_dir / "awiros-anpr-ocr"
 
     def setup_directories(self):
         self.track_dir.mkdir(parents=True, exist_ok=True)
         self.prepared_ocr_dir.mkdir(parents=True, exist_ok=True)
         self.pec_gate_dir.mkdir(parents=True, exist_ok=True)
+        self.umar_dir.mkdir(parents=True, exist_ok=True)
+        self.datacluster_ev_dir.mkdir(parents=True, exist_ok=True)
+        self.roboflow_ev_dir.mkdir(parents=True, exist_ok=True)
+        self.awiros_dir.mkdir(parents=True, exist_ok=True)
 
     def download_kaggle_license_plates(self) -> Tuple[str, str, int]:
         """
@@ -802,6 +884,364 @@ class TrackADatasetManager:
 
         return "READY", "Perimeter templates created for GATE_1, GATE_2, GATE_3", total_staged
 
+    def download_umar1103_final_licence(self) -> Tuple[str, str, int]:
+        """
+        Manages Indian plates dataset: umar1103/final-licence (Hugging Face / Kaggle).
+        Downloads via huggingface_hub or kaggle CLI if credentials exist,
+        otherwise checks local candidate archives and generates an instruction stub.
+        """
+        check_exclusion_policy("umar1103/final-licence")
+        dest = self.umar_dir
+        dest.mkdir(parents=True, exist_ok=True)
+
+        images_count = count_images_in_dir(dest)
+        if images_count > 0 and not self.force:
+            logger.info(f"{GREEN}[Track A] umar1103/final-licence already present: {images_count} images in {dest}{RESET}")
+            return "READY", f"Found {images_count} images", images_count
+
+        # Check local candidate paths across workspace
+        local_candidates = [
+            REPO_ROOT / "training_1" / "final-licence",
+            REPO_ROOT / "training_1" / "umar1103-final-licence",
+            REPO_ROOT / "training_1" / "archive(10)",
+        ]
+        imported_count = 0
+        for cand in local_candidates:
+            if cand.is_dir():
+                cand_imgs = list(cand.glob("**/*.jpg")) + list(cand.glob("**/*.png"))
+                if cand_imgs:
+                    symlink_target = dest / cand.name
+                    if not symlink_target.exists():
+                        try:
+                            symlink_target.symlink_to(cand.resolve())
+                            imported_count += len(cand_imgs)
+                        except Exception:
+                            pass
+
+        if imported_count > 0:
+            logger.info(f"{GREEN}[Track A] Linked local plate archives: {imported_count} images staged.{RESET}")
+
+        # Attempt download via huggingface_hub
+        hf_downloaded = False
+        try:
+            from huggingface_hub import snapshot_download  # type: ignore
+
+            logger.info("[Track A] Attempting Hugging Face snapshot_download for umar1103/final-licence...")
+            snapshot_download(
+                repo_id="umar1103/final-licence",
+                repo_type="dataset",
+                local_dir=str(dest),
+                ignore_patterns=["*.git*", "*.md"],
+            )
+            hf_downloaded = True
+        except Exception as e:
+            logger.debug(f"Hugging Face hub download skipped or failed: {e}")
+
+        # Attempt download via Kaggle CLI
+        if not hf_downloaded:
+            kaggle_json = Path.home() / ".kaggle" / "kaggle.json"
+            has_kaggle_creds = kaggle_json.is_file() or (
+                os.environ.get("KAGGLE_USERNAME") and os.environ.get("KAGGLE_KEY")
+            )
+            if has_kaggle_creds:
+                logger.info("[Track A] Kaggle credentials found. Invoking kaggle CLI for umar1103/final-licence...")
+                try:
+                    cmd = [
+                        sys.executable,
+                        "-m",
+                        "kaggle",
+                        "datasets",
+                        "download",
+                        "-d",
+                        "umar1103/final-licence",
+                        "-p",
+                        str(dest),
+                        "--unzip",
+                    ]
+                    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+                    if proc.returncode == 0:
+                        logger.info(f"{GREEN}[Track A] Kaggle download completed for umar1103/final-licence.{RESET}")
+                    else:
+                        logger.warning(f"Kaggle CLI exited with {proc.returncode}: {proc.stderr[:160]}")
+                except Exception as e:
+                    logger.warning(f"Kaggle download invocation failed: {e}")
+
+        # Generate manifest & instruction README
+        images_count = count_images_in_dir(dest)
+        manifest_data = {
+            "dataset_id": "umar1103/final-licence",
+            "source_urls": [
+                "https://huggingface.co/datasets/umar1103/final-licence",
+                "https://www.kaggle.com/datasets/umar1103/final-licence",
+            ],
+            "license": "Research / Permissive",
+            "images_staged": images_count,
+            "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        }
+        with open(dest / "manifest.json", "w") as f:
+            json.dump(manifest_data, f, indent=2)
+
+        readme_text = (
+            "# Indian Vehicle License Plates Dataset (umar1103/final-licence)\n\n"
+            "- **Hugging Face:** `https://huggingface.co/datasets/umar1103/final-licence`\n"
+            "- **Kaggle:** `https://www.kaggle.com/datasets/umar1103/final-licence`\n\n"
+            "### Download Commands:\n"
+            "```bash\n"
+            "# Via Hugging Face Hub CLI:\n"
+            "huggingface-cli download umar1103/final-licence --repo-type dataset --local-dir .\n\n"
+            "# Via Kaggle API:\n"
+            "kaggle datasets download -d umar1103/final-licence -p . --unzip\n"
+            "```\n"
+        )
+        (dest / "README_UMAR1103_DOWNLOAD.md").write_text(readme_text)
+
+        status = "READY" if images_count > 0 else "PARTIAL"
+        return status, f"umar1103/final-licence: {images_count} images staged", images_count
+
+    def download_datacluster_ev_plates(self) -> Tuple[str, str, int]:
+        """
+        Manages DataCluster Labs Indian EV green license plates dataset.
+        Statutory format: White font on Green plate (Private EV), Yellow font on Green plate (Commercial EV).
+        """
+        check_exclusion_policy("dataclusterlabs/indian-ev-dataset")
+        dest = self.datacluster_ev_dir
+        (dest / "images").mkdir(parents=True, exist_ok=True)
+        (dest / "labels").mkdir(parents=True, exist_ok=True)
+
+        images_count = count_images_in_dir(dest)
+        if images_count > 0 and not self.force:
+            logger.info(f"{GREEN}[Track A] DataCluster EV plates present: {images_count} images in {dest}{RESET}")
+            return "READY", f"Found {images_count} images", images_count
+
+        # Check local candidates
+        local_candidates = [
+            REPO_ROOT / "training_1" / "datacluster_ev",
+            REPO_ROOT / "training_1" / "green_ev_plates",
+            REPO_ROOT / "training_1" / "archive(11)",
+        ]
+        imported_count = 0
+        for cand in local_candidates:
+            if cand.is_dir():
+                cand_imgs = list(cand.glob("**/*.jpg")) + list(cand.glob("**/*.png"))
+                if cand_imgs:
+                    symlink_target = dest / "images" / cand.name
+                    if not symlink_target.exists():
+                        try:
+                            symlink_target.symlink_to(cand.resolve())
+                            imported_count += len(cand_imgs)
+                        except Exception:
+                            pass
+
+        # Try Hugging Face Hub if dataset mirrored under DataCluster / dataclusterlabs
+        try:
+            from huggingface_hub import snapshot_download  # type: ignore
+
+            snapshot_download(
+                repo_id="DataCluster-Labs/indian-ev-number-plates",
+                repo_type="dataset",
+                local_dir=str(dest),
+                ignore_patterns=["*.git*"],
+            )
+        except Exception:
+            pass
+
+        images_count = count_images_in_dir(dest)
+
+        # Write Indian Green EV color calibration standard
+        color_spec = {
+            "standard": "MoRTH India Statutory Standard for Electric Vehicles (EV)",
+            "plate_color_classes": {
+                "PRIVATE_EV": {
+                    "background": "GREEN",
+                    "font": "WHITE",
+                    "description": "Personal electric cars, two-wheelers, scooters (Ather, Ola, Nexon EV)",
+                    "hsv_range": {"h_min": 35, "h_max": 85, "s_min": 50, "s_max": 255, "v_min": 40, "v_max": 255},
+                },
+                "COMMERCIAL_EV": {
+                    "background": "GREEN",
+                    "font": "YELLOW",
+                    "description": "Commercial passenger & cargo EVs (BluSmart cabs, electric auto-rickshaws, buses)",
+                    "hsv_range": {"h_min": 35, "h_max": 85, "s_min": 50, "s_max": 255, "v_min": 40, "v_max": 255},
+                },
+            },
+            "contrast_ratio_target": ">= 3.0:1 (Yellow-on-Green) / >= 4.5:1 (White-on-Green)",
+        }
+        with open(dest / "GREEN_EV_COLOR_SPEC.json", "w") as f:
+            json.dump(color_spec, f, indent=2)
+
+        manifest_data = {
+            "dataset_id": "dataclusterlabs/indian-ev-dataset",
+            "provider": "DataCluster Labs",
+            "license": "CC BY-NC-ND / Research",
+            "statutory_type": "Green EV License Plates",
+            "images_staged": images_count,
+            "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        }
+        with open(dest / "manifest.json", "w") as f:
+            json.dump(manifest_data, f, indent=2)
+
+        readme_text = (
+            "# DataCluster Labs Indian Electric Vehicle (EV) License Plates\n\n"
+            "This dataset provides ground-truth green background license plates conforming to Indian MoRTH rules:\n"
+            "- **Private EV:** White lettering on statutory Green background.\n"
+            "- **Commercial EV:** Yellow lettering on statutory Green background.\n\n"
+            "### Ingestion & Licensing:\n"
+            "Obtain authorized research credentials from DataCluster Labs:\n"
+            "- Website: `https://datacluster.ai/`\n"
+            "- Place raw annotated TAR/ZIP in this directory and unpack into `images/` and `labels/`.\n"
+        )
+        (dest / "README_DATACLUSTER_EV.md").write_text(readme_text)
+
+        status = "READY" if images_count > 0 else "PARTIAL"
+        return status, f"DataCluster EV plates: {images_count} images staged", images_count
+
+    def download_roboflow_ev_plates(self) -> Tuple[str, str, int]:
+        """
+        Manages Roboflow dataset: electric-vehicle-number-plate-bwvra (Indian EV green plates).
+        Uses ROBOFLOW_API_KEY environment variable if available, otherwise prepares staging manifest.
+        """
+        check_exclusion_policy("electric-vehicle-number-plate-bwvra")
+        dest = self.roboflow_ev_dir
+        (dest / "images").mkdir(parents=True, exist_ok=True)
+        (dest / "labels").mkdir(parents=True, exist_ok=True)
+
+        images_count = count_images_in_dir(dest)
+        if images_count > 0 and not self.force:
+            logger.info(f"{GREEN}[Track A] Roboflow EV plates present: {images_count} images in {dest}{RESET}")
+            return "READY", f"Found {images_count} images", images_count
+
+        # Check local candidates
+        local_candidates = [
+            REPO_ROOT / "training_1" / "electric-vehicle-number-plate-bwvra",
+            REPO_ROOT / "training_1" / "roboflow_ev",
+        ]
+        imported_count = 0
+        for cand in local_candidates:
+            if cand.is_dir():
+                cand_imgs = list(cand.glob("**/*.jpg")) + list(cand.glob("**/*.png"))
+                if cand_imgs:
+                    symlink_target = dest / "images" / cand.name
+                    if not symlink_target.exists():
+                        try:
+                            symlink_target.symlink_to(cand.resolve())
+                            imported_count += len(cand_imgs)
+                        except Exception:
+                            pass
+
+        # Check Roboflow Python SDK download if API key set
+        rf_key = os.environ.get("ROBOFLOW_API_KEY")
+        if rf_key:
+            logger.info("[Track A] ROBOFLOW_API_KEY detected. Attempting Roboflow SDK download for electric-vehicle-number-plate-bwvra...")
+            try:
+                from roboflow import Roboflow  # type: ignore
+
+                rf = Roboflow(api_key=rf_key)
+                project = rf.workspace("ev-plates").project("electric-vehicle-number-plate-bwvra")
+                project.version(1).download("yolov11", location=str(dest))
+            except Exception as e:
+                logger.warning(f"Roboflow download failed: {e}")
+
+        images_count = count_images_in_dir(dest)
+        manifest_data = {
+            "dataset_id": "roboflow/electric-vehicle-number-plate-bwvra",
+            "url": "https://universe.roboflow.com/ev-plates/electric-vehicle-number-plate-bwvra",
+            "license": "CC BY 4.0",
+            "images_staged": images_count,
+            "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        }
+        with open(dest / "manifest.json", "w") as f:
+            json.dump(manifest_data, f, indent=2)
+
+        readme_text = (
+            "# Roboflow Indian EV Number Plate Dataset (electric-vehicle-number-plate-bwvra)\n\n"
+            "- **Universe URL:** `https://universe.roboflow.com/ev-plates/electric-vehicle-number-plate-bwvra`\n"
+            "- **License:** CC BY 4.0\n\n"
+            "### Download with Python SDK:\n"
+            "```python\n"
+            "from roboflow import Roboflow\n"
+            "rf = Roboflow(api_key=\"YOUR_KEY\")\n"
+            "project = rf.workspace(\"ev-plates\").project(\"electric-vehicle-number-plate-bwvra\")\n"
+            "dataset = project.version(1).download(\"yolov11\", location=\"./roboflow-ev-bwvra\")\n"
+            "```\n"
+        )
+        (dest / "README_ROBOFLOW_EV.md").write_text(readme_text)
+
+        status = "READY" if images_count > 0 else "PARTIAL"
+        return status, f"Roboflow EV plates: {images_count} images staged", images_count
+
+    def download_awiros_anpr_ocr(self) -> Tuple[str, str, int]:
+        """
+        Manages Awiros real Indian gate ANPR dataset (Awiros/anpr-ocr).
+        Contains multi-camera perimeter gate vehicle imagery and plate transcriptions.
+        """
+        check_exclusion_policy("Awiros/anpr-ocr")
+        dest = self.awiros_dir
+        dest.mkdir(parents=True, exist_ok=True)
+
+        images_count = count_images_in_dir(dest)
+        if images_count > 0 and not self.force:
+            logger.info(f"{GREEN}[Track A] Awiros ANPR dataset present: {images_count} images in {dest}{RESET}")
+            return "READY", f"Found {images_count} images", images_count
+
+        # Check local candidates
+        local_candidates = [
+            REPO_ROOT / "training_1" / "awiros-anpr-ocr",
+            REPO_ROOT / "training_1" / "anpr-ocr",
+            REPO_ROOT / "training_1" / "archive(8)",
+        ]
+        imported_count = 0
+        for cand in local_candidates:
+            if cand.is_dir():
+                cand_imgs = list(cand.glob("**/*.jpg")) + list(cand.glob("**/*.png"))
+                if cand_imgs:
+                    symlink_target = dest / cand.name
+                    if not symlink_target.exists():
+                        try:
+                            symlink_target.symlink_to(cand.resolve())
+                            imported_count += len(cand_imgs)
+                        except Exception:
+                            pass
+
+        # Attempt download via huggingface_hub
+        try:
+            from huggingface_hub import snapshot_download  # type: ignore
+
+            logger.info("[Track A] Attempting Hugging Face snapshot_download for Awiros/anpr-ocr...")
+            snapshot_download(
+                repo_id="Awiros/anpr-ocr",
+                repo_type="dataset",
+                local_dir=str(dest),
+                ignore_patterns=["*.git*"],
+            )
+        except Exception as e:
+            logger.debug(f"Hugging Face snapshot_download for Awiros/anpr-ocr skipped or failed: {e}")
+
+        images_count = count_images_in_dir(dest)
+        manifest_data = {
+            "dataset_id": "Awiros/anpr-ocr",
+            "source": "https://huggingface.co/datasets/Awiros/anpr-ocr",
+            "license": "Research / Permissive",
+            "domain": "Real Indian Gate ANPR Multi-Camera Surveillance",
+            "images_staged": images_count,
+            "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        }
+        with open(dest / "manifest.json", "w") as f:
+            json.dump(manifest_data, f, indent=2)
+
+        readme_text = (
+            "# Awiros Indian Gate ANPR & OCR Dataset (Awiros/anpr-ocr)\n\n"
+            "- **Source:** `https://huggingface.co/datasets/Awiros/anpr-ocr`\n"
+            "- **Content:** Real-world perimeter gate camera views of Indian vehicles, license plates, and OCR annotations.\n\n"
+            "### Download with Hugging Face CLI:\n"
+            "```bash\n"
+            "huggingface-cli download Awiros/anpr-ocr --repo-type dataset --local-dir .\n"
+            "```\n"
+        )
+        (dest / "README_AWIROS_ANPR.md").write_text(readme_text)
+
+        status = "READY" if images_count > 0 else "PARTIAL"
+        return status, f"Awiros ANPR-OCR: {images_count} images staged", images_count
+
 
 # ---------------------------------------------------------------------------
 # Track B Downloader & Manager
@@ -1061,8 +1501,59 @@ def run_verification(target_dir: Path) -> int:
     else:
         collector.add("Track A", "PEC Gate Crop Collection Template", pec_dir, "MISSING", "Gate structure incomplete", 0)
 
+    # 5. umar1103/final-licence
+    umar_dir = target_dir / "track_a" / "umar1103-final-licence"
+    umar_count = count_images_in_dir(umar_dir)
+    umar_manifest = umar_dir / "manifest.json"
+    if umar_manifest.is_file() or umar_count > 0:
+        collector.add("Track A", "umar1103/final-licence (Indian Plates)", umar_dir, "READY" if umar_count > 0 else "PARTIAL", f"{umar_count} images staged", umar_count)
+    else:
+        collector.add("Track A", "umar1103/final-licence (Indian Plates)", umar_dir, "MISSING", "Not staged", 0)
+
+    # 6. DataCluster Indian EV Plates
+    dc_dir = target_dir / "track_a" / "datacluster-ev-plates"
+    dc_count = count_images_in_dir(dc_dir)
+    dc_manifest = dc_dir / "manifest.json"
+    if dc_manifest.is_file() or dc_count > 0:
+        collector.add("Track A", "DataCluster Indian EV Plates (Green)", dc_dir, "READY" if dc_count > 0 else "PARTIAL", f"{dc_count} images staged", dc_count)
+    else:
+        collector.add("Track A", "DataCluster Indian EV Plates (Green)", dc_dir, "MISSING", "Not staged", 0)
+
+    # 7. Roboflow EV Plates (electric-vehicle-number-plate-bwvra)
+    rf_ev_dir = target_dir / "track_a" / "roboflow-ev-bwvra"
+    rf_ev_count = count_images_in_dir(rf_ev_dir)
+    rf_ev_manifest = rf_ev_dir / "manifest.json"
+    if rf_ev_manifest.is_file() or rf_ev_count > 0:
+        collector.add("Track A", "Roboflow EV Plates (bwvra)", rf_ev_dir, "READY" if rf_ev_count > 0 else "PARTIAL", f"{rf_ev_count} images staged", rf_ev_count)
+    else:
+        collector.add("Track A", "Roboflow EV Plates (bwvra)", rf_ev_dir, "MISSING", "Not staged", 0)
+
+    # 8. Awiros Gate ANPR OCR
+    aw_dir = target_dir / "track_a" / "awiros-anpr-ocr"
+    aw_count = count_images_in_dir(aw_dir)
+    aw_manifest = aw_dir / "manifest.json"
+    if aw_manifest.is_file() or aw_count > 0:
+        collector.add("Track A", "Awiros Gate ANPR & OCR Dataset", aw_dir, "READY" if aw_count > 0 else "PARTIAL", f"{aw_count} images staged", aw_count)
+    else:
+        collector.add("Track A", "Awiros Gate ANPR & OCR Dataset", aw_dir, "MISSING", "Not staged", 0)
+
+    # 9. Strict Tabular Exclusion Audit (minalchoudhary/india-ev-dataset)
+    exclusion_ok = False
+    try:
+        check_exclusion_policy("minalchoudhary/india-ev-dataset")
+    except ValueError:
+        exclusion_ok = True
+    collector.add(
+        "Track A",
+        "Tabular Exclusion (minalchoudhary/india-ev-dataset)",
+        "STRICT_POLICY_EXCLUDED",
+        "READY" if exclusion_ok else "ERROR",
+        "Enforced: Tabular CSV strictly excluded",
+        0,
+    )
+
     # Track B Checks
-    # 5. Hugging Face Datasets
+    # 10. Hugging Face Datasets
     hf_dir = target_dir / "track_b" / "huggingface"
     hf_card = hf_dir / "HF_DATASET_CARDS.md"
     if hf_card.is_file():
@@ -1070,7 +1561,7 @@ def run_verification(target_dir: Path) -> int:
     else:
         collector.add("Track B", "HF CORD-v2 & Invoices-Donut", hf_dir, "MISSING", "Not initialized", 0)
 
-    # 6. Synthetic GST Invoices
+    # 11. Synthetic GST Invoices
     syn_dir = target_dir / "synthetic_invoices"
     syn_json = syn_dir / "synthetic_invoices.json"
     syn_gt = syn_dir / "synthetic_ground_truth.json"
@@ -1082,7 +1573,7 @@ def run_verification(target_dir: Path) -> int:
         collector.add("Track B", "Synthetic GST Invoices Suite", syn_dir, "MISSING", "Fixtures missing", 0)
 
     # Track C Checks
-    # 7. Item Taxonomy Seed Data
+    # 12. Item Taxonomy Seed Data
     tax_csv = target_dir / "item_taxonomy_seed" / "item_taxonomy_seed.csv"
     if tax_csv.is_file():
         chk = compute_sha256(tax_csv) == CANONICAL_TAXONOMY_SHA256
@@ -1155,6 +1646,22 @@ def main():
         # Step 4: PEC Gate template
         st, msg, count = mgr_a.setup_pec_gate_crop_template()
         logger.info(f"PEC Gate Template: [{st}] {msg}")
+
+        # Step 5: umar1103/final-licence
+        st, msg, count = mgr_a.download_umar1103_final_licence()
+        logger.info(f"umar1103/final-licence: [{st}] {msg}")
+
+        # Step 6: DataCluster Indian EV Plates (Green EV)
+        st, msg, count = mgr_a.download_datacluster_ev_plates()
+        logger.info(f"DataCluster EV Plates: [{st}] {msg}")
+
+        # Step 7: Roboflow EV Plates (electric-vehicle-number-plate-bwvra)
+        st, msg, count = mgr_a.download_roboflow_ev_plates()
+        logger.info(f"Roboflow EV Plates: [{st}] {msg}")
+
+        # Step 8: Awiros Gate ANPR OCR
+        st, msg, count = mgr_a.download_awiros_anpr_ocr()
+        logger.info(f"Awiros Gate ANPR OCR: [{st}] {msg}")
 
     # 2. Track B
     if args.track_b:

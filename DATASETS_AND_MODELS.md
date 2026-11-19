@@ -44,10 +44,14 @@ Track A focuses on vehicle detection, license plate localization, character segm
 | **`unified_plate_dataset`** | Unified campus & synthetic plate set | 3,598 images | 3,061 train / 537 val | Internal / Permissive | **Compiled & Used** in extended 100-epoch YOLO11n training. |
 | **`prepared/ocr_in_v1`** | Avinash-6 + KP00011 curated crops | 13,698 real plate crops | 9,570 train / 2,053 val / 2,073 test | Apache-2.0 / MIT | **Built & Verified**; zero plate-text overlap between splits. |
 | **`training_1/ocr_dataset`** | Statutory high-res Indian plate crops | 1,081 verified crops | 881 train / 200 val | Internal / Permissive | **Compiled & Used** in CRNN OCR extended training. |
+| **`umar1103/final-licence`** | [HuggingFace / Kaggle](https://huggingface.co/datasets/umar1103/final-licence) | 927+ multi-region plates | Staged for EC2 fine-tuning | Research / Permissive | **Staged & Hooked** in `download_datasets.py`; broad Indian regional plate coverage. |
+| **`DataCluster Indian EV Plates`** | [DataCluster Labs](https://datacluster.ai/) | 150+ green EV plate crops | Staged under `track_a/datacluster-ev-plates` | CC BY-NC-ND / Research | **Staged & Hooked**; statutory green plates (white-on-green private, yellow-on-green commercial). |
+| **`Roboflow EV Plates (bwvra)`** | [Roboflow Universe](https://universe.roboflow.com/ev-plates/electric-vehicle-number-plate-bwvra) | Full EV annotation project | Staged under `track_a/roboflow-ev-bwvra` | CC BY 4.0 | **Staged & Hooked**; specialized EV plate detector annotations. |
+| **`Awiros/anpr-ocr`** | [Awiros / HuggingFace](https://huggingface.co/datasets/Awiros/anpr-ocr) | 2,900 real gate captures | Staged under `track_a/awiros-anpr-ocr` | Research / Permissive | **Staged & Hooked**; real perimeter gate ANPR imagery with multi-camera perspective. |
 | **`DataCluster Indian Plates`** | [HuggingFace DataCluster](https://huggingface.co/datasets/DataCluster) | 15,000+ images (5,000 annotated)| Sample subset available | CC BY-NC-ND / Custom | **Evaluated**; sample subset used for validation; commercial license withheld. |
 | **`sanchit2843/Indian_LPR`** | [GitHub / arXiv:2111.06054](https://github.com/sanchit2843/Indian_LPR) | 16,192 images (2.5 MB metadata)| Withheld by original authors | Research Only | **Metadata Downloaded**; raw frames withheld by authors. |
 | **`IND-VNP` / IEEE DataPort** | IEEE DataPort / arXiv:2207.06657 | 3,000+ multi-state plates | Diverse Indian states | Academic / Restricted | **Cataloged** as fallback if local footage needs augmentation. |
-| **`PEC Campus Gate Footage`** | On-site cameras at Gates 1, 2, 3 | Target: 1,500–3,000 frames | Day, Night, Twilight, Rain | Institutional / Consented | **In Progress**; mandatory for production site calibration. |
+| **`PEC Campus Gate Footage`** | On-site cameras at Gates 1, 2, 3 | Target: 1,500–3,000 frames | Day, Night, Twilight, Rain | Institutional / Consented | **In Progress**; extracted via `capture_gate_calibration_frames.py` with leak-free protocol. |
 
 ### 2.2 Supplemental Vehicle Re-ID & Traffic Benchmarks
 
@@ -58,6 +62,52 @@ Track A focuses on vehicle detection, license plate localization, character segm
 | **`VeRi-776`** | Tsinghua University | 776 vehicles, 50,000 images | Research Use Only | Cross-camera vehicle Re-Identification between Gate 1 and Gate 2. |
 | **`UFPR-ALPR`** | Federal University of Paraná | 4,500 ALPR images | Research Use Only | Baseline comparison for non-Indian plate detection algorithms. |
 | **`CCPD`** | Chinese City Parking Dataset | 250,000 plate images | Research Use Only | Generic bounding box detector pretraining only (NOT for Indian text). |
+
+### 2.3 Strictly Excluded & Disqualified Datasets
+
+To preserve dataset integrity and prevent non-visual tabular data from corrupting vision pipelines, the following dataset is strictly excluded:
+
+| Disqualified Identifier | Data Provider | Modality | Reason for Disqualification | Enforcement Mechanism |
+| :--- | :--- | :--- | :--- | :--- |
+| **`minalchoudhary/india-ev-dataset`** | Kaggle | Tabular CSV | Non-visual tabular dataset of EV vehicle market statistics and specifications. Contains **zero images** and zero ANPR bounding boxes. | Programmatically blocked in `scripts/download_datasets.py` (`check_exclusion_policy()`). Raises immediate exception if requested. |
+
+### 2.4 Campus Gate Calibration & Leak-Free Dataset Capture Protocol
+
+Calibration frames are extracted directly from gate CCTV streams and recordings using `scripts/capture_gate_calibration_frames.py`.
+
+```
+                        GATE VIDEO / RTSP STREAM
+                                   │
+                                   ▼
+                   YOLO11n Detector + CRNN OCR
+                                   │
+                                   ▼
+                   Centroid & IoU Vehicle Tracker
+                                   │
+                  ┌────────────────┴────────────────┐
+                  ▼                                 ▼
+         Burst Window Separation         Vehicle Identity Grouping
+             (> 5.0 seconds)                (Consensus Plate Text)
+                  │                                 │
+                  └────────────────┬────────────────┘
+                                   │
+                                   ▼
+                    Deterministic GroupKFold Split
+                 (Zero Vehicle or Track Leakage)
+                                   │
+                  ┌────────────────┴────────────────┐
+                  ▼                                 ▼
+             TRAIN SPLIT                        VAL SPLIT
+        (80% Vehicle Groups)              (20% Vehicle Groups)
+```
+
+- **Perimeter Gates Targeted:**
+  - `GATE_1`: Main Administrative Perimeter Gate (Vidya Path, Axis P1455-LE 1080p).
+  - `GATE_2`: Hostel & Residential Perimeter Gate (Hikvision DS-2CD2047G2-LU ColorVu).
+  - `GATE_3`: Service & Heavy Vehicle Delivery Gate (Axis P1455-LE 1080p).
+- **Burst Temporal Separation Invariant:** Consecutive observations of a vehicle within $\le 5.0\text{ s}$ are merged into a single passage burst. Discrete passages must exhibit $> 5.0\text{ s}$ separation.
+- **Leak-Free Guarantee:** All frames and crops from a vehicle track or unique plate are allocated exclusively to either the training split or the validation split:
+  $$\text{Vehicles}_{\text{train}} \cap \text{Vehicles}_{\text{val}} = \emptyset, \quad \text{Tracks}_{\text{train}} \cap \text{Tracks}_{\text{val}} = \emptyset$$
 
 ---
 
@@ -152,6 +202,20 @@ weights/
 5. **PaddleOCR-VL (0.9B):**
    - *Architecture:* Multimodal Vision-Language OCR model (0.9B parameters).
    - *Requirements:* Staged locally (`2.0 GB`); requires isolated Python 3.12 virtualenv.
+
+#### 5.1.1 AWS EC2 GPU Training Automation (`g4dn.xlarge` / `g5.xlarge`)
+
+Both Track A models feature dedicated production training automation scripts optimized for NVIDIA Turing (T4) and Ampere (A10G) architectures:
+
+| Training Shell Script | Target Task / Model | Precision Mode | CUDA Verification | Cloud Checkpoint Target |
+| :--- | :--- | :--- | :--- | :--- |
+| **`ec2/train_track_a_detector.sh`** | Ultralytics YOLO11n Plate Detector | PyTorch AMP (FP16) | Native PyTorch + Tensor Core check (Compute $\ge 7.0$) | `s3://campus-security-models/checkpoints/track_a_detector/` |
+| **`ec2/train_track_a_ocr.sh`** | CCT-S v2 / PyTorch CRNN OCR | `KERAS_BACKEND=torch` AMP (FP16) | Native PyTorch + Tensor Core check (Compute $\ge 7.0$) | `s3://campus-security-models/checkpoints/track_a_ocr/` |
+
+**Key Execution Capabilities:**
+- **Automatic S3 Sync:** Immediately upon convergence or milestone epochs, best `.pt`, `.onnx`, and training telemetry JSON files are uploaded to `s3://campus-security-models/checkpoints/`.
+- **Fault-Tolerant Non-Interactive Execution:** Clean exit traps (`trap cleanup EXIT`) and optional smoke tests (`--smoke-test`) for CI/CD validation.
+- **ONNX Export In-Place:** Automatically exports PyTorch models to ONNX Runtime format for edge deployment to campus gate devices.
 
 ---
 

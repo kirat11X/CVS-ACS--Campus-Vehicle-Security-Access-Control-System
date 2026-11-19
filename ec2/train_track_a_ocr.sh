@@ -47,6 +47,7 @@ WORKERS=4
 SEED=42
 SMOKE_TEST=false
 RUN_ID="ocr_cct_$(date +%Y%m%d_%H%M%S)"
+S3_CHECKPOINT_URI="${S3_CHECKPOINT_URI:-s3://campus-security-models/checkpoints/track_a_ocr}"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -71,12 +72,29 @@ while [[ $# -gt 0 ]]; do
             RUN_ID="$2"
             shift 2
             ;;
+        --s3-uri)
+            S3_CHECKPOINT_URI="$2"
+            shift 2
+            ;;
+        --help|-h)
+            echo "Usage: $0 [--epochs N] [--batch-size N] [--lr VAL] [--smoke-test] [--run-id ID] [--s3-uri S3_PATH]"
+            exit 0
+            ;;
         *)
             echo "Unknown argument: $1"
             exit 1
             ;;
     esac
 done
+
+# Error trap for clean non-interactive exit
+cleanup() {
+    local exit_code=$?
+    if [ $exit_code -ne 0 ]; then
+        log_error "Track A OCR Training script failed with exit status $exit_code."
+    fi
+}
+trap cleanup EXIT
 
 echo -e "\n${BOLD}${CYAN}======================================================================${RESET}"
 echo -e "${BOLD}${CYAN}          TRACK A: ANPR SECOND-READER OCR CCT TRAINING         ${RESET}"
@@ -104,12 +122,44 @@ export KERAS_BACKEND=torch
 export CUDA_VISIBLE_DEVICES=0
 log_ok "Enforced KERAS_BACKEND=torch."
 
-# 2. Check GPU
-if command -v nvidia-smi >/dev/null 2>&1; then
-    GPU_NAME=$(nvidia-smi --query-gpu=gpu_name,memory.total --format=csv,noheader | head -n 1)
-    log_ok "Target GPU: $GPU_NAME"
+# 2. PyTorch CUDA Verification & Mixed Precision (FP16/AMP) Setup
+log_info "Verifying PyTorch CUDA acceleration and GPU capabilities..."
+export PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True"
+export MIXED_PRECISION="fp16"
+
+CUDA_INFO=$("$PYTHON_BIN" -c "
+import sys
+try:
+    import torch
+    if not torch.cuda.is_available():
+        print('NO_CUDA|Torch installed but CUDA unavailable')
+        sys.exit(0)
+    dev_name = torch.cuda.get_device_name(0)
+    cap = torch.cuda.get_device_capability(0)
+    vram_gb = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+    is_tensor_core_ready = cap[0] >= 7
+    print(f'CUDA_OK|{dev_name}|{cap[0]}.{cap[1]}|{vram_gb:.2f}|{is_tensor_core_ready}')
+except Exception as e:
+    print(f'ERROR|{e}')
+" 2>/dev/null || echo "ERROR|Invocation failed")
+
+IFS='|' read -r CUDA_STATUS CUDA_DEV CUDA_CAP CUDA_VRAM CUDA_TC <<< "$CUDA_INFO"
+
+if [ "$CUDA_STATUS" = "CUDA_OK" ]; then
+    log_ok "PyTorch CUDA Verified: $CUDA_DEV ($CUDA_VRAM GB VRAM, Compute Capability $CUDA_CAP)"
+    if [ "$CUDA_TC" = "True" ]; then
+        log_ok "Tensor Cores Detected (Compute >= 7.0 for T4/A10G). Enabling PyTorch AMP (FP16) mixed precision."
+        export TORCH_AMP_ENABLED=1
+    else
+        log_warn "Compute capability $CUDA_CAP does not have high-throughput Tensor Cores; running standard FP32."
+        export TORCH_AMP_ENABLED=0
+    fi
 else
-    log_warn "No nvidia-smi detected. Training will run on CPU (very slow)."
+    log_warn "PyTorch CUDA Verification Notice: $CUDA_DEV"
+    if [ "$SMOKE_TEST" = false ]; then
+        log_warn "Training without CUDA acceleration on EC2 GPU host is not recommended."
+    fi
+    export TORCH_AMP_ENABLED=0
 fi
 
 # 3. Locate Dataset (prepared/ocr_in_v1)
@@ -254,3 +304,31 @@ log_ok "Track A OCR Training complete!"
 log_ok "PyTorch Weights: $TARGET_PT"
 log_ok "ONNX Artifact:   $TARGET_ONNX"
 log_ok "Metrics Summary: $METRICS_JSON"
+
+# 9. Automatic S3 Model Checkpoint Upload
+S3_DEST="${S3_CHECKPOINT_URI%/}/${RUN_ID}"
+log_info "Initiating automatic checkpoint synchronization to S3 (${S3_DEST})..."
+
+if command -v aws >/dev/null 2>&1; then
+    UPLOAD_SUCCESS=true
+    if [ -f "$TARGET_PT" ]; then
+        log_info "Uploading PyTorch weights to S3..."
+        aws s3 cp "$TARGET_PT" "${S3_DEST}/track_a_ocr_cct.pt" --only-show-errors || UPLOAD_SUCCESS=false
+    fi
+    if [ -f "$TARGET_ONNX" ]; then
+        log_info "Uploading ONNX model to S3..."
+        aws s3 cp "$TARGET_ONNX" "${S3_DEST}/track_a_ocr_cct.onnx" --only-show-errors || UPLOAD_SUCCESS=false
+    fi
+    if [ -f "$METRICS_JSON" ]; then
+        log_info "Uploading metrics JSON to S3..."
+        aws s3 cp "$METRICS_JSON" "${S3_DEST}/track_a_ocr_metrics.json" --only-show-errors || UPLOAD_SUCCESS=false
+    fi
+
+    if [ "$UPLOAD_SUCCESS" = true ]; then
+        log_ok "Automatic S3 checkpoint upload successful: ${S3_DEST}"
+    else
+        log_warn "S3 upload encountered warnings. Local checkpoints are preserved at ${TARGET_PT}."
+    fi
+else
+    log_warn "AWS CLI (aws) is not installed on this host. Skipping S3 upload. Checkpoints remain preserved locally at ${TARGET_PT}."
+fi

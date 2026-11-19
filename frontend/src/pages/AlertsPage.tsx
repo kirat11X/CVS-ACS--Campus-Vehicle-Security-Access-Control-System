@@ -1,4 +1,4 @@
-import { ArrowRight, BellRing, Car, Package, RefreshCw } from "lucide-react";
+import { ArrowRight, BellRing, Car, Package, RefreshCw, Volume2, VolumeX } from "lucide-react";
 import { useMemo } from "react";
 import { Link, useSearchParams } from "react-router";
 import { useAlerts } from "../api/queries";
@@ -9,6 +9,7 @@ import { FilterChips, PageHeader } from "../components/ui/Layout";
 import { cx } from "../lib/cx";
 import { ALERT_KIND_LABEL, SEVERITY_STYLE, formatDateTime, formatRelative } from "../lib/format";
 import { useNow } from "../lib/hooks";
+import { useSoundAlerts } from "../lib/soundAlerts";
 
 type KindFilter = "ALL" | "PLATES" | "DELIVERIES";
 type SeverityFilter = AlertSeverity | "ALL";
@@ -26,6 +27,7 @@ function alertTarget(a: AlertItem): string {
 export function AlertsPage() {
   const alerts = useAlerts(100, 15_000);
   const now = useNow(30_000);
+  const { soundEnabled, toggleSound, testSound } = useSoundAlerts();
   const [params, setParams] = useSearchParams();
   const kind = (params.get("kind") as KindFilter | null) ?? "ALL";
   const severity = (params.get("severity") as SeverityFilter | null) ?? "ALL";
@@ -55,9 +57,39 @@ export function AlertsPage() {
         title="Alerts"
         description="Everything that needs a guard's attention: plates to review, unlinked plates, and delivery lines flagged REVIEW or ALERT without a decision. Alerts inform; they never block anyone."
         actions={
-          <Button size="sm" icon={<RefreshCw className={cx("h-3.5 w-3.5", alerts.isFetching && "animate-spin")} />} onClick={() => void alerts.refetch()}>
-            Refresh
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              size="sm"
+              variant="secondary"
+              icon={<Volume2 className="h-3.5 w-3.5 text-slate-600 dark:text-slate-400" />}
+              onClick={testSound}
+              title="Test audio alert chime on speaker"
+            >
+              Test Sound
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              icon={
+                soundEnabled ? (
+                  <Volume2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                ) : (
+                  <VolumeX className="h-3.5 w-3.5 text-slate-400" />
+                )
+              }
+              onClick={toggleSound}
+              title={soundEnabled ? "Mute alert audio" : "Enable alert audio"}
+            >
+              {soundEnabled ? "Sound: ON" : "Muted"}
+            </Button>
+            <Button
+              size="sm"
+              icon={<RefreshCw className={cx("h-3.5 w-3.5", alerts.isFetching && "animate-spin")} />}
+              onClick={() => void alerts.refetch()}
+            >
+              Refresh
+            </Button>
+          </div>
         }
       />
 

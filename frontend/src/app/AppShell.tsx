@@ -1,4 +1,4 @@
-import { LogOut, Menu as MenuIcon, Moon, Search, Sun } from "lucide-react";
+import { LogOut, Menu as MenuIcon, Moon, Search, Sun, Volume2, VolumeX } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent, type RefObject } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import { useAlerts } from "../api/queries";
@@ -12,6 +12,7 @@ import { SearchInput } from "../components/ui/Form";
 import { useFeed } from "../feed/LiveFeedContext";
 import { cx } from "../lib/cx";
 import { initials } from "../lib/format";
+import { soundAlerts, useSoundAlerts } from "../lib/soundAlerts";
 import { useTheme } from "../lib/theme";
 import { NAV, normalizePlate, visibleNav, type NavItem } from "./nav";
 
@@ -67,7 +68,35 @@ export function AppShell() {
   const { user } = useSession();
   const { logout } = useAuth();
   const { connection, lastSyncAt, needsReview } = useFeed();
-  const alerts = useAlerts(100, 30_000);
+  const alerts = useAlerts(100, 15_000);
+  const { soundEnabled, toggleSound } = useSoundAlerts();
+  const seenAlertKeys = useRef<Set<string>>(new Set());
+  const initialAlertsLoaded = useRef<boolean>(false);
+
+  // Audible notification on new alert arrivals
+  useEffect(() => {
+    if (!alerts.data) return;
+    const currentKeys = new Set(alerts.data.map((a) => `${a.kind}:${a.ref}:${a.at}`));
+    if (!initialAlertsLoaded.current) {
+      seenAlertKeys.current = currentKeys;
+      initialAlertsLoaded.current = true;
+      return;
+    }
+
+    const newAlerts = alerts.data.filter((a) => !seenAlertKeys.current.has(`${a.kind}:${a.ref}:${a.at}`));
+    if (newAlerts.length > 0) {
+      const hasHigh = newAlerts.some((a) => a.severity === "HIGH" || a.kind.includes("ALERT"));
+      if (hasHigh) {
+        soundAlerts.playHighAlertSound();
+      } else {
+        soundAlerts.playMediumAlertSound();
+      }
+      for (const a of newAlerts) {
+        seenAlertKeys.current.add(`${a.kind}:${a.ref}:${a.at}`);
+      }
+    }
+  }, [alerts.data]);
+
   const badges: Record<string, number> = {
     "/feed": needsReview,
     "/reviews": needsReview,
@@ -186,6 +215,11 @@ export function AppShell() {
           <div className="ml-auto flex items-center gap-1.5">
             <ConnectionIndicator state={connection} lastSyncAt={lastSyncAt} compact />
             <IconButton className="lg:hidden" label="Look up a plate" icon={<Search className="h-5 w-5" />} onClick={() => setSearchOpen(true)} />
+            <IconButton
+              label={soundEnabled ? "Alert audio: ON (Click to mute)" : "Alert audio: MUTED (Click to enable)"}
+              icon={soundEnabled ? <Volume2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" /> : <VolumeX className="h-5 w-5 text-slate-400" />}
+              onClick={toggleSound}
+            />
             <IconButton
               label={resolved === "dark" ? "Switch to light theme" : "Switch to dark theme"}
               icon={resolved === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}

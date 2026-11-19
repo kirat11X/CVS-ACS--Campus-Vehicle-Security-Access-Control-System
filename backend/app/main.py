@@ -85,6 +85,7 @@ app.add_middleware(
 )
 
 app.include_router(vehicles_router)
+app.include_router(stream_settings_router)
 app.include_router(gates_router)
 app.include_router(observations_router)
 app.include_router(auth_router)
@@ -103,7 +104,6 @@ app.include_router(system_router)
 app.include_router(reviews_router)
 app.include_router(telegram_router)
 app.include_router(orders_router)
-app.include_router(stream_settings_router)
 
 class WebhookTestPayload(BaseModel):
     source: str

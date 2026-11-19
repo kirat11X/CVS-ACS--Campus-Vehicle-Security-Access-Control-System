@@ -167,13 +167,9 @@ stop_all_services() {
         rm -f "$BACKEND_PID_FILE"
     fi
 
-    # Stop any stray uvicorn processes on port 8000
-    local stray_uvicorn
-    stray_uvicorn=$(lsof -ti:8000 2>/dev/null || true)
-    if [[ -n "$stray_uvicorn" ]]; then
-        kill -9 "$stray_uvicorn" 2>/dev/null || true
-        log_ok "Terminated stray process on port 8000"
-    fi
+    # Terminate any lingering uvicorn backend instances
+    pkill -f "uvicorn.*backend\.app\.main:app" 2>/dev/null || true
+    pkill -f "node.*vite.*--port 5173" 2>/dev/null || true
 
     # Option to stop docker containers
     if command -v docker >/dev/null 2>&1; then
@@ -535,15 +531,9 @@ fi
 if [[ "$SUBCOMMAND" != "frontend" ]]; then
     log_step "5/6: Starting FastAPI Core Backend (Port 8000)"
 
-    # Clean up any existing process on 8000
-    if is_port_open 8000; then
-        local_stray=$(lsof -ti:8000 2>/dev/null || true)
-        if [[ -n "$local_stray" ]]; then
-            log_warn "Port 8000 already occupied by PID $local_stray. Terminating prior instance..."
-            kill -15 "$local_stray" 2>/dev/null || kill -9 "$local_stray" 2>/dev/null || true
-            sleep 1
-        fi
-    fi
+    # Clean up any existing uvicorn process on 8000
+    pkill -f "uvicorn.*backend\.app\.main:app" 2>/dev/null || true
+    sleep 0.5
 
     log_info "Launching Uvicorn on 0.0.0.0:8000..."
     nohup env PYTHONPATH=. "$ROOT_DIR/.venv/bin/uvicorn" backend.app.main:app \
@@ -589,15 +579,9 @@ if [[ "$SUBCOMMAND" != "backend" ]]; then
         npm install
     fi
 
-    # Clean up any existing process on 5173
-    if is_port_open 5173; then
-        local_vite=$(lsof -ti:5173 2>/dev/null || true)
-        if [[ -n "$local_vite" ]]; then
-            log_warn "Port 5173 already occupied by PID $local_vite. Terminating prior instance..."
-            kill -15 "$local_vite" 2>/dev/null || kill -9 "$local_vite" 2>/dev/null || true
-            sleep 1
-        fi
-    fi
+    # Clean up any existing vite process on 5173
+    pkill -f "node.*vite.*--port 5173" 2>/dev/null || true
+    sleep 0.5
 
     log_info "Launching Vite Dev Server on 0.0.0.0:5173..."
     nohup npm run dev -- --host 0.0.0.0 --port 5173 >> "$LOGS_DIR/frontend.log" 2>&1 &

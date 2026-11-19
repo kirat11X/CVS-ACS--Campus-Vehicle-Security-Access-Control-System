@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from typing import Any, Dict, Optional
 
@@ -68,8 +69,15 @@ async def telegram_webhook(
 
 @router.get("/telegram/status", status_code=status.HTTP_200_OK)
 @router.get("/api/telegram/status", status_code=status.HTTP_200_OK)
-def telegram_status() -> Dict[str, Any]:
+async def telegram_status() -> Dict[str, Any]:
     """Returns runtime health and configuration metadata for the Telegram Bot Connector."""
+    if telegram_service.is_configured and not telegram_service.is_running:
+        # Auto-heal: trigger background start if disconnected
+        try:
+            asyncio.create_task(telegram_service.start(max_retries=2))
+        except RuntimeError:
+            pass
+
     return {
         "status": "online" if telegram_service.is_running else ("configured" if telegram_service.is_configured else "disabled"),
         "mode": telegram_service.mode,

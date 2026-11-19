@@ -192,6 +192,7 @@ class TelegramBotService:
         self._is_running: bool = False
         self._lock = asyncio.Lock()
         self._main_loop: Optional[asyncio.AbstractEventLoop] = None
+        self._watchdog_task: Optional[asyncio.Task] = None
         self._processed_update_ids: OrderedDict[int, float] = OrderedDict()
         self._processed_file_unique_ids: OrderedDict[str, float] = OrderedDict()
 
@@ -242,11 +243,11 @@ class TelegramBotService:
 
         return app
 
-    async def start(self) -> None:
-        """Initializes and starts the bot application (starts polling if in polling mode)."""
+    async def start(self, max_retries: int = 4) -> bool:
+        """Initializes and starts the bot application with auto-retry, backoff, and watchdog supervision."""
         async with self._lock:
             if self._is_running or not self.is_configured:
-                return
+                return self._is_running
 
             try:
                 try:
@@ -254,25 +255,86 @@ class TelegramBotService:
                 except RuntimeError:
                     self._main_loop = None
 
+                # Clean up any partial previous application state
+                if self.application:
+                    try:
+                        if self.application.running:
+                            await self.application.stop()
+                        await self.application.shutdown()
+                    except Exception:
+                        pass
+                    self.application = None
+
                 self.application = self._build_application()
-                await self.application.initialize()
-                await self.application.start()
 
-                if self.mode == "polling":
-                    logger.info("Starting Telegram bot updater polling for @KritanshCampusbot...")
-                    await self.application.updater.start_polling(drop_pending_updates=True)
-                    logger.info("Telegram bot polling started successfully.")
-                else:
-                    logger.info("Telegram bot initialized in webhook mode (ready for POST /api/telegram/webhook).")
+                last_exc = None
+                for attempt in range(1, max_retries + 1):
+                    try:
+                        await self.application.initialize()
+                        await self.application.start()
 
-                self._is_running = True
-            except Exception as exc:
-                logger.error("Failed to start TelegramBotService: %s", exc)
+                        if self.mode == "polling":
+                            logger.info("Starting Telegram bot updater polling for @KritanshCampusbot...")
+                            await self.application.updater.start_polling(drop_pending_updates=True)
+                            logger.info("Telegram bot polling started successfully.")
+                        else:
+                            logger.info("Telegram bot initialized in webhook mode (ready for POST /api/telegram/webhook).")
+
+                        self._is_running = True
+                        self._start_watchdog()
+                        return True
+                    except Exception as exc:
+                        last_exc = exc
+                        logger.warning(
+                            "Telegram bot startup attempt %d/%d failed: %s. Retrying in %ds...",
+                            attempt,
+                            max_retries,
+                            exc,
+                            attempt * 2,
+                        )
+                        if attempt < max_retries:
+                            await asyncio.sleep(attempt * 2)
+
+                logger.error("Failed to start TelegramBotService after %d attempts: %s", max_retries, last_exc)
                 self._is_running = False
+                self._start_watchdog()
+                return False
+            except Exception as exc:
+                logger.error("Unexpected error starting TelegramBotService: %s", exc)
+                self._is_running = False
+                self._start_watchdog()
+                return False
+
+    def _start_watchdog(self) -> None:
+        """Starts a background supervisor task that monitors health and auto-reconnects if disconnected."""
+        if self._watchdog_task and not self._watchdog_task.done():
+            return
+        try:
+            loop = asyncio.get_running_loop()
+            self._watchdog_task = loop.create_task(self._watchdog_loop())
+        except RuntimeError:
+            pass
+
+    async def _watchdog_loop(self) -> None:
+        """Background loop ensuring TelegramBotService reconnects automatically if dropped."""
+        while True:
+            await asyncio.sleep(30)
+            if not self.is_configured:
+                break
+            if not self._is_running:
+                logger.info("Watchdog detected Telegram bot offline. Attempting auto-reconnect...")
+                try:
+                    await self.start(max_retries=2)
+                except Exception as exc:
+                    logger.debug("Watchdog auto-reconnect attempt failed: %s", exc)
 
     async def stop(self) -> None:
         """Cleanly stops polling and shuts down the bot application."""
         async with self._lock:
+            if self._watchdog_task and not self._watchdog_task.done():
+                self._watchdog_task.cancel()
+                self._watchdog_task = None
+
             if not self._is_running or not self.application:
                 return
 

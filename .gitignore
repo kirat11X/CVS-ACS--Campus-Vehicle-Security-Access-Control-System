@@ -39,6 +39,10 @@ mosquitto_log/
 media/clips/
 media/recordings/
 
+# Runtime processes & logs
+.run/
+logs/
+
 # IDE / OS
 .vscode/
 .idea/

@@ -152,7 +152,7 @@ stop_all_services() {
     local stray_vite
     stray_vite=$(lsof -ti:5173 2>/dev/null || true)
     if [[ -n "$stray_vite" ]]; then
-        kill -9 $stray_vite 2>/dev/null || true
+        kill -9 "$stray_vite" 2>/dev/null || true
         log_ok "Terminated stray process on port 5173"
     fi
 
@@ -171,7 +171,7 @@ stop_all_services() {
     local stray_uvicorn
     stray_uvicorn=$(lsof -ti:8000 2>/dev/null || true)
     if [[ -n "$stray_uvicorn" ]]; then
-        kill -9 $stray_uvicorn 2>/dev/null || true
+        kill -9 "$stray_uvicorn" 2>/dev/null || true
         log_ok "Terminated stray process on port 8000"
     fi
 
@@ -418,9 +418,11 @@ else
     if ! command -v docker >/dev/null 2>&1; then
         log_warn "Docker command not found! Assuming services are running on host/remote."
     else
-        log_info "Starting containers via Docker Compose (PostgreSQL 5433, Mosquitto 1883, Frigate 5000, n8n 5678)..."
-        docker compose up -d mosquitto postgres frigate n8n 2>&1 || docker compose up -d 2>&1
-        log_ok "Docker Compose containers launched."
+        log_info "Ensuring core infrastructure (PostgreSQL 5433, Mosquitto 1883) is active..."
+        docker compose up -d mosquitto postgres
+        log_ok "Core database and message broker containers running."
+        # Launch auxiliary services (Frigate NVR, n8n) in background
+        (docker compose up -d frigate n8n > "$LOGS_DIR/containers_aux.log" 2>&1 &) || true
     fi
 fi
 
@@ -538,18 +540,19 @@ if [[ "$SUBCOMMAND" != "frontend" ]]; then
         local_stray=$(lsof -ti:8000 2>/dev/null || true)
         if [[ -n "$local_stray" ]]; then
             log_warn "Port 8000 already occupied by PID $local_stray. Terminating prior instance..."
-            kill -15 $local_stray 2>/dev/null || kill -9 $local_stray 2>/dev/null || true
+            kill -15 "$local_stray" 2>/dev/null || kill -9 "$local_stray" 2>/dev/null || true
             sleep 1
         fi
     fi
 
     log_info "Launching Uvicorn on 0.0.0.0:8000..."
-    PYTHONPATH=. "$ROOT_DIR/.venv/bin/uvicorn" backend.app.main:app \
+    nohup env PYTHONPATH=. "$ROOT_DIR/.venv/bin/uvicorn" backend.app.main:app \
         --host 0.0.0.0 \
         --port 8000 \
-        --log-level info > "$LOGS_DIR/backend.log" 2>&1 &
+        --log-level info >> "$LOGS_DIR/backend.log" 2>&1 &
     BACKEND_PID=$!
     echo "$BACKEND_PID" > "$BACKEND_PID_FILE"
+    disown "$BACKEND_PID" 2>/dev/null || true
 
     # Wait for backend to be healthy
     MAX_API_WAIT=20
@@ -591,15 +594,16 @@ if [[ "$SUBCOMMAND" != "backend" ]]; then
         local_vite=$(lsof -ti:5173 2>/dev/null || true)
         if [[ -n "$local_vite" ]]; then
             log_warn "Port 5173 already occupied by PID $local_vite. Terminating prior instance..."
-            kill -15 $local_vite 2>/dev/null || kill -9 $local_vite 2>/dev/null || true
+            kill -15 "$local_vite" 2>/dev/null || kill -9 "$local_vite" 2>/dev/null || true
             sleep 1
         fi
     fi
 
     log_info "Launching Vite Dev Server on 0.0.0.0:5173..."
-    npm run dev -- --host 0.0.0.0 --port 5173 > "$LOGS_DIR/frontend.log" 2>&1 &
+    nohup npm run dev -- --host 0.0.0.0 --port 5173 >> "$LOGS_DIR/frontend.log" 2>&1 &
     FRONTEND_PID=$!
     echo "$FRONTEND_PID" > "$FRONTEND_PID_FILE"
+    disown "$FRONTEND_PID" 2>/dev/null || true
     cd "$ROOT_DIR"
 
     # Wait for frontend to respond

@@ -49,6 +49,14 @@ from backend.app.services.anpr.ocr_engine import (
 )
 from backend.app.services.anpr.polarity_normalizer import normalize_plate_agnostic
 from backend.app.services.anpr.track_voter import TrackVoter
+from backend.app.services.anpr.vehicle_gatekeeper import (
+    FALLBACK_MODEL_PATH,
+    SimpleVehicleTracker,
+    UVH26_MODEL_PATH,
+    VehicleDetection,
+    VehicleGatekeeper,
+    VehicleTrack,
+)
 from backend.app.services.multiframe_plate_consensus import decompose_indian_plate_slots, fuse_multiframe_plate_reads
 from backend.app.services.observation_service import ObservationService
 from backend.app.services.plate_normalizer import (
@@ -65,9 +73,9 @@ logger = logging.getLogger("campus_security.camera_stream")
 
 ROOT_DIR = Path(BASE_DIR).resolve()
 WEIGHTS_DIR = ROOT_DIR / "weights"
-DETECTOR_PATH = WEIGHTS_DIR / "yolo11n_plate_detector_fleet_best.onnx"
+DETECTOR_PATH = WEIGHTS_DIR / "yolo11n_plate_detector_finetuned.onnx"
 if not DETECTOR_PATH.exists():
-    DETECTOR_PATH = WEIGHTS_DIR / "yolo11n_plate_detector_finetuned.onnx"
+    DETECTOR_PATH = WEIGHTS_DIR / "yolo11n_plate_detector_fleet_best.onnx"
 if not DETECTOR_PATH.exists():
     DETECTOR_PATH = WEIGHTS_DIR / "yolo11n_plate_detector_best.onnx"
 
@@ -363,6 +371,10 @@ class CameraStreamManager:
         self._det_session = None
         self._ocr_session = None
         self._rapid_ocr = None
+        self._vehicle_gatekeeper: Optional[VehicleGatekeeper] = None
+        self._vehicle_trackers: Dict[str, SimpleVehicleTracker] = collections.defaultdict(
+            lambda: SimpleVehicleTracker(max_age_sec=2.0)
+        )
         self._matcher: Optional[OpticalPlateMatcher] = None
         self._last_registry_sync: float = 0.0
 
@@ -499,6 +511,13 @@ class CameraStreamManager:
             if DETECTOR_PATH.exists() and self._det_session is None:
                 self._det_session = ort.InferenceSession(str(DETECTOR_PATH), opts, providers=["CPUExecutionProvider"])
                 logger.info("Loaded YOLO11n Plate Detector from %s", DETECTOR_PATH.name)
+
+            if self._vehicle_gatekeeper is None:
+                try:
+                    self._vehicle_gatekeeper = VehicleGatekeeper()
+                    logger.info("Loaded Stage-0 Vehicle Gatekeeper (UVH-26 / Fallback)")
+                except Exception as vg_err:
+                    logger.warning("Stage-0 Vehicle Gatekeeper failed to load: %s", vg_err)
 
             if OCR_PATH.exists() and self._ocr_session is None:
                 self._ocr_session = ort.InferenceSession(str(OCR_PATH), opts, providers=["CPUExecutionProvider"])
@@ -739,36 +758,37 @@ class CameraStreamManager:
 
             # Check for temporal tracks that need flushing (e.g. vehicle departed or short burst)
             now = time.time()
-            for gid in list(self._temporal_tracks.keys()):
-                track = self._temporal_tracks[gid]
+            for tid in list(self._temporal_tracks.keys()):
+                track = self._temporal_tracks[tid]
                 if not track:
                     continue
-                last_ts = self._temporal_track_last_update.get(gid, 0.0)
+                last_ts = self._temporal_track_last_update.get(tid, 0.0)
                 idle_sec = now - last_ts
+                gid = tid.split("_veh_")[0] if "_veh_" in tid else tid
                 # If vehicle accumulated at least 3 frames and has now moved past (idle >= 0.8s)
                 if len(track) >= 3 and idle_sec >= 0.8:
                     candidates = list(track[:8])
-                    consensus = track.get_consensus(gid)
+                    consensus = track.get_consensus(tid)
                     if consensus is None and len(candidates) >= 3:
                         temp_voter = TrackVoter(min_consensus_frames=len(candidates), max_track_frames=8)
                         for c in candidates:
                             temp_voter.add_observation(
-                                track_id=gid,
+                                track_id=tid,
                                 plate_text=c.get("raw_plate", ""),
                                 confidence=float(c.get("conf", 0.8)),
                                 bbox=c.get("bbox", []),
                                 frame_ts=float(c.get("timestamp", now)),
                                 frame_bgr=c.get("frame"),
                             )
-                        consensus = temp_voter.get_consensus(gid)
-                    self._temporal_tracks[gid].clear()
+                        consensus = temp_voter.get_consensus(tid)
+                    self._temporal_tracks[tid].clear()
                     try:
                         self._fuse_and_ingest(gid, consensus if consensus else candidates)
                     except Exception as exc:
                         logger.error("Error fusing flushed track for %s: %s", gid, exc)
                 elif len(track) < 3 and idle_sec >= 1.5:
                     # Discard transient false-alarm or sub-threshold track
-                    self._temporal_tracks[gid].clear()
+                    self._temporal_tracks[tid].clear()
 
     def process_frame(
         self,
@@ -818,59 +838,112 @@ class CameraStreamManager:
                 # Static scene with no vehicle motion - skip expensive YOLO / false triggers
                 return None
 
-        # 2. Letterbox padding (with RGB conversion for YOLO)
-        canvas, scale, dx, dy = letterbox_image(frame, 640)
-        canvas_rgb = cv2.cvtColor(canvas, cv2.COLOR_BGR2RGB)
+        # ---------------------------------------------------------------------
+        # Stage 0: Vehicle Gatekeeper (IISc AIM UVH-26 / fallback)
+        # ---------------------------------------------------------------------
+        # If gatekeeper is initialized, detect approaching vehicles.
+        # If zero vehicles detected, return immediately (zero empty-space false alarms, zero wasted OCR CPU).
+        vehicle_dets: Optional[List[VehicleDetection]] = None
+        if self._vehicle_gatekeeper is not None and getattr(self._vehicle_gatekeeper, "session", None) is not None:
+            vehicle_dets = self._vehicle_gatekeeper.detect_vehicles(frame)
+            if not vehicle_dets:
+                logger.debug("[%s] Stage 0 Gatekeeper: zero vehicles detected, skipping frame.", gate_id)
+                return None
 
-        # 3. YOLO11n Plate Detection
-        boxes = []
-        if self._det_session is not None:
-            inp = canvas_rgb.transpose(2, 0, 1)[np.newaxis, :, :, :].astype(np.float32) / 255.0
-            det_out = self._det_session.run(None, {self._det_session.get_inputs()[0].name: inp})[0][0]
+        # ---------------------------------------------------------------------
+        # Track & Crop: Persistent Track ID & Vehicle Class Assignment
+        # ---------------------------------------------------------------------
+        now_ts = time.time()
+        if vehicle_dets is not None:
+            tracker = self._vehicle_trackers[gate_id]
+            tracker.gate_id = gate_id
+            tracked_vehicles = tracker.update(vehicle_dets, now_ts)
+        else:
+            # Passthrough fallback when gatekeeper is disabled/not loaded (e.g. isolated test without gatekeeper)
+            tracked_vehicles = [(
+                VehicleTrack(
+                    track_id=gate_id,
+                    vehicle_class="car",
+                    observed_type=ObservedVehicleType.CAR,
+                    bbox=[0, 0, w, h],
+                    confidence=0.9,
+                    last_seen_ts=now_ts,
+                    first_seen_ts=now_ts,
+                ),
+                None,
+            )]
 
-            conf_thresh = 0.65
-            for col in range(det_out.shape[1]):
-                score = float(det_out[4, col])
-                if score >= conf_thresh:
-                    cx_pad, cy_pad, bw_pad, bh_pad = det_out[0:4, col]
-                    cx_orig = (cx_pad - dx) / scale
-                    cy_orig = (cy_pad - dy) / scale
-                    bw_orig = bw_pad / scale
-                    bh_orig = bh_pad / scale
+        # ---------------------------------------------------------------------
+        # Stage 1: Zoomed Plate Detection inside each detected vehicle crop
+        # ---------------------------------------------------------------------
+        final_boxes: List[Tuple[int, int, int, int, float, VehicleTrack]] = []
+        for track, v_det in tracked_vehicles:
+            if v_det is not None:
+                v_crop, (vx1, vy1, vx2, vy2) = VehicleGatekeeper.crop_vehicle(frame, track.bbox, pad_pct=0.05)
+            else:
+                v_crop, (vx1, vy1, vx2, vy2) = frame, (0, 0, w, h)
 
-                    # Aspect-ratio clamping: 0.9 <= w/h <= 6.0
-                    aspect = bw_orig / max(1.0, bh_orig)
-                    if aspect < 0.9 or aspect > 6.0:
-                        continue
+            if v_crop.size == 0 or v_crop.shape[0] < 20 or v_crop.shape[1] < 20:
+                continue
 
-                    # Reject oversized or tiny candidate boxes
-                    if bw_orig > 0.7 * w or bh_orig > 0.35 * h:
-                        continue
-                    if bw_orig < 32 or bh_orig < 16:
-                        continue
+            vh, vw = v_crop.shape[:2]
+            canvas, scale, dx, dy = letterbox_image(v_crop, 640)
+            canvas_rgb = cv2.cvtColor(canvas, cv2.COLOR_BGR2RGB)
 
-                    x1 = max(0, int(cx_orig - bw_orig / 2))
-                    y1 = max(0, int(cy_orig - bh_orig / 2))
-                    x2 = min(w, int(cx_orig + bw_orig / 2))
-                    y2 = min(h, int(cy_orig + bh_orig / 2))
-                    boxes.append((x1, y1, x2, y2, score))
+            candidate_boxes = []
+            if self._det_session is not None:
+                inp = canvas_rgb.transpose(2, 0, 1)[np.newaxis, :, :, :].astype(np.float32) / 255.0
+                det_out = self._det_session.run(None, {self._det_session.get_inputs()[0].name: inp})[0][0]
 
-        # NMS on candidate boxes with score threshold 0.65
-        final_boxes = []
-        if boxes:
-            cv_boxes = [[b[0], b[1], b[2] - b[0], b[3] - b[1]] for b in boxes]
-            scores = [b[4] for b in boxes]
-            indices = cv2.dnn.NMSBoxes(cv_boxes, scores, 0.65, 0.45)
-            for idx in (indices.flatten() if len(indices) > 0 else []):
-                final_boxes.append(boxes[idx])
+                conf_thresh = 0.65
+                for col in range(det_out.shape[1]):
+                    score = float(det_out[4, col])
+                    if score >= conf_thresh:
+                        cx_pad, cy_pad, bw_pad, bh_pad = det_out[0:4, col]
+                        cx_orig = (cx_pad - dx) / scale
+                        cy_orig = (cy_pad - dy) / scale
+                        bw_orig = bw_pad / scale
+                        bh_orig = bh_pad / scale
+
+                        # Aspect-ratio clamping: 0.9 <= w/h <= 6.0 (handles square 2W plates to wide commercial plates)
+                        aspect = bw_orig / max(1.0, bh_orig)
+                        if aspect < 0.9 or aspect > 6.0:
+                            continue
+
+                        # Reject oversized or tiny candidate boxes within vehicle crop
+                        if bw_orig > 0.95 * vw or bh_orig > 0.85 * vh:
+                            continue
+                        if bw_orig < 24 or bh_orig < 12:
+                            continue
+
+                        local_x1 = max(0, int(cx_orig - bw_orig / 2))
+                        local_y1 = max(0, int(cy_orig - bh_orig / 2))
+                        local_x2 = min(vw, int(cx_orig + bw_orig / 2))
+                        local_y2 = min(vh, int(cy_orig + bh_orig / 2))
+
+                        # Project box back to original full frame coordinates
+                        orig_x1 = min(w, max(0, vx1 + local_x1))
+                        orig_y1 = min(h, max(0, vy1 + local_y1))
+                        orig_x2 = min(w, max(0, vx1 + local_x2))
+                        orig_y2 = min(h, max(0, vy1 + local_y2))
+                        candidate_boxes.append((orig_x1, orig_y1, orig_x2, orig_y2, score, track))
+
+            if candidate_boxes:
+                cv_boxes = [[b[0], b[1], b[2] - b[0], b[3] - b[1]] for b in candidate_boxes]
+                scores = [b[4] for b in candidate_boxes]
+                indices = cv2.dnn.NMSBoxes(cv_boxes, scores, 0.65, 0.45)
+                for idx in (indices.flatten() if len(indices) > 0 else []):
+                    final_boxes.append(candidate_boxes[idx])
 
         if not final_boxes:
             return None
 
-        # 4. High-Accuracy OCR & Statutory Indian Plate Normalization
+        # ---------------------------------------------------------------------
+        # Stage 2: Preprocessing + Dual-Pass OCR + Positional Grammar + Voting
+        # ---------------------------------------------------------------------
         best_plate = None
-        for x1, y1, x2, y2, score in final_boxes:
-            # Requirement 3: Geometry & Bounding Box Padding
+        for x1, y1, x2, y2, score, track in final_boxes:
+            # Geometry & Bounding Box Padding (+8% W, +5% H)
             px1, py1, px2, py2 = pad_plate_bbox(
                 [x1, y1, x2, y2],
                 frame.shape[:2],
@@ -882,16 +955,16 @@ class CameraStreamManager:
             if crop.size == 0 or crop.shape[0] < 12 or crop.shape[1] < 20:
                 continue
 
-            # Requirement 3: Filter candidate crop with is_plate_like_crop(crop) before OCR
+            # Crop-level plate-likeness gate before OCR
             if not is_plate_like_crop(crop):
                 logger.debug("[%s] Dropping non-plate crop (failed contrast/edge texture gate)", gate_id)
                 continue
 
-            # Requirement 3: Apply deskew_plate(crop, min_angle=3.0, max_angle=25.0)
+            # Deskew plate
             crop = deskew_plate(crop, min_angle=3.0, max_angle=25.0)
 
-            # Requirement 4: Dual-Pass Multi-Color & EV OCR Execution
-            # Pass 1 (Primary - Color Agnostic):
+            # Dual-Pass Multi-Color & EV OCR Execution
+            # Pass 1 (Primary - Color Agnostic CLAHE + Otsu Normalization):
             norm_crop, was_inverted = normalize_plate_agnostic(crop)
             text1, conf1, engine1 = run_dual_pass_ocr(
                 norm_crop,
@@ -908,7 +981,6 @@ class CameraStreamManager:
             chosen_engine = engine1
 
             # Pass 2 (Fallback - Soft CIE LAB Color Remapping):
-            # If conf1 < 0.55 or cat1 == 'INVALID':
             if conf1 < 0.55 or cat1 == "INVALID":
                 remapped_crop, detected_type = remap_to_yellow_black(crop)
                 text2, conf2, engine2 = run_dual_pass_ocr(
@@ -917,8 +989,6 @@ class CameraStreamManager:
                     rapid_ocr=self._rapid_ocr,
                 )
                 plate2, syntax_conf2, cat2 = correct_indian_plate(text2)
-                # Pick Pass 2 if cat2 != 'INVALID' and (cat1 == 'INVALID' or conf2 > conf1)
-                # Else: Use Pass 1 result
                 if cat2 != "INVALID" and (cat1 == "INVALID" or conf2 > conf1):
                     chosen_text = text2
                     chosen_conf = conf2
@@ -927,7 +997,7 @@ class CameraStreamManager:
                     chosen_cat = cat2
                     chosen_engine = engine2
 
-            # If both passes fail to meet quality criteria, reject
+            # If both passes fail quality threshold, reject
             if not chosen_text or (chosen_conf < 0.40 and chosen_syntax_conf < 0.40 and chosen_cat == "INVALID"):
                 logger.debug("[%s] Dropping low-confidence OCR read '%s' (conf=%.2f)", gate_id, chosen_text, chosen_conf)
                 continue
@@ -936,7 +1006,6 @@ class CameraStreamManager:
             if not plate_to_use or len(plate_to_use) < 6:
                 continue
 
-            now_ts = time.time()
             candidate_conf = max(float(score), float(chosen_conf))
             best_plate = plate_to_use
 
@@ -951,26 +1020,37 @@ class CameraStreamManager:
                 "frame": frame.copy(),
                 "sharpness": laplacian_var,
                 "timestamp": now_ts,
+                "vehicle_class": track.vehicle_class,
+                "observed_type": track.observed_type,
+                "vehicle_confidence": track.confidence,
+                "vehicle_track_id": track.track_id,
+                "vehicle_bbox": track.bbox,
             }
 
             if not require_consensus:
                 return self._fuse_and_ingest(gate_id, [candidate])
 
-            # Requirement 5: Accumulate observation into per-gate TrackVoter
-            track_voter = self._temporal_tracks[gate_id]
+            # Accumulate observation into per-track (or per-gate) TrackVoter
+            target_track_id = track.track_id if track.track_id != gate_id else gate_id
+            track_voter = self._temporal_tracks[target_track_id]
             track_voter.add_observation(
-                track_id=gate_id,
+                track_id=target_track_id,
                 plate_text=plate_to_use,
                 confidence=candidate_conf,
                 bbox=[px1, py1, px2, py2],
                 frame_ts=now_ts,
                 frame_bgr=frame.copy(),
             )
-            self._temporal_track_last_update[gate_id] = now_ts
+            self._temporal_track_last_update[target_track_id] = now_ts
 
-            consensus = track_voter.get_consensus(gate_id)
+            consensus = track_voter.get_consensus(target_track_id)
             if consensus is not None:
                 track_voter.clear()
+                consensus["vehicle_class"] = track.vehicle_class
+                consensus["observed_type"] = track.observed_type
+                consensus["vehicle_confidence"] = track.confidence
+                consensus["vehicle_track_id"] = track.track_id
+                consensus["vehicle_bbox"] = track.bbox
                 return self._fuse_and_ingest(gate_id, consensus)
 
             return None
@@ -1123,6 +1203,27 @@ class CameraStreamManager:
 
         # Ingestion into ObservationService with multi-frame metadata
         frame_cnt = int(fused_res.get("frame_count") or (len(candidates) if isinstance(candidates, list) else 1))
+        
+        # Extract vehicle-first cascade metadata
+        v_class = "car"
+        v_obs_type = ObservedVehicleType.CAR
+        v_conf = 0.9
+        v_track_id = gate_id
+        v_bbox = []
+        if isinstance(candidates, dict):
+            v_class = candidates.get("vehicle_class", "car")
+            v_obs_type = candidates.get("observed_type", ObservedVehicleType.CAR)
+            v_conf = float(candidates.get("vehicle_confidence", 0.9))
+            v_track_id = candidates.get("vehicle_track_id", gate_id)
+            v_bbox = candidates.get("vehicle_bbox", [])
+        elif isinstance(candidates, list) and candidates:
+            c0 = candidates[0]
+            v_class = c0.get("vehicle_class", "car")
+            v_obs_type = c0.get("observed_type", ObservedVehicleType.CAR)
+            v_conf = float(c0.get("vehicle_confidence", 0.9))
+            v_track_id = c0.get("vehicle_track_id", gate_id)
+            v_bbox = c0.get("vehicle_bbox", [])
+
         extra_meta = {
             "multiframe_consensus": True,
             "frame_count": frame_cnt,
@@ -1131,6 +1232,11 @@ class CameraStreamManager:
             "format_category": format_category,
             "requires_manual_check": requires_manual_check,
             "action": "MANUAL_CHECK" if requires_manual_check else "PROCEED",
+            "vehicle_class": v_class,
+            "vehicle_track_id": v_track_id,
+            "vehicle_bbox": v_bbox,
+            "observed_type": v_obs_type,
+            "vehicle_confidence": v_conf,
             "candidate_reads": (
                 [c.get("raw_plate", "") for c in candidates if c.get("raw_plate")]
                 if isinstance(candidates, list)
@@ -1208,6 +1314,9 @@ class CameraStreamManager:
                 if extra_metadata:
                     meta.update(extra_metadata)
 
+                veh_type = extra_metadata.get("observed_type", ObservedVehicleType.CAR) if extra_metadata else ObservedVehicleType.CAR
+                veh_conf = float(extra_metadata.get("vehicle_confidence", 0.9)) if extra_metadata else 0.9
+
                 event_data = ObservationCreate(
                     gate_id=gate_id,
                     camera_id=f"{gate_id.lower()}_ip_cam",
@@ -1216,8 +1325,8 @@ class CameraStreamManager:
                     source_event_id=source_event_id,
                     raw_plate=plate,
                     plate_confidence=float(confidence),
-                    vehicle_type=ObservedVehicleType.CAR,
-                    vehicle_confidence=0.9,
+                    vehicle_type=veh_type,
+                    vehicle_confidence=veh_conf,
                     direction=ObservationDirection.ENTRY,
                     metadata_payload=meta,
                 )

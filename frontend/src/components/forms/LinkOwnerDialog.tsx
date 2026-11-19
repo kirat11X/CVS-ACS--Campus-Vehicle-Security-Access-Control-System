@@ -137,7 +137,7 @@ export function LinkOwnerDialog({
               <Select value={newOwner.person_type} onChange={(e) => setNewOwner({ ...newOwner, person_type: e.target.value as PersonType })}>
                 {PERSON_TYPES.map((p) => (
                   <option key={p} value={p}>
-                    {humanize(p)}
+                    {p === "RESIDENT" ? "Residential" : humanize(p)}
                   </option>
                 ))}
               </Select>
@@ -176,7 +176,7 @@ export function LinkOwnerDialog({
           <Select value={category} onChange={(e) => setCategory(e.target.value as VehicleCategory)}>
             {categories.map((c) => (
               <option key={c} value={c}>
-                {humanize(c)}
+                {c === "RESIDENT" ? "Residential" : humanize(c)}
               </option>
             ))}
           </Select>

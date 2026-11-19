@@ -151,7 +151,7 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-const BELONGS_TO: PersonType[] = ["STUDENT", "FACULTY", "STAFF"];
+const BELONGS_TO: PersonType[] = ["STUDENT", "FACULTY", "STAFF", "RESIDENT"];
 
 interface PanelProps {
   token: string;
@@ -301,15 +301,29 @@ export function PlateDetailPanel({ token, item, onResolved, onLink, onMarkVisito
                 <Select value={belongsTo} onChange={(e) => setBelongsTo(e.target.value as PersonType)}>
                   {BELONGS_TO.map((p) => (
                     <option key={p} value={p}>
-                      {humanize(p)}
+                      {p === "RESIDENT" ? "Residential" : humanize(p)}
                     </option>
                   ))}
                 </Select>
               </Field>
-              <Field label={belongsTo === "STUDENT" ? "SID" : "Employee ID or department"}>
+              <Field
+                label={
+                  belongsTo === "STUDENT"
+                    ? "SID"
+                    : belongsTo === "RESIDENT"
+                    ? "Residence ID / House No."
+                    : "Employee ID or department"
+                }
+              >
                 <Input
                   className="font-mono"
-                  placeholder={belongsTo === "STUDENT" ? "e.g. 2410xxxx" : "e.g. EMP-1042 or CSE Department"}
+                  placeholder={
+                    belongsTo === "STUDENT"
+                      ? "e.g. 2410xxxx"
+                      : belongsTo === "RESIDENT"
+                      ? "e.g. R1042"
+                      : "e.g. EMP-1042 or CSE Department"
+                  }
                   maxLength={100}
                   value={reference}
                   onChange={(e) => setReference(e.target.value)}

@@ -569,7 +569,7 @@ class CameraStreamManager:
             match_score = score
             if self._matcher is not None:
                 res = self._matcher.match(norm_plate)
-                if res.is_matched and res.matched_plate:
+                if res.matched_plate:
                     effective_plate = res.matched_plate
                     match_score = max(score, float(res.similarity_score))
 

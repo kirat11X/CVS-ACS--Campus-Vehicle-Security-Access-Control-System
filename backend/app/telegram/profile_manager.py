@@ -214,6 +214,17 @@ class TelegramProfileManager:
             p = self._profiles.get(chat_id)
             return dict(p) if p else None
 
+    def get_profile_by_identifier(self, identifier: str) -> Optional[Dict[str, Any]]:
+        """Returns the registered profile matching identifier (e.g. Student ID, Roll No), or None."""
+        clean_id = (identifier or "").strip().upper()
+        if not clean_id:
+            return None
+        with self._lock:
+            for prof in self._profiles.values():
+                if (prof.get("identifier") or "").strip().upper() == clean_id:
+                    return dict(prof)
+        return None
+
     def is_registered(self, chat_id: int) -> bool:
         """Checks if the user has completed name, ID, and location registration."""
         p = self.get_profile(chat_id)

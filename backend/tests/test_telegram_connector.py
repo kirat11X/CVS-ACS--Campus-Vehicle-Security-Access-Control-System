@@ -1050,3 +1050,147 @@ def test_handle_edit_and_profile_chat_allowed_enforcement():
         assert "Unauthorized" in mock_msg_unauth.reply_text.call_args[0][0]
 
     asyncio.run(_run())
+
+
+def test_override_decision_via_screening_service_notifies_telegram_sender(db: Session, sample_invoice_bytes):
+    """
+    Verifies that when a guard or admin overrides a delivery decision via delivery_screening_service.record_decision:
+    - The Telegram sender receives a detailed override message with Order ID, new decision, officer name, and instructions.
+    """
+    test_chat_id = 888888
+    test_sid = "22103078"
+    profile_manager.save_profile(
+        chat_id=test_chat_id,
+        full_name="Kirat",
+        identifier=test_sid,
+        location="Shivalik Hostel",
+    )
+
+    test_oid = f"TG-OVR-{uuid.uuid4().hex[:6].upper()}"
+    inv = delivery_screening_service.process(
+        db,
+        order_id=test_oid,
+        content=sample_invoice_bytes,
+        source=DeliverySource.TELEGRAM,
+        sender=f"Kirat ({test_sid}) · Shivalik Hostel",
+        customer_name="Kirat",
+    )
+    inv.order.delivery_agent_phone = str(test_chat_id)
+    db.commit()
+
+    guard = db.query(User).filter(User.username == "guard1").first()
+    guard_id = guard.id if guard else uuid.uuid4()
+
+    with patch.object(telegram_service, "send_message_sync") as mock_send_sync:
+        # Guard overrides to CLEARED
+        delivery_screening_service.record_decision(
+            db,
+            order_id=test_oid,
+            decision=GuardDecision.CLEARED,
+            note="Inspected packet, all clear",
+            user_id=guard_id,
+        )
+
+        mock_send_sync.assert_called_once()
+        sent_chat_id, sent_text = mock_send_sync.call_args[0]
+        assert sent_chat_id == test_chat_id
+        assert test_oid in sent_text
+        assert "APPROVED & CLEARED" in sent_text
+        assert "Inspected packet, all clear" in sent_text
+        assert "Kirat" in sent_text
+        assert "Shivalik Hostel" in sent_text
+        assert "Your delivery has been cleared by campus security" in sent_text
+
+    with patch.object(telegram_service, "send_message_sync") as mock_send_sync:
+        # Guard overrides to HELD
+        delivery_screening_service.record_decision(
+            db,
+            order_id=test_oid,
+            decision=GuardDecision.HELD,
+            note="Physical packet inspection required at Gate 3",
+            user_id=guard_id,
+        )
+
+        mock_send_sync.assert_called_once()
+        sent_chat_id, sent_text = mock_send_sync.call_args[0]
+        assert sent_chat_id == test_chat_id
+        assert "FLAGGED & HELD FOR PHYSICAL SEARCH" in sent_text
+        assert "Physical packet inspection required at Gate 3" in sent_text
+
+
+def test_override_decision_via_triage_notifies_telegram_sender(db: Session, sample_invoice_bytes):
+    """
+    Verifies that when a guard or admin triages a cargo review (via web or Telegram callback):
+    - The Telegram sender receives the updated decision message.
+    """
+    test_chat_id = 777777
+    test_sid = "23104011"
+    profile_manager.save_profile(
+        chat_id=test_chat_id,
+        full_name="Aman",
+        identifier=test_sid,
+        location="Aravali Hostel",
+    )
+
+    test_oid = f"TG-TRG-{uuid.uuid4().hex[:6].upper()}"
+    inv = delivery_screening_service.process(
+        db,
+        order_id=test_oid,
+        content=sample_invoice_bytes,
+        source=DeliverySource.TELEGRAM,
+        sender=f"Aman ({test_sid}) · Aravali Hostel",
+        customer_name="Aman",
+    )
+    inv.order.delivery_agent_phone = str(test_chat_id)
+    db.commit()
+
+    guard = db.query(User).filter(User.username == "guard1").first()
+    guard_id = guard.id if guard else uuid.uuid4()
+
+    with patch.object(telegram_service, "send_message_sync") as mock_send_sync:
+        review_id = f"cargo_{inv.id}"
+        execute_review_triage(
+            db,
+            review_id=review_id,
+            action=TriageAction.REJECT,
+            guard_id=guard_id,
+            reason_notes="Turned away due to prohibited items",
+            gate_override="GATE_3",
+        )
+
+        mock_send_sync.assert_called_once()
+        sent_chat_id, sent_text = mock_send_sync.call_args[0]
+        assert sent_chat_id == test_chat_id
+        assert test_oid in sent_text
+        assert "DENIED & TURNED AWAY" in sent_text
+        assert "Turned away due to prohibited items" in sent_text
+        assert "Gate 3" in sent_text
+
+
+def test_override_decision_non_telegram_order_ignored(db: Session, sample_invoice_bytes):
+    """
+    Verifies that non-Telegram orders (e.g. Local Intake, Console) do not attempt
+    to dispatch Telegram override messages.
+    """
+    test_oid = f"LOCAL-{uuid.uuid4().hex[:6].upper()}"
+    inv = delivery_screening_service.process(
+        db,
+        order_id=test_oid,
+        content=sample_invoice_bytes,
+        source=DeliverySource.LOCAL_INTAKE,
+        sender="Walk-in Rider",
+    )
+
+    guard = db.query(User).filter(User.username == "guard1").first()
+    guard_id = guard.id if guard else uuid.uuid4()
+
+    with patch.object(telegram_service, "send_message_sync") as mock_send_sync:
+        delivery_screening_service.record_decision(
+            db,
+            order_id=test_oid,
+            decision=GuardDecision.CLEARED,
+            note="Local rider cleared",
+            user_id=guard_id,
+        )
+
+        mock_send_sync.assert_not_called()

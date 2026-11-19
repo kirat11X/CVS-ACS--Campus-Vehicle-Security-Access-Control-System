@@ -17,6 +17,7 @@ from backend.app.models.enums import (
     AlertSeverity,
     AlertStatus,
     GuardDecision,
+    OrderStatus,
     ReasonCode,
     ResolutionOutcome,
     ScreeningVerdict,
@@ -349,7 +350,32 @@ def execute_review_triage(
             timestamp=now,
         )
         db.add(access_audit)
+
+        # Update order status if order is linked
+        if invoice.order:
+            if action in (TriageAction.ALLOW, TriageAction.OVERRIDE):
+                invoice.order.verification_status = AccessState.ALLOWED
+                invoice.order.status = OrderStatus.VERIFIED
+            else:
+                invoice.order.verification_status = AccessState.DENIED
+                invoice.order.status = OrderStatus.REVIEW
+
         db.commit()
+
+        # Notify Telegram sender if order originated from Telegram
+        try:
+            from backend.app.telegram.bot_service import notify_sender_of_override
+            notify_sender_of_override(
+                db=db,
+                order=invoice.order,
+                invoice=invoice,
+                decision=action.value,
+                guard_id=guard_id,
+                note=reason_notes,
+                gate_name=gate_override or (invoice.gate_id if invoice else None),
+            )
+        except Exception as exc:
+            logger.warning("Failed to trigger Telegram override notification from triage: %s", exc)
 
         return TriageResponse(
             status="SUCCESS",

@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from backend.app.config import INVOICE_MAX_UPLOAD_MB, MEDIA_ROOT
 from backend.app.models.delivery import DeliveryDecision, DeliveryOrder, Invoice, InvoiceItem
-from backend.app.models.enums import DeliverySource, GuardDecision, OrderStatus, PlatformType, ScreeningVerdict
+from backend.app.models.enums import AccessState, DeliverySource, GuardDecision, OrderStatus, PlatformType, ScreeningVerdict
 from backend.app.models.gate import Gate
 from backend.app.schemas.delivery import (
     DecisionRecord,
@@ -518,7 +518,35 @@ class DeliveryScreeningService:
             order_id=order.id, invoice_id=invoice.id, decision=decision,
             note=(note or "").strip() or None, decided_by_id=user_id,
         ))
+
+        # Synchronize order verification status with manual guard decision
+        if decision == GuardDecision.CLEARED:
+            order.verification_status = AccessState.ALLOWED
+            order.status = OrderStatus.VERIFIED
+        elif decision == GuardDecision.HELD:
+            order.verification_status = AccessState.DENIED
+            order.status = OrderStatus.REVIEW
+        elif decision == GuardDecision.ESCALATED:
+            order.verification_status = AccessState.DENIED
+            order.status = OrderStatus.REJECTED
+
         db.commit()
+
+        # Notify Telegram sender if order originated from Telegram
+        try:
+            from backend.app.telegram.bot_service import notify_sender_of_override
+            notify_sender_of_override(
+                db=db,
+                order=order,
+                invoice=invoice,
+                decision=decision.value,
+                guard_id=user_id,
+                note=note,
+                gate_name=order.gate_id or invoice.gate_id,
+            )
+        except Exception as exc:
+            logger.warning("Failed to trigger Telegram override notification: %s", exc)
+
         return self.detail(db, order_id)
 
     def update_items(

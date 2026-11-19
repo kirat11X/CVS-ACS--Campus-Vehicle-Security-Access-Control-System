@@ -27,12 +27,14 @@ import asyncio
 import io
 import logging
 import re
+import threading
 import uuid
 from collections import OrderedDict
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from telegram import (
+    Bot,
     CallbackQuery,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
@@ -189,6 +191,7 @@ class TelegramBotService:
         self.application: Optional[Application] = None
         self._is_running: bool = False
         self._lock = asyncio.Lock()
+        self._main_loop: Optional[asyncio.AbstractEventLoop] = None
         self._processed_update_ids: OrderedDict[int, float] = OrderedDict()
         self._processed_file_unique_ids: OrderedDict[str, float] = OrderedDict()
 
@@ -246,6 +249,11 @@ class TelegramBotService:
                 return
 
             try:
+                try:
+                    self._main_loop = asyncio.get_running_loop()
+                except RuntimeError:
+                    self._main_loop = None
+
                 self.application = self._build_application()
                 await self.application.initialize()
                 await self.application.start()
@@ -280,6 +288,41 @@ class TelegramBotService:
                 logger.warning("Error stopping TelegramBotService: %s", exc)
             finally:
                 self._is_running = False
+
+    async def send_message_to_chat(self, chat_id: int, text: str) -> bool:
+        """Sends a Markdown-formatted message to a specific Telegram chat_id."""
+        if not self.is_configured:
+            return False
+        try:
+            bot = self.application.bot if self.application else Bot(token=self.token)
+            await bot.send_message(chat_id=chat_id, text=text, parse_mode="Markdown")
+            return True
+        except Exception as exc:
+            logger.warning("Failed to send message to Telegram chat %s: %s", chat_id, exc)
+            return False
+
+    def send_message_sync(self, chat_id: int, text: str) -> None:
+        """Dispatches an asynchronous Telegram message from synchronous context safely."""
+        if not self.is_configured:
+            return
+        try:
+            loop = None
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                pass
+
+            if loop and loop.is_running():
+                asyncio.run_coroutine_threadsafe(self.send_message_to_chat(chat_id, text), loop)
+            elif self._main_loop and self._main_loop.is_running():
+                asyncio.run_coroutine_threadsafe(self.send_message_to_chat(chat_id, text), self._main_loop)
+            else:
+                threading.Thread(
+                    target=lambda: asyncio.run(self.send_message_to_chat(chat_id, text)),
+                    daemon=True,
+                ).start()
+        except Exception as exc:
+            logger.warning("Error dispatching sync Telegram message to chat %s: %s", chat_id, exc)
 
     def _is_chat_allowed(self, chat_id: int) -> bool:
         if not self.allowed_chat_ids:
@@ -979,6 +1022,11 @@ class TelegramBotService:
                             raise proc_exc
 
                     order = invoice.order
+                    order.delivery_agent_phone = str(chat_id)
+                    if cust_id:
+                        order.customer_id = cust_id
+                    if sender_name:
+                        order.customer_name = sender_name
                     oid = order.order_id
                     vendor = invoice.vendor or (order.restaurant if hasattr(order, "restaurant") else None) or order.platform.value
                     if not vendor or vendor.upper() in ("OTHER", "UNKNOWN", "NONE"):
@@ -1029,6 +1077,7 @@ class TelegramBotService:
                             "order_id": order.order_id,
                             "student_id": sender_id,
                             "student_name": sender_name,
+                            "chat_id": chat_id,
                             "location": user_location,
                             "restaurant": order.restaurant,
                             "platform": order.platform.value if order.platform else "OTHER",
@@ -1112,6 +1161,7 @@ class TelegramBotService:
                             gate_id=gate_id_val,
                             customer_name=sender_name,
                             customer_id=cust_id,
+                            delivery_agent_phone=str(chat_id),
                             status=OrderStatus.OCR_PROCESSED,
                             verification_status=AccessState.ALLOWED,
                         )
@@ -1119,6 +1169,7 @@ class TelegramBotService:
                         db.flush()
                     else:
                         order.customer_name = sender_name
+                        order.delivery_agent_phone = str(chat_id)
                         if cust_id:
                             order.customer_id = cust_id
                         order.status = OrderStatus.OCR_PROCESSED
@@ -1163,6 +1214,7 @@ class TelegramBotService:
                             "order_id": order.order_id,
                             "customer_name": sender_name,
                             "identifier": sender_id,
+                            "chat_id": chat_id,
                             "location": user_location,
                         },
                         timestamp=now,
@@ -1480,3 +1532,204 @@ class TelegramBotService:
 
 
 telegram_service = TelegramBotService()
+
+
+def resolve_telegram_chat_id(
+    db: Session,
+    order: Optional[Any],
+    invoice: Optional[Any] = None,
+) -> Optional[int]:
+    """
+    Resolves the Telegram chat_id of the user who submitted this delivery invoice.
+    Uses multi-tier fallback:
+      1. order.delivery_agent_phone if numeric (stored chat_id)
+      2. VehicleOwner linked via order.customer_id -> matched in telegram_users or profile_manager
+      3. regex extraction from invoice.sender or order.customer_name "Name (SID) · Location"
+      4. AccessDecision audit record context_data
+      5. invoice.sender if numeric
+    """
+    if not order and not invoice:
+        return None
+
+    from backend.app.models.identity import TelegramUser, VehicleOwner
+    from backend.app.models.gate import AccessDecision
+
+    # 1. Direct stored chat_id on order.delivery_agent_phone
+    if order and hasattr(order, "delivery_agent_phone") and order.delivery_agent_phone:
+        val = str(order.delivery_agent_phone).strip()
+        if val.isdigit():
+            c_id = int(val)
+            if profile_manager.get_profile(c_id):
+                return c_id
+            tg_row = db.query(TelegramUser).filter(TelegramUser.chat_id == c_id).first()
+            if tg_row:
+                return tg_row.chat_id
+            # Even if not yet in cache, a numeric delivery_agent_phone for a TG order is the chat_id
+            if (getattr(order, "order_id", "") and str(order.order_id).startswith("TG-")) or (invoice and getattr(invoice, "source", None) == DeliverySource.TELEGRAM):
+                return c_id
+
+    # 2. VehicleOwner linked to order
+    if order and hasattr(order, "customer_id") and order.customer_id:
+        owner = db.get(VehicleOwner, order.customer_id)
+        if owner and owner.identifier:
+            prof = profile_manager.get_profile_by_identifier(owner.identifier)
+            if prof and prof.get("chat_id"):
+                return int(prof["chat_id"])
+            tg_row = db.query(TelegramUser).filter(TelegramUser.identifier == owner.identifier).first()
+            if tg_row:
+                return tg_row.chat_id
+
+    # 3. Invoice sender string e.g. "Kirat (22103078) · Shivalik Hostel"
+    inv_sender = (getattr(invoice, "sender", None) if invoice else None) or (getattr(order, "customer_name", None) if order else None)
+    if inv_sender:
+        m = re.search(r"\(([^)]+)\)", inv_sender)
+        if m:
+            ident = m.group(1).strip()
+            prof = profile_manager.get_profile_by_identifier(ident)
+            if prof and prof.get("chat_id"):
+                return int(prof["chat_id"])
+            tg_row = db.query(TelegramUser).filter(TelegramUser.identifier == ident).first()
+            if tg_row:
+                return tg_row.chat_id
+
+        if str(inv_sender).strip().isdigit():
+            return int(str(inv_sender).strip())
+
+    # 4. AccessDecision audit record
+    if order and getattr(order, "order_id", None):
+        try:
+            audits = (
+                db.query(AccessDecision)
+                .filter(AccessDecision.context_data.isnot(None))
+                .order_by(AccessDecision.timestamp.desc())
+                .limit(20)
+                .all()
+            )
+            for a in audits:
+                ctx = a.context_data or {}
+                if ctx.get("order_id") == order.order_id and ctx.get("chat_id"):
+                    return int(ctx["chat_id"])
+        except Exception:
+            pass
+
+    return None
+
+
+def notify_sender_of_override(
+    db: Session,
+    order: Optional[Any],
+    invoice: Optional[Any],
+    decision: str,
+    guard_id: Optional[uuid.UUID] = None,
+    note: Optional[str] = None,
+    gate_name: Optional[str] = None,
+) -> bool:
+    """
+    Notifies the Telegram sender when an admin or guard records an override or manual decision.
+    Renders full invoice order details, updated decision, officer note, and next steps for the student.
+    """
+    if not order and not invoice:
+        return False
+
+    is_telegram = False
+    if invoice and getattr(invoice, "source", None) == DeliverySource.TELEGRAM:
+        is_telegram = True
+    elif order and (
+        (getattr(order, "order_id", "") and str(order.order_id).startswith("TG-"))
+        or (hasattr(order, "delivery_agent_phone") and order.delivery_agent_phone and str(order.delivery_agent_phone).strip().isdigit())
+    ):
+        is_telegram = True
+
+    if not is_telegram:
+        return False
+
+    chat_id = resolve_telegram_chat_id(db, order, invoice)
+    if not chat_id:
+        logger.info(
+            "No Telegram chat_id found for order %s; skipping override notification",
+            getattr(order, "order_id", "UNKNOWN"),
+        )
+        return False
+
+    officer_name = "Campus Security Guard"
+    if guard_id:
+        guard_user = db.get(User, guard_id)
+        if guard_user:
+            officer_name = guard_user.full_name or guard_user.username or "Campus Security Officer"
+
+    effective_gate = gate_name or (getattr(invoice, "gate_id", None) if invoice else None) or (getattr(order, "gate_id", None) if order else None) or "Gate 3"
+    if effective_gate.startswith("GATE_"):
+        effective_gate = effective_gate.replace("_", " ").title()
+
+    oid = getattr(order, "order_id", None) or (getattr(invoice, "order_id", None) if invoice else "Delivery")
+    display_oid = str(oid) if oid else "Delivery"
+
+    plat_val = order.platform.value if (order and hasattr(order, "platform") and order.platform) else "Quick Commerce"
+    if str(plat_val).upper() == "OTHER":
+        plat_val = "Quick Commerce"
+
+    is_qc = str(plat_val).upper() in ("ZEPTO", "BLINKIT", "SWIGGY INSTAMART", "INSTAMART", "BIGBASKET", "AMAZON")
+    place_name = str(plat_val).title() if is_qc else ((getattr(order, "restaurant", None) if order else None) or (getattr(invoice, "vendor", None) if invoice else None) or "Store / Merchant")
+
+    total = float(invoice.total_amount or invoice.computed_total or 0.0) if invoice else 0.0
+
+    # User / Recipient Profile
+    prof = profile_manager.get_profile(chat_id)
+    recipient_name = (prof.get("full_name") if prof else None) or (getattr(order, "customer_name", None) if order else "Student")
+    identifier = (prof.get("identifier") if prof else None) or (getattr(order, "customer_id", None) and "ID") or "Student"
+    user_location = (prof.get("location") if prof else None) or "Campus"
+
+    # Items summary
+    item_lines = []
+    if invoice and getattr(invoice, "items", None):
+        for idx, itm in enumerate(invoice.items, start=1):
+            qty = itm.quantity if (itm.quantity is not None and itm.quantity > 0) else 1
+            price_val = float(itm.total_price or 0.0)
+            price_str = f" — ₹{price_val:,.2f}" if price_val > 0 else ""
+            item_lines.append(f"{idx}. *{itm.item_name}* (Qty: *{qty}*){price_str}")
+
+    items_summary = "\n".join(item_lines) if item_lines else "• _Items verified by cargo screening model_"
+
+    dec_upper = str(decision).strip().upper()
+    now_str = datetime.now(timezone.utc).strftime("%I:%M %p UTC")
+
+    # Initial verdict info
+    initial_verdict = (invoice.overall_verdict.value if (invoice and getattr(invoice, "overall_verdict", None)) else "REVIEW")
+
+    if dec_upper in ("CLEARED", "ALLOW"):
+        status_label = "✅ *APPROVED & CLEARED*"
+        instructions = "✅ *Your delivery has been cleared by campus security.* You may collect your parcel at the gate."
+    elif dec_upper in ("HELD", "OVERRIDE", "REVIEW"):
+        status_label = "⚠️ *FLAGGED & HELD FOR PHYSICAL SEARCH*"
+        instructions = f"⚠️ *Your delivery is held at {effective_gate} for physical inspection.* Please report to the gate security post with your ID to verify the parcel."
+    elif dec_upper in ("ESCALATED", "REJECT", "DENIED"):
+        status_label = "⛔ *DENIED & TURNED AWAY*"
+        instructions = f"⛔ *Campus security has denied entry for this delivery.* The delivery agent has been turned away at {effective_gate}."
+    else:
+        status_label = f"ℹ️ *{dec_upper}*"
+        instructions = f"ℹ️ Security decision recorded at {effective_gate}."
+
+    note_text = (note or "").strip() or "Decision confirmed by security personnel."
+
+    text = (
+        f"🛡️ *Campus Gate Security Update: Decision Override*\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"👤 *Recipient:* *{recipient_name}* (`{identifier}`)\n"
+        f"📍 *Hostel / Location:* *{user_location}*\n"
+        f"🆔 *Order ID:* `{display_oid}`\n"
+        f"🏪 *Ordered From:* *{place_name}*\n"
+        f"📋 *Item Details & Quantities:*\n"
+        f"{items_summary}\n\n"
+        f"💰 *Bill Total:* *₹{total:,.2f}*\n\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"🛡️ *Updated Decision:* {status_label}\n"
+        f"ℹ️ *Initial Screening:* `{initial_verdict}` ➔ *Officer Decision:* `{dec_upper}`\n"
+        f"👮 *Reviewed By:* *{officer_name}* ({effective_gate})\n"
+        f"💬 *Officer Note:* _{note_text}_\n"
+        f"⏱️ *Timestamp:* `{now_str}`\n\n"
+        f"{instructions}"
+    )
+
+    telegram_service.send_message_sync(chat_id, text)
+    logger.info("Dispatched Telegram override notification for order %s to chat_id %s (decision: %s)", oid, chat_id, dec_upper)
+    return True

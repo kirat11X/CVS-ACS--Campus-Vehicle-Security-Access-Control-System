@@ -73,6 +73,26 @@ Every subsystem and API endpoint preserves the following foundational invariants
 - Python 3.14+ with venv
 - Intel iGPU (`/dev/dri`) or compatible hardware acceleration device
 
+### 🚀 One-Command Turnkey Startup (Recommended)
+Start the entire project stack—Docker infrastructure (PostgreSQL, Mosquitto, Frigate, n8n), database schema migrations, Ollama local LLM runtime, YOLO11n + CRNN model weights, FastAPI backend API, and the React 19 guard console—with a single command:
+
+```bash
+./start.sh            # Starts infrastructure, migrations, models, backend & frontend
+```
+
+Useful management commands:
+```bash
+./start.sh status     # Show health and operational status matrix across all ports
+./start.sh demo       # Run the interactive video ANPR & delivery invoice OCR pipeline
+./start.sh test       # Execute the full automated pytest verification test suite (138+ tests)
+./start.sh stop       # Gracefully shut down frontend, backend, and container services
+./start.sh -d         # Launch full stack in daemon (background) mode
+```
+
+---
+
+### Manual Step-by-Step Setup
+
 ### 1. Start Containerized Infrastructure
 ```bash
 # Start PostgreSQL, Mosquitto MQTT, Frigate NVR, and n8n

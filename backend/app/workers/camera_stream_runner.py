@@ -124,6 +124,114 @@ def letterbox_image(image: np.ndarray, target_size: int = 640) -> Tuple[np.ndarr
     return canvas, scale, dx, dy
 
 
+def is_plate_like_crop(crop: np.ndarray) -> bool:
+    """
+    Crop-level plate-likeness gate before OCR.
+    Rejects crops with low grayscale contrast (std < 22.0) or abnormal
+    Canny edge density (< 0.04 or > 0.55) so flat walls, shadows, and
+    uniform empty space never reach OCR.
+    """
+    if crop is None or crop.size == 0 or crop.shape[0] < 12 or crop.shape[1] < 30:
+        return False
+
+    gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY) if crop.ndim == 3 else crop
+    std = float(np.std(gray))
+    if std < 22.0:
+        return False
+
+    edges = cv2.Canny(gray, 50, 150)
+    edge_density = float(np.count_nonzero(edges)) / float(edges.size)
+    if edge_density < 0.04 or edge_density > 0.55:
+        return False
+
+    return True
+
+
+def preprocess_plate_crop(crop: np.ndarray) -> np.ndarray:
+    """
+    Preprocesses plate crop before OCR:
+    1. Aspect-preserving bicubic upscale when crop_height < 48px.
+    2. CLAHE on the L-channel when crop brightness < 90 or contrast std < 45.
+    """
+    if crop is None or crop.size == 0:
+        return crop
+
+    enhanced = crop.copy()
+    ch, cw = enhanced.shape[:2]
+
+    # 1. Aspect-preserving bicubic upscale if height < 48px
+    if 0 < ch < 48:
+        scale = 48.0 / float(ch)
+        new_w = max(1, int(round(cw * scale)))
+        enhanced = cv2.resize(enhanced, (new_w, 48), interpolation=cv2.INTER_CUBIC)
+        ch, cw = enhanced.shape[:2]
+
+    # 2. CLAHE on L-channel when brightness < 90 or contrast std < 45
+    lab = cv2.cvtColor(enhanced, cv2.COLOR_BGR2LAB)
+    l_chan, a_chan, b_chan = cv2.split(lab)
+    mean_brightness = float(np.mean(l_chan))
+    std_contrast = float(np.std(l_chan))
+
+    if mean_brightness < 90.0 or std_contrast < 45.0:
+        clahe = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(8, 8))
+        l_enhanced = clahe.apply(l_chan)
+        lab = cv2.merge([l_enhanced, a_chan, b_chan])
+        enhanced = cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
+
+    return enhanced
+
+
+def sort_multiline_boxes(
+    lines_with_boxes: List[Any],
+    crop_height: int,
+) -> List[Any]:
+    """
+    When RapidOCR returns multiple lines on 2-line plates, sort boxes
+    top-to-bottom (y_center) then left-to-right (x_center) before joining.
+    """
+    if len(lines_with_boxes) <= 1:
+        return lines_with_boxes
+
+    parsed = []
+    for item in lines_with_boxes:
+        box = item[0]
+        pts = np.array(box, dtype=np.float32).reshape(-1, 2)
+        y_center = float(np.mean(pts[:, 1]))
+        x_center = float(np.mean(pts[:, 0]))
+        parsed.append({
+            "item": item,
+            "y_center": y_center,
+            "x_center": x_center,
+        })
+
+    # Sort primarily by y_center
+    parsed.sort(key=lambda d: d["y_center"])
+
+    # Cluster into horizontal lines based on vertical tolerance (e.g. 25% crop height)
+    line_threshold = max(10.0, 0.25 * float(crop_height))
+    lines: List[List[Dict[str, Any]]] = []
+
+    for entry in parsed:
+        placed = False
+        for line in lines:
+            avg_y = sum(d["y_center"] for d in line) / len(line)
+            if abs(entry["y_center"] - avg_y) <= line_threshold:
+                line.append(entry)
+                placed = True
+                break
+        if not placed:
+            lines.append([entry])
+
+    # Sort each horizontal line left-to-right
+    sorted_items = []
+    for line in lines:
+        line.sort(key=lambda d: d["x_center"])
+        for d in line:
+            sorted_items.append(d["item"])
+
+    return sorted_items
+
+
 class CameraStreamManager:
     """
     Manages live camera capture loops across multiple gates, dynamically
@@ -148,6 +256,8 @@ class CameraStreamManager:
         self._last_seen: Dict[str, datetime] = {}
         self._last_errors: Dict[str, Optional[str]] = {}
         self._latest_frames: Dict[str, np.ndarray] = {}
+        self._prev_grays: Dict[str, np.ndarray] = {}
+        self._last_motion_ts: Dict[str, float] = {}
 
         # Shared bounded inference queue
         self._inference_queue: queue.Queue[Optional[Tuple[str, np.ndarray, float]]] = queue.Queue(maxsize=30)
@@ -568,6 +678,29 @@ class CameraStreamManager:
             logger.debug("[%s] Dropping blurry frame (variance=%.1f < 40.0)", gate_id, laplacian_var)
             return None
 
+        # Lightweight motion/background change gating:
+        # Prevents static empty frames (e.g. bare walls, stationary scenery) from repeatedly running inference
+        now_ts = time.time()
+        small_gray = cv2.resize(gray, (160, 120), interpolation=cv2.INTER_AREA)
+        prev_gray = self._prev_grays.get(gate_id)
+        has_motion = True
+        if prev_gray is not None and prev_gray.shape == small_gray.shape:
+            diff = cv2.absdiff(small_gray, prev_gray)
+            mean_diff = float(np.mean(diff))
+            if mean_diff < 1.5:
+                has_motion = False
+        self._prev_grays[gate_id] = small_gray
+
+        if has_motion:
+            self._last_motion_ts[gate_id] = now_ts
+
+        if require_consensus:
+            last_motion = self._last_motion_ts.get(gate_id, now_ts)
+            has_active_track = bool(self._temporal_tracks.get(gate_id))
+            if not has_motion and (now_ts - last_motion > 2.5) and not has_active_track:
+                # Static scene with no vehicle motion - skip expensive YOLO / false triggers
+                return None
+
         # 2. Letterbox padding (with RGB conversion for YOLO)
         canvas, scale, dx, dy = letterbox_image(frame, 640)
         canvas_rgb = cv2.cvtColor(canvas, cv2.COLOR_BGR2RGB)
@@ -578,7 +711,7 @@ class CameraStreamManager:
             inp = canvas_rgb.transpose(2, 0, 1)[np.newaxis, :, :, :].astype(np.float32) / 255.0
             det_out = self._det_session.run(None, {self._det_session.get_inputs()[0].name: inp})[0][0]
 
-            conf_thresh = 0.55
+            conf_thresh = 0.65
             for col in range(det_out.shape[1]):
                 score = float(det_out[4, col])
                 if score >= conf_thresh:
@@ -605,12 +738,12 @@ class CameraStreamManager:
                     y2 = min(h, int(cy_orig + bh_orig / 2))
                     boxes.append((x1, y1, x2, y2, score))
 
-        # NMS on candidate boxes
+        # NMS on candidate boxes with score threshold 0.65
         final_boxes = []
         if boxes:
             cv_boxes = [[b[0], b[1], b[2] - b[0], b[3] - b[1]] for b in boxes]
             scores = [b[4] for b in boxes]
-            indices = cv2.dnn.NMSBoxes(cv_boxes, scores, 0.55, 0.45)
+            indices = cv2.dnn.NMSBoxes(cv_boxes, scores, 0.65, 0.45)
             for idx in (indices.flatten() if len(indices) > 0 else []):
                 final_boxes.append(boxes[idx])
 
@@ -620,21 +753,72 @@ class CameraStreamManager:
         # 4. High-Accuracy OCR & Statutory Indian Plate Normalization
         best_plate = None
         for x1, y1, x2, y2, score in final_boxes:
-            crop = frame[y1:y2, x1:x2]
+            bw = x2 - x1
+            bh = y2 - y1
+
+            # 8% bounding-box padding around plate crops (clamped to frame dimensions)
+            pad_w = int(round(bw * 0.08))
+            pad_h = int(round(bh * 0.08))
+            px1 = max(0, x1 - pad_w)
+            py1 = max(0, y1 - pad_h)
+            px2 = min(w, x2 + pad_w)
+            py2 = min(h, y2 + pad_h)
+
+            crop = frame[py1:py2, px1:px2]
             if crop.size == 0 or crop.shape[0] < 12 or crop.shape[1] < 30:
                 continue
 
+            # Crop-level plate-likeness gate before OCR:
+            # Rejects crops with low grayscale contrast (std < 22.0) or abnormal Canny edge density (< 0.04 or > 0.55)
+            if not is_plate_like_crop(crop):
+                logger.debug("[%s] Dropping non-plate crop (failed contrast/edge texture gate)", gate_id)
+                continue
+
+            # Crop preprocessing before OCR: aspect-preserving bicubic upscale if height < 48px, LAB CLAHE if dark/low contrast
+            prep_crop = preprocess_plate_crop(crop)
+            prep_h, prep_w = prep_crop.shape[:2]
+            aspect_ratio = float(prep_w) / max(1.0, float(prep_h))
+            is_possible_multiline = aspect_ratio < 2.5
+
             raw_text = ""
             char_conf = 0.0
+            crnn_text = ""
+            crnn_conf = 0.0
 
-            # 1. Primary Engine: RapidOCR (PP-OCRv4) - trained, robust on 1-line and 2-line Indian plates
-            if self._rapid_ocr is not None:
+            # Step 1: Run plate-trained ONNX model FIRST (indian_plate_crnn_best.onnx / track_a_ocr_cct.onnx)
+            if self._ocr_session is not None:
                 try:
-                    res, _ = self._rapid_ocr(crop)
+                    crop_rgb = cv2.cvtColor(prep_crop, cv2.COLOR_BGR2RGB)
+                    crop_res = cv2.resize(crop_rgb, (128, 32)).transpose(2, 0, 1)[np.newaxis, :, :, :].astype(np.float32) / 127.5 - 1.0
+                    logits = self._ocr_session.run(None, {self._ocr_session.get_inputs()[0].name: crop_res})[0]
+                    crnn_text, crnn_conf = decode_crnn_logits(logits)
+                except Exception as crnn_err:
+                    logger.debug("[%s] CRNN inference error: %s", gate_id, crnn_err)
+
+            crnn_norm = normalize_plate(crnn_text) if crnn_text else ""
+            crnn_is_valid = is_valid_indian_plate(crnn_norm) or bool(suggest_repairs(crnn_norm))
+
+            # Step 2: RapidOCR fallback/tie-breaker when CRNN confidence is low (< 0.55) or for 2-line plates
+            need_rapid_ocr = (
+                self._rapid_ocr is not None and (
+                    crnn_conf < 0.55
+                    or is_possible_multiline
+                    or len(crnn_norm) < 7
+                    or not crnn_is_valid
+                )
+            )
+
+            rapid_text = ""
+            rapid_conf = 0.0
+            if need_rapid_ocr:
+                try:
+                    res, _ = self._rapid_ocr(prep_crop)
                     if res:
+                        # When RapidOCR returns multiple lines on 2-line plates, sort boxes top-to-bottom then left-to-right
+                        sorted_res = sort_multiline_boxes(res, prep_h)
                         lines = []
                         confs = []
-                        for box, txt, r_score in res:
+                        for box, txt, r_score in sorted_res:
                             norm = normalize_plate(txt)
                             if norm == "IND":
                                 continue
@@ -646,17 +830,32 @@ class CameraStreamManager:
                                 lines.append(norm)
                                 confs.append(float(r_score))
                         if lines:
-                            raw_text = "".join(lines)
-                            char_conf = float(np.mean(confs))
+                            rapid_text = "".join(lines)
+                            rapid_conf = float(np.mean(confs))
                 except Exception as ocr_err:
-                    logger.debug("[%s] RapidOCR inference error: %s", gate_id, ocr_err)
+                    logger.debug("[%s] RapidOCR fallback error: %s", gate_id, ocr_err)
 
-            # 2. Fallback Engine: CRNN ONNX session
-            if not raw_text and self._ocr_session is not None:
-                crop_rgb = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
-                crop_res = cv2.resize(crop_rgb, (128, 32)).transpose(2, 0, 1)[np.newaxis, :, :, :].astype(np.float32) / 127.5 - 1.0
-                logits = self._ocr_session.run(None, {self._ocr_session.get_inputs()[0].name: crop_res})[0]
-                raw_text, char_conf = decode_crnn_logits(logits)
+            rapid_norm = normalize_plate(rapid_text) if rapid_text else ""
+            rapid_is_valid = is_valid_indian_plate(rapid_norm) or bool(suggest_repairs(rapid_norm))
+
+            # Tie-breaker selection
+            if crnn_text and not rapid_text:
+                raw_text, char_conf = crnn_text, crnn_conf
+            elif rapid_text and not crnn_text:
+                raw_text, char_conf = rapid_text, rapid_conf
+            elif crnn_text and rapid_text:
+                if rapid_is_valid and not crnn_is_valid:
+                    raw_text, char_conf = rapid_text, rapid_conf
+                elif crnn_is_valid and not rapid_is_valid:
+                    raw_text, char_conf = crnn_text, crnn_conf
+                elif is_possible_multiline and len(rapid_norm) >= 7:
+                    raw_text, char_conf = rapid_text, rapid_conf
+                elif crnn_conf >= 0.55 and crnn_is_valid:
+                    raw_text, char_conf = crnn_text, crnn_conf
+                elif rapid_conf > crnn_conf:
+                    raw_text, char_conf = rapid_text, rapid_conf
+                else:
+                    raw_text, char_conf = crnn_text, crnn_conf
 
             # Reject OCR reads with low character confidence (< 0.45)
             if char_conf < 0.45:
@@ -671,7 +870,7 @@ class CameraStreamManager:
             candidate = {
                 "raw_plate": raw_text,
                 "conf": max(score, char_conf),
-                "bbox": [x1, y1, x2, y2],
+                "bbox": [px1, py1, px2, py2],
                 "frame": frame.copy(),
                 "sharpness": laplacian_var,
                 "timestamp": time.time(),
@@ -720,13 +919,14 @@ class CameraStreamManager:
         agreement_rate = fused_res.get("agreement_rate", 1.0)
         slot_breakdown = fused_res.get("slot_breakdown", {})
 
-        # 1. Statutory Indian Plate Validation & Suggest Repairs (if not already valid)
+        # 1. Statutory Indian Plate Validation & Positional Repair
         candidate_plate = fused_plate
-        if not is_valid:
-            repairs = suggest_repairs(fused_plate)
+        is_statutory = is_valid_indian_plate(candidate_plate)
+        if not is_statutory:
+            repairs = suggest_repairs(candidate_plate)
             if repairs:
                 candidate_plate = repairs[0]
-                is_valid = True
+                is_statutory = is_valid_indian_plate(candidate_plate)
 
         # 2. Registry Matching via OpticalPlateMatcher
         self._refresh_registry_matcher()
@@ -735,15 +935,21 @@ class CameraStreamManager:
         registry_matched = False
         if self._matcher is not None:
             res = self._matcher.match(candidate_plate)
-            if res.matched_plate and float(res.similarity_score) >= 0.70:
-                effective_plate = res.matched_plate
-                match_score = max(match_score, float(res.similarity_score))
-                registry_matched = True
+            if res.matched_plate:
+                if is_statutory and float(res.similarity_score) >= 0.75:
+                    effective_plate = res.matched_plate
+                    match_score = max(match_score, float(res.similarity_score))
+                    registry_matched = True
+                elif (not is_statutory) and float(res.similarity_score) >= 0.85 and float(res.score_margin) >= 0.07 and not res.is_ambiguous:
+                    effective_plate = res.matched_plate
+                    match_score = max(match_score, float(res.similarity_score))
+                    registry_matched = True
 
-        # Guardrail Gate: Must strictly be either a valid statutory Indian plate or match campus vehicle registry
-        if not is_valid and not registry_matched:
+        # Tightened Gate: Never accept a static-noise fuzzy match unless is_valid_indian_plate(repaired) is True
+        # OR (similarity_score >= 0.85 with ambiguity margin >= 0.07).
+        if not is_statutory and not registry_matched:
             logger.info(
-                "[%s] Dropped non-statutory plate candidate '%s' (not a valid Indian plate and not in registry)",
+                "[%s] Dropped non-statutory/noise candidate '%s' (not a valid Indian plate and failed strict registry threshold)",
                 gate_id,
                 fused_plate,
             )

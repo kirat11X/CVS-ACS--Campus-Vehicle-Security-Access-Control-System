@@ -1,4 +1,5 @@
 import re
+from typing import Optional
 
 # Comprehensive list of 36 Current States/UTs + 4 Former States (valid on older vehicles)
 CURRENT_STATES = {
@@ -118,34 +119,179 @@ def is_valid_indian_plate(normalized_plate: str) -> bool:
     return False
 
 
+EXPANDED_DIGIT_TO_LETTER: dict[str, list[str]] = {
+    "0": ["O", "D"],
+    "1": ["I", "L"],
+    "2": ["Z"],
+    "3": ["E", "J"],
+    "4": ["A"],
+    "5": ["S"],
+    "6": ["G"],
+    "7": ["T"],
+    "8": ["B"],
+    "9": [],
+}
+
+EXPANDED_LETTER_TO_DIGIT: dict[str, list[str]] = {
+    "O": ["0"],
+    "D": ["0"],
+    "Q": ["0"],
+    "I": ["1"],
+    "L": ["1"],
+    "Z": ["2"],
+    "E": ["3"],
+    "J": ["3"],
+    "A": ["4"],
+    "S": ["5"],
+    "G": ["6"],
+    "T": ["7"],
+    "B": ["8"],
+}
+
+# Legacy 1-to-1 confusion pairs kept for backward compatibility
 CONFUSION_PAIRS: dict[str, str] = {
     "O": "0", "0": "O",
     "I": "1", "1": "I",
     "B": "8", "8": "B",
     "S": "5", "5": "S",
     "Z": "2", "2": "Z",
+    "D": "0",
+    "A": "4", "4": "A",
+    "G": "6", "6": "G",
+    "T": "7", "7": "T",
 }
+
+
+def _get_letter_candidates(ch: str) -> list[tuple[str, int]]:
+    """Returns candidate letters for a letter slot: (char, swap_penalty)."""
+    if ch.isalpha():
+        return [(ch.upper(), 0)]
+    alts = EXPANDED_DIGIT_TO_LETTER.get(ch, [])
+    return [(alt, 1) for alt in alts]
+
+
+def _get_digit_candidates(ch: str) -> list[tuple[str, int]]:
+    """Returns candidate digits for a digit slot: (char, swap_penalty)."""
+    if ch.isdigit():
+        return [(ch, 0)]
+    alts = EXPANDED_LETTER_TO_DIGIT.get(ch.upper(), [])
+    return [(alt, 1) for alt in alts]
 
 
 def suggest_repairs(raw: str | None) -> list[str]:
     """
-    Evaluates O/0, I/1, B/8, S/5, Z/2 swaps to turn an invalid OCR read into a valid Indian plate.
+    Evaluates positional syntax-constrained repairs to turn an invalid OCR read
+    into a valid statutory Indian plate (Standard State or Bharat Series).
     Returns valid repaired plate candidates, fewest swaps first.
     """
     text = normalize_plate(raw)
     if not text or is_valid_indian_plate(text):
         return []
+
     import itertools
 
-    positions = [i for i, ch in enumerate(text) if ch in CONFUSION_PAIRS][:8]
+    length = len(text)
     found: set[tuple[int, str]] = set()
-    for k in range(1, min(4, len(positions) + 1)):
-        for subset in itertools.combinations(positions, k):
-            chars = list(text)
-            for i in subset:
-                chars[i] = CONFUSION_PAIRS[chars[i]]
-            candidate = "".join(chars)
-            if is_valid_indian_plate(candidate):
-                found.add((k, candidate))
+
+    # 1. Bharat Series Repair: YY BH #### XX (indices 0-1 digits, 2-3 BH, 4-7 digits, 8-9 letters)
+    if 9 <= length <= 10:
+        if (text[2] in "B80" and text[3] in "H4") or text[2:4] in {"BH", "8H", "B4", "84", "0H", "OH"}:
+            y0_cands = _get_digit_candidates(text[0])
+            y1_cands = _get_digit_candidates(text[1])
+            b_cost = 0 if text[2] == "B" else 1
+            h_cost = 0 if text[3] == "H" else 1
+
+            n_cands = [_get_digit_candidates(text[i]) for i in range(4, 8)]
+            s_cands = [_get_letter_candidates(text[i]) for i in range(8, length)]
+
+            for y0, c_y0 in y0_cands:
+                for y1, c_y1 in y1_cands:
+                    yy = y0 + y1
+                    if int(yy) < 21:
+                        continue
+                    for n_prod in itertools.product(*n_cands):
+                        num_str = "".join(p[0] for p in n_prod)
+                        c_num = sum(p[1] for p in n_prod)
+                        if num_str == "0000":
+                            continue
+                        for s_prod in itertools.product(*s_cands):
+                            ser_str = "".join(p[0] for p in s_prod)
+                            c_ser = sum(p[1] for p in s_prod)
+                            if any(c in ser_str for c in "IO"):
+                                continue
+                            cand = f"{yy}BH{num_str}{ser_str}"
+                            if is_valid_indian_plate(cand):
+                                total_c = c_y0 + c_y1 + b_cost + h_cost + c_num + c_ser
+                                found.add((total_c, cand))
+
+    # 2. Standard State Format: SS DD [L{1,3}] NNNN
+    if 8 <= length <= 11:
+        tail_cands = [_get_digit_candidates(text[i]) for i in range(length - 4, length)]
+        c0_cands = _get_letter_candidates(text[0])
+        c1_cands = _get_letter_candidates(text[1])
+
+        state_cands = []
+        for c0, cost0 in c0_cands:
+            for c1, cost1 in c1_cands:
+                st = c0 + c1
+                if st in ALL_VALID_STATES:
+                    state_cands.append((st, cost0 + cost1))
+
+        m_len = length - 6
+        splits = []
+        # Standard: 2 digits RTO, middle letters (0-3)
+        if m_len >= 0 and (m_len - 2) <= 3 and (m_len - 2) >= 0:
+            splits.append((2, m_len - 2))
+        # Delhi: 1 digit RTO, middle letters (1-3)
+        if m_len >= 1 and (m_len - 1) <= 3 and (m_len - 1) >= 1:
+            splits.append((1, m_len - 1))
+
+        for rto_len, ser_len in splits:
+            for st, st_cost in state_cands:
+                if rto_len == 1 and st != "DL":
+                    continue
+                if ser_len == 0 and st != "KA":
+                    continue
+
+                rto_cands = [_get_digit_candidates(text[2 + i]) for i in range(rto_len)]
+                ser_cands = [_get_letter_candidates(text[2 + rto_len + i]) for i in range(ser_len)]
+
+                for rto_prod in itertools.product(*rto_cands):
+                    rto_str = "".join(p[0] for p in rto_prod)
+                    rto_cost = sum(p[1] for p in rto_prod)
+                    if int(rto_str) == 0:
+                        continue
+                    for ser_prod in (itertools.product(*ser_cands) if ser_len > 0 else [()]):
+                        ser_str = "".join(p[0] for p in ser_prod)
+                        ser_cost = sum(p[1] for p in ser_prod)
+                        if any(c in ser_str for c in "IO"):
+                            continue
+                        for tail_prod in itertools.product(*tail_cands):
+                            tail_str = "".join(p[0] for p in tail_prod)
+                            tail_cost = sum(p[1] for p in tail_prod)
+                            if tail_str == "0000":
+                                continue
+                            cand = f"{st}{rto_str}{ser_str}{tail_str}"
+                            if is_valid_indian_plate(cand):
+                                total_c = st_cost + rto_cost + ser_cost + tail_cost
+                                found.add((total_c, cand))
+
     return [v for _, v in sorted(found)]
+
+
+def repair_plate_positional(raw: str | None) -> Optional[str]:
+    """
+    Positional syntax-constrained Indian plate repair.
+    - If raw is already a valid Indian plate, preserves it exactly (e.g. '22BH1234AA').
+    - If raw has OCR letter/digit confusions, repairs using statutory positional constraints
+      (e.g. 'P810A81234' -> 'PB10AB1234', '0L01AB1234' -> 'DL01AB1234').
+    - Returns None if the plate cannot be repaired to a valid statutory Indian format.
+    """
+    text = normalize_plate(raw)
+    if not text:
+        return None
+    if is_valid_indian_plate(text):
+        return text
+    candidates = suggest_repairs(text)
+    return candidates[0] if candidates else None
 

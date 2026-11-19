@@ -5,6 +5,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session, selectinload
 
 from backend.app.config import (
+    MEDIA_ROOT,
     RESOLUTION_CONFIDENCE_THRESHOLD,
     RESOLUTION_SUGGESTION_MIN_SIMILARITY,
     RESOLUTION_SUGGESTION_LIMIT,
@@ -410,7 +411,19 @@ class IdentityResolutionService:
             note=obs.note,
             created_by=_user_summary(obs.created_by),
             update_count=int(meta.get("update_count", 0) or 0),
-            has_snapshot=obs.source == ObservationSource.FRIGATE and bool(obs.source_event_id),
+            has_snapshot=bool(
+                (obs.source == ObservationSource.FRIGATE and obs.source_event_id)
+                or (
+                    obs.source_event_id
+                    and (
+                        meta.get("has_snapshot") is True
+                        or (MEDIA_ROOT / "snapshots" / f"{obs.source_event_id}.jpg").is_file()
+                        or (MEDIA_ROOT / "snapshots" / f"{obs.id}.jpg").is_file()
+                        or (MEDIA_ROOT / "frigate" / f"{obs.source_event_id}.jpg").is_file()
+                        or obs.source == ObservationSource.OTHER
+                    )
+                )
+            ),
         )
 
         return ResolvedObservation(

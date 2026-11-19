@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+import cv2
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from backend.app.dependencies import CurrentUser, get_db, require_admin, require_staff
@@ -208,3 +209,30 @@ def stop_gate_camera_stream(
     camera_stream_manager.set_gate_enabled(gid, False)
     telemetry = camera_stream_manager.get_telemetry()
     return GateStreamSettingsResponse(**telemetry)
+
+
+@router.get("/gates/stream-settings/{gate_id}/live-frame")
+@router.get("/api/gates/stream-settings/{gate_id}/live-frame")
+def get_gate_live_frame(
+    gate_id: str,
+    user: CurrentUser = Depends(require_staff),
+):
+    """
+    Returns the most recent live frame captured from the gate's camera stream as a JPEG image.
+    Allows staff, guards, and admins to inspect the camera feed in real time.
+    """
+    gid = gate_id.strip().upper()
+    frame = camera_stream_manager.get_latest_frame(gid)
+    if frame is None or frame.size == 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No live frame available for gate '{gid}'. The stream may be offline or initializing.",
+        )
+    ret, buffer = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
+    if not ret:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to encode live frame.")
+    return Response(
+        content=buffer.tobytes(),
+        media_type="image/jpeg",
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )

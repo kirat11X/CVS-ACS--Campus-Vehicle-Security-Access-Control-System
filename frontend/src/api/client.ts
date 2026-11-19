@@ -165,6 +165,14 @@ export const api = {
     if (res.status === 401) notifyUnauthorized();
     return { blob: res.ok ? await res.blob() : null, status: res.status };
   },
+  gateLiveFrame: async (token: string, gateId: string, signal?: AbortSignal): Promise<{ blob: Blob | null; status: number }> => {
+    const res = await fetch(apiUrl(`/gates/stream-settings/${enc(gateId)}/live-frame?t=${Date.now()}`), {
+      headers: { Authorization: `Bearer ${token}` },
+      signal,
+    });
+    if (res.status === 401) notifyUnauthorized();
+    return { blob: res.ok ? await res.blob() : null, status: res.status };
+  },
 
   // ---- Dashboard ----
   dashboard: (token: string, since: string) => request<DashboardSummary>(`/dashboard/summary${query({ since })}`, { token }),

@@ -41,6 +41,35 @@ def db():
     session.close()
 
 
+@pytest.fixture(scope="module", autouse=True)
+def preserve_stream_settings(db: Session):
+    original_rows = [
+        {
+            "gate_id": r.gate_id,
+            "ip_address": r.ip_address,
+            "port": r.port,
+            "protocol": r.protocol,
+            "stream_path": r.stream_path,
+            "custom_url": r.custom_url,
+            "enabled": r.enabled,
+            "total_fps_budget": r.total_fps_budget,
+        }
+        for r in db.query(GateStreamSetting).all()
+    ]
+    yield
+    # Restore original settings
+    for row in original_rows:
+        existing = db.get(GateStreamSetting, row["gate_id"])
+        if existing:
+            for k, v in row.items():
+                setattr(existing, k, v)
+    db.commit()
+    camera_stream_manager.update_settings(
+        total_fps_budget=15.0,
+        gates_update=original_rows,
+    )
+
+
 @pytest.fixture(scope="module")
 def admin_headers(db: Session):
     admin = db.query(User).filter(User.username == "admin").first()
@@ -307,3 +336,58 @@ def test_debounce_cache_suppresses_rapid_duplicate_detections(db: Session):
     # Simulate 61 seconds passing
     runner._debounce_cache[key] = time.time() - 65.0
     assert time.time() - runner._debounce_cache[key] >= 60.0
+
+
+def test_live_frame_endpoint(guard_headers):
+    """GET /api/gates/stream-settings/{gate_id}/live-frame returns image/jpeg or 404."""
+    with TestClient(app) as client:
+        dummy = np.zeros((200, 300, 3), dtype=np.uint8)
+        camera_stream_manager._latest_frames["GATE_1"] = dummy
+
+        res = client.get("/api/gates/stream-settings/GATE_1/live-frame", headers=guard_headers)
+        assert res.status_code == 200
+        assert res.headers["content-type"] == "image/jpeg"
+        assert len(res.content) > 0
+
+        # Nonexistent gate returns 404
+        res_404 = client.get("/api/gates/stream-settings/GATE_NONEXISTENT/live-frame", headers=guard_headers)
+        assert res_404.status_code == 404
+
+
+def test_observation_snapshot_persisted(guard_headers, db: Session):
+    """Verifies that _ingest_observation writes the annotated snapshot to disk and GET /feed/snapshots serves it."""
+    from pathlib import Path
+    from backend.app.config import MEDIA_ROOT
+    from backend.app.models.observation import ObservationEvent
+
+    runner = CameraStreamManager(total_fps_budget=15.0)
+    dummy_frame = np.full((300, 400, 3), 128, dtype=np.uint8)
+    gate_id = "GATE_1"
+    test_plate = "TESTSNAP99"
+
+    runner._ingest_observation(
+        gate_id=gate_id,
+        plate=test_plate,
+        confidence=0.88,
+        sharpness=120.0,
+        bbox=[50, 50, 200, 100],
+        frame=dummy_frame,
+    )
+
+    obs = db.query(ObservationEvent).filter(ObservationEvent.raw_plate == test_plate).order_by(ObservationEvent.observed_at.desc()).first()
+    assert obs is not None
+    assert obs.metadata_payload.get("has_snapshot") is True
+
+    snap_file = Path(MEDIA_ROOT) / "snapshots" / f"{obs.id}.jpg"
+    assert snap_file.is_file()
+
+    with TestClient(app) as client:
+        res = client.get(f"/feed/snapshots/{obs.id}", headers=guard_headers)
+        assert res.status_code == 200
+        assert res.headers["content-type"] == "image/jpeg"
+
+    try:
+        snap_file.unlink(missing_ok=True)
+        (Path(MEDIA_ROOT) / "snapshots" / f"{obs.source_event_id}.jpg").unlink(missing_ok=True)
+    except Exception:
+        pass

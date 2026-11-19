@@ -23,6 +23,7 @@ import { cx } from "../../lib/cx";
 import { Button } from "../ui/Button";
 import { ErrorNote } from "../ui/Feedback";
 import { Field, Input } from "../ui/Form";
+import { Dialog } from "../ui/Dialog";
 import { Section } from "../ui/Layout";
 import { useToast } from "../ui/Toast";
 
@@ -39,6 +40,7 @@ export function GateCamerasSection() {
   const [testingGate, setTestingGate] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [previewGateId, setPreviewGateId] = useState<string | null>(null);
 
   // Add Gate dialog state
   const [showAddGate, setShowAddGate] = useState(false);
@@ -404,17 +406,30 @@ export function GateCamerasSection() {
                       : "No frames captured yet"}
                   </div>
 
-                  {isAdmin && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      loading={testingGate === gate.gate_id}
-                      icon={<Wifi className="h-3.5 w-3.5" />}
-                      onClick={() => handleTestConnection(gate)}
-                    >
-                      Test Connection
-                    </Button>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {gate.enabled && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        icon={<Camera className="h-3.5 w-3.5" />}
+                        onClick={() => setPreviewGateId(gate.gate_id)}
+                      >
+                        Live Snapshot
+                      </Button>
+                    )}
+
+                    {isAdmin && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        loading={testingGate === gate.gate_id}
+                        icon={<Wifi className="h-3.5 w-3.5" />}
+                        onClick={() => handleTestConnection(gate)}
+                      >
+                        Test Connection
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
             );
@@ -496,7 +511,106 @@ export function GateCamerasSection() {
             )}
           </div>
         )}
+
+        {previewGateId && (
+          <LiveSnapshotModal
+            token={token}
+            gateId={previewGateId}
+            onClose={() => setPreviewGateId(null)}
+          />
+        )}
       </div>
     </Section>
+  );
+}
+
+function LiveSnapshotModal({
+  token,
+  gateId,
+  onClose,
+}: {
+  token: string;
+  gateId: string;
+  onClose: () => void;
+}) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(Date.now());
+
+  useEffect(() => {
+    let objectUrl: string | null = null;
+    const controller = new AbortController();
+    setLoading(true);
+    setError(null);
+    api
+      .gateLiveFrame(token, gateId, controller.signal)
+      .then(({ blob, status }) => {
+        if (!blob) {
+          setError(`Could not grab frame from gate ${gateId} (HTTP ${status}). Stream may be offline.`);
+          setLoading(false);
+          return;
+        }
+        objectUrl = URL.createObjectURL(blob);
+        setUrl(objectUrl);
+        setLoading(false);
+      })
+      .catch((err) => {
+        if (!controller.signal.aborted) {
+          setError(err instanceof Error ? err.message : "Failed to load snapshot");
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      controller.abort();
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [token, gateId, refreshKey]);
+
+  return (
+    <Dialog
+      title={`Live Camera Snapshot · ${gateId}`}
+      description="Real-time frame captured from the gate IP camera stream"
+      onClose={onClose}
+      size="xl"
+      footer={
+        <div className="flex w-full items-center justify-between">
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<RefreshCw className="h-3.5 w-3.5" />}
+            onClick={() => setRefreshKey(Date.now())}
+          >
+            Refresh Frame
+          </Button>
+          <Button variant="primary" size="sm" onClick={onClose}>
+            Close
+          </Button>
+        </div>
+      }
+    >
+      <div className="flex min-h-[300px] flex-col items-center justify-center rounded-lg bg-slate-950 p-2">
+        {loading && !url && (
+          <div className="flex flex-col items-center gap-2 py-12 text-slate-400">
+            <Camera className="h-8 w-8 animate-pulse text-sky-400" />
+            <span className="text-xs">Capturing live frame from camera...</span>
+          </div>
+        )}
+        {error && (
+          <div className="flex flex-col items-center gap-2 py-8 text-rose-400">
+            <AlertCircle className="h-6 w-6" />
+            <span className="max-w-sm text-center text-xs">{error}</span>
+          </div>
+        )}
+        {url && (
+          <img
+            src={url}
+            alt={`Live stream from ${gateId}`}
+            className="max-h-[68vh] w-auto rounded-md object-contain shadow-lg"
+          />
+        )}
+      </div>
+    </Dialog>
   );
 }

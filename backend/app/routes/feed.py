@@ -77,37 +77,40 @@ def get_observation_snapshot(
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(require_staff),
 ):
-    """Proxies the Frigate snapshot (or thumbnail) for a camera observation with local fallback."""
+    """Proxies the camera snapshot (Frigate or live stream runner) with local fallback."""
     obs = db.get(ObservationEvent, observation_id)
     if not obs:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Observation '{observation_id}' not found.")
-    if obs.source != ObservationSource.FRIGATE or not obs.source_event_id:
+    if obs.source == ObservationSource.MANUAL and not obs.source_event_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Observation has no camera snapshot.")
 
     # Check local disk cache first
     local_candidates = [
-        MEDIA_ROOT / "frigate" / f"{obs.source_event_id}.jpg",
-        MEDIA_ROOT / "frigate" / f"{obs.source_event_id}.png",
+        MEDIA_ROOT / "snapshots" / f"{obs.id}.jpg",
+        (MEDIA_ROOT / "snapshots" / f"{obs.source_event_id}.jpg") if obs.source_event_id else None,
+        (MEDIA_ROOT / "frigate" / f"{obs.source_event_id}.jpg") if obs.source_event_id else None,
+        (MEDIA_ROOT / "frigate" / f"{obs.source_event_id}.png") if obs.source_event_id else None,
         MEDIA_ROOT / "test_plate.png",
     ]
     for p in local_candidates:
-        if p.is_file():
+        if p and p.is_file():
             return FileResponse(p, media_type="image/jpeg" if p.suffix == ".jpg" else "image/png")
 
-    base = f"http://{FRIGATE_HOST}:{FRIGATE_PORT}/api/events/{quote(obs.source_event_id, safe='')}"
-    try:
-        with httpx.Client(timeout=1.0) as client:
-            for name in ("snapshot.jpg", "thumbnail.jpg"):
-                resp = client.get(f"{base}/{name}")
-                content_type = resp.headers.get("content-type", "")
-                if resp.status_code == 200 and content_type.startswith("image/"):
-                    return Response(
-                        content=resp.content,
-                        media_type=content_type,
-                        headers={"Cache-Control": "private, max-age=60"},
-                    )
-    except (httpx.HTTPError, OSError):
-        pass
+    if obs.source == ObservationSource.FRIGATE and obs.source_event_id:
+        base = f"http://{FRIGATE_HOST}:{FRIGATE_PORT}/api/events/{quote(obs.source_event_id, safe='')}"
+        try:
+            with httpx.Client(timeout=1.0) as client:
+                for name in ("snapshot.jpg", "thumbnail.jpg"):
+                    resp = client.get(f"{base}/{name}")
+                    content_type = resp.headers.get("content-type", "")
+                    if resp.status_code == 200 and content_type.startswith("image/"):
+                        return Response(
+                            content=resp.content,
+                            media_type=content_type,
+                            headers={"Cache-Control": "private, max-age=60"},
+                        )
+        except (httpx.HTTPError, OSError):
+            pass
 
     # Clean SVG camera placeholder when Frigate is offline
     plate_label = obs.raw_plate or obs.normalized_plate or "ANPR CAM"

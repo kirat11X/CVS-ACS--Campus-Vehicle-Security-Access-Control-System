@@ -1,6 +1,7 @@
 import { AlertCircle, Building2, Camera, FlaskConical, LayoutGrid, List, Package, Plus, Radio, Unlink } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
+import { api } from "../api/client";
 import { useDashboard, useGates, useStreamSettings } from "../api/queries";
 import type { LinkStatus, PersonType, ResolvedObservation } from "../api/types";
 import { useSession } from "../auth/AuthContext";
@@ -14,6 +15,7 @@ import { ManualEntryDialog, type ManualEntryPrefill } from "../components/forms/
 import { RegisterVehicleDialog } from "../components/forms/RegisterVehicleDialog";
 import { SimulatePlateDialog } from "../components/forms/SimulatePlateDialog";
 import { Button } from "../components/ui/Button";
+import { Dialog as ModalDialog } from "../components/ui/Dialog";
 import { EmptyState, Skeleton } from "../components/ui/Feedback";
 import { SearchInput } from "../components/ui/Form";
 import { FilterChips, PageHeader, Section, StatTile } from "../components/ui/Layout";
@@ -29,6 +31,7 @@ type Dialog =
   | { type: "manual"; prefill: ManualEntryPrefill }
   | { type: "correct"; target: CorrectionTarget }
   | { type: "simulate" }
+  | { type: "camera"; gateId: string }
   | null;
 
 /** The slides' filter chips; "Linked" includes inactive registrations, "No plate" shows only when present. */
@@ -130,16 +133,20 @@ export function FeedPage() {
         actions={
           <>
             {streamSettings && streamSettings.active_gates_count > 0 && (
-              <a
-                href="#/settings"
-                className="hidden items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 sm:inline-flex"
-                title={`Adaptive FPS budget: ${streamSettings.total_fps_budget} FPS divided across ${streamSettings.active_gates_count} active gate(s)`}
+              <button
+                type="button"
+                onClick={() => {
+                  const running = streamSettings.gates.find((g) => g.is_running || g.enabled);
+                  if (running) setDialog({ type: "camera", gateId: running.gate_id });
+                }}
+                className="hidden items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 sm:inline-flex cursor-pointer transition-colors"
+                title={`Click to view live camera stream snapshot (${streamSettings.total_fps_budget} FPS budget)`}
               >
                 <Camera className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400" />
                 <span>
                   {streamSettings.active_gates_count} Gate{streamSettings.active_gates_count === 1 ? "" : "s"} · {streamSettings.per_gate_target_fps.toFixed(1)} FPS
                 </span>
-              </a>
+              </button>
             )}
             <ConnectionIndicator state={connection} lastSyncAt={lastSyncAt} />
             {user.role === "ADMIN" && (
@@ -374,6 +381,104 @@ export function FeedPage() {
           }}
         />
       )}
+      {dialog?.type === "camera" && (
+        <FeedCameraDialog
+          token={token}
+          gateId={dialog.gateId}
+          onClose={closeDialog}
+        />
+      )}
     </>
+  );
+}
+
+function FeedCameraDialog({
+  token,
+  gateId,
+  onClose,
+}: {
+  token: string;
+  gateId: string;
+  onClose: () => void;
+}) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(Date.now());
+
+  useEffect(() => {
+    let objectUrl: string | null = null;
+    const controller = new AbortController();
+    setLoading(true);
+    setError(null);
+    api
+      .gateLiveFrame(token, gateId, controller.signal)
+      .then(({ blob, status }) => {
+        if (!blob) {
+          setError(`Could not grab snapshot from ${gateId} (HTTP ${status}). Stream may be idle.`);
+          setLoading(false);
+          return;
+        }
+        objectUrl = URL.createObjectURL(blob);
+        setUrl(objectUrl);
+        setLoading(false);
+      })
+      .catch((err) => {
+        if (!controller.signal.aborted) {
+          setError(err instanceof Error ? err.message : "Failed to load snapshot");
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      controller.abort();
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [token, gateId, refreshKey]);
+
+  return (
+    <ModalDialog
+      title={`Live Camera Stream · ${gateId}`}
+      description="Live snapshot grabbed directly from the gate's camera feed"
+      onClose={onClose}
+      size="xl"
+      footer={
+        <div className="flex w-full items-center justify-between">
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<Camera className="h-3.5 w-3.5" />}
+            onClick={() => setRefreshKey(Date.now())}
+          >
+            Refresh Snapshot
+          </Button>
+          <Button variant="primary" size="sm" onClick={onClose}>
+            Close
+          </Button>
+        </div>
+      }
+    >
+      <div className="flex min-h-[300px] flex-col items-center justify-center rounded-lg bg-slate-950 p-2">
+        {loading && !url && (
+          <div className="flex flex-col items-center gap-2 py-12 text-slate-400">
+            <Camera className="h-8 w-8 animate-pulse text-sky-400" />
+            <span className="text-xs">Capturing snapshot from live stream...</span>
+          </div>
+        )}
+        {error && (
+          <div className="flex flex-col items-center gap-2 py-8 text-rose-400">
+            <AlertCircle className="h-6 w-6" />
+            <span className="max-w-sm text-center text-xs">{error}</span>
+          </div>
+        )}
+        {url && (
+          <img
+            src={url}
+            alt={`Live stream from ${gateId}`}
+            className="max-h-[68vh] w-auto rounded-md object-contain shadow-lg"
+          />
+        )}
+      </div>
+    </ModalDialog>
   );
 }

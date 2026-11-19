@@ -33,7 +33,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 import cv2
 import numpy as np
 
-from backend.app.config import BASE_DIR
+from backend.app.config import BASE_DIR, MEDIA_ROOT
 from backend.app.db import SessionLocal
 from backend.app.models.enums import ObservationDirection, ObservationSource, ObservedVehicleType
 from backend.app.models.stream_setting import GateStreamSetting
@@ -108,6 +108,7 @@ class CameraStreamManager:
         )
         self._last_seen: Dict[str, datetime] = {}
         self._last_errors: Dict[str, Optional[str]] = {}
+        self._latest_frames: Dict[str, np.ndarray] = {}
 
         # Shared bounded inference queue
         self._inference_queue: queue.Queue[Optional[Tuple[str, np.ndarray, float]]] = queue.Queue(maxsize=30)
@@ -414,6 +415,7 @@ class CameraStreamManager:
                     now = datetime.now(timezone.utc)
                     self._last_seen[gate_id] = now
                     self._fps_meters[gate_id].append(time.time())
+                    self._latest_frames[gate_id] = frame
 
                     # Push frame into shared bounded inference queue
                     try:
@@ -583,7 +585,7 @@ class CameraStreamManager:
             self._debounce_cache[debounce_key] = now_sec
 
             # 7. Ingestion into ObservationService
-            self._ingest_observation(gate_id, effective_plate, match_score, laplacian_var, [x1, y1, x2, y2])
+            self._ingest_observation(gate_id, effective_plate, match_score, laplacian_var, [x1, y1, x2, y2], frame=frame)
             best_plate = effective_plate
             break
 
@@ -596,15 +598,39 @@ class CameraStreamManager:
         confidence: float,
         sharpness: float,
         bbox: List[int],
+        frame: Optional[np.ndarray] = None,
     ):
-        """Stores observation in PostgreSQL and publishes to live feed."""
+        """Stores observation in PostgreSQL, persists snapshot image, and publishes to live feed."""
         try:
+            source_event_id = f"stream_{gate_id}_{plate}_{int(time.time())}"
+            has_snap = False
+
+            if frame is not None and frame.size > 0:
+                try:
+                    snap_dir = Path(MEDIA_ROOT) / "snapshots"
+                    snap_dir.mkdir(parents=True, exist_ok=True)
+                    snap_path = snap_dir / f"{source_event_id}.jpg"
+
+                    annotated = frame.copy()
+                    if bbox and len(bbox) == 4:
+                        bx1, by1, bx2, by2 = bbox
+                        cv2.rectangle(annotated, (bx1, by1), (bx2, by2), (34, 197, 94), 3)
+                        label = f"{plate} ({int(confidence * 100)}%)"
+                        (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)
+                        ty = max(th + 10, by1 - 8)
+                        cv2.rectangle(annotated, (bx1, ty - th - 6), (bx1 + tw + 8, ty + 4), (0, 0, 0), -1)
+                        cv2.putText(annotated, label, (bx1 + 4, ty), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (34, 197, 94), 2)
+                    cv2.imwrite(str(snap_path), annotated)
+                    has_snap = True
+                except Exception as write_err:
+                    logger.warning("[%s] Failed to save snapshot frame: %s", gate_id, write_err)
+
             with SessionLocal() as db:
                 event_data = ObservationCreate(
                     gate_id=gate_id,
                     camera_id=f"{gate_id.lower()}_ip_cam",
                     source=ObservationSource.OTHER,
-                    source_event_id=f"stream_{gate_id}_{plate}_{int(time.time())}",
+                    source_event_id=source_event_id,
                     raw_plate=plate,
                     plate_confidence=float(confidence),
                     vehicle_type=ObservedVehicleType.CAR,
@@ -614,20 +640,40 @@ class CameraStreamManager:
                         "pipeline": "live_mobile_stream_runner",
                         "sharpness_laplacian": round(sharpness, 1),
                         "bbox": bbox,
+                        "has_snapshot": has_snap,
                         "ingestion_time": datetime.now(timezone.utc).isoformat(),
                     },
                 )
                 obs = ObservationService.create_or_update_observation(db, event_data)
+
+                if has_snap:
+                    try:
+                        obs_snap = snap_dir / f"{obs.id}.jpg"
+                        if not obs_snap.exists():
+                            import shutil
+                            shutil.copyfile(str(snap_path), str(obs_snap))
+                    except Exception:
+                        pass
+
                 logger.info(
-                    "[%s] Ingested plate %s (conf=%.2f, sharpness=%.1f) -> Observation %s",
+                    "[%s] Ingested plate %s (conf=%.2f, sharpness=%.1f) -> Observation %s (snapshot=%s)",
                     gate_id,
                     plate,
                     confidence,
                     sharpness,
                     obs.id,
+                    has_snap,
                 )
         except Exception as exc:
             logger.error("[%s] Failed to persist observation for plate %s: %s", gate_id, plate, exc)
+
+    def get_latest_frame(self, gate_id: str) -> Optional[np.ndarray]:
+        """Returns the most recent frame captured for this gate, or None if stream is idle."""
+        with self._lock:
+            frame = self._latest_frames.get(gate_id)
+            if frame is not None:
+                return frame.copy()
+            return None
 
     # -------------------------------------------------------------------------
     # Telemetry & Diagnostics

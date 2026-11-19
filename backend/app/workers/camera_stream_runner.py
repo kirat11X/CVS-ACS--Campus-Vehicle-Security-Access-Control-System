@@ -39,6 +39,7 @@ from backend.app.models.enums import ObservationDirection, ObservationSource, Ob
 from backend.app.models.stream_setting import GateStreamSetting
 from backend.app.models.vehicle import Vehicle
 from backend.app.schemas.observation import ObservationCreate
+from backend.app.services.multiframe_plate_consensus import decompose_indian_plate_slots, fuse_multiframe_plate_reads
 from backend.app.services.observation_service import ObservationService
 from backend.app.services.plate_normalizer import is_valid_indian_plate, normalize_plate, suggest_repairs
 from research_track.track_a.src.registry_matcher import OpticalPlateMatcher
@@ -163,6 +164,9 @@ class CameraStreamManager:
         self._debounce_cache: Dict[Tuple[str, str], float] = {}
         # Gate-level burst debounce: gate_id -> (timestamp, plate)
         self._gate_last_ingest: Dict[str, Tuple[float, str]] = {}
+        # Temporal candidate tracks for multi-frame consensus: gate_id -> list of candidate frame dicts
+        self._temporal_tracks: Dict[str, List[Dict[str, Any]]] = collections.defaultdict(list)
+        self._temporal_track_last_update: Dict[str, float] = {}
 
     # -------------------------------------------------------------------------
     # Lifecycle & Configuration
@@ -500,39 +504,58 @@ class CameraStreamManager:
     def _inference_loop(self):
         """
         Consumes frames from shared queue and runs them through the full ANPR guardrail pipeline.
+        Periodically flushes accumulated temporal candidate tracks when vehicles pass through.
         """
-        logger.info("ANPR Inference Worker loop started.")
+        logger.info("ANPR Inference Worker loop started with multi-frame slot consensus.")
 
         while not self._stop_event.is_set():
             try:
-                item = self._inference_queue.get(timeout=0.5)
+                item = self._inference_queue.get(timeout=0.3)
             except queue.Empty:
-                continue
+                item = None
 
-            if item is None:
-                break
+            if item is not None:
+                gate_id, frame, frame_ts = item
+                # Drop stale frames older than 1.0s to preserve low latency
+                if time.time() - frame_ts <= 1.0:
+                    try:
+                        self.process_frame(gate_id, frame, require_consensus=True)
+                    except Exception as exc:
+                        logger.error("Error processing frame from %s: %s", gate_id, exc)
 
-            gate_id, frame, frame_ts = item
+            # Check for temporal tracks that need flushing (e.g. vehicle departed or short burst)
+            now = time.time()
+            for gid in list(self._temporal_tracks.keys()):
+                track = self._temporal_tracks[gid]
+                if not track:
+                    continue
+                last_ts = self._temporal_track_last_update.get(gid, 0.0)
+                idle_sec = now - last_ts
+                # If vehicle accumulated at least 3 frames and has now moved past (idle >= 0.8s)
+                if len(track) >= 3 and idle_sec >= 0.8:
+                    candidates = list(track[:8])
+                    self._temporal_tracks[gid].clear()
+                    try:
+                        self._fuse_and_ingest(gid, candidates)
+                    except Exception as exc:
+                        logger.error("Error fusing flushed track for %s: %s", gid, exc)
+                elif len(track) < 3 and idle_sec >= 1.5:
+                    # Discard transient false-alarm or sub-threshold track
+                    self._temporal_tracks[gid].clear()
 
-            # Drop stale frames older than 1.0s to preserve low latency
-            if time.time() - frame_ts > 1.0:
-                continue
-
-            try:
-                self.process_frame(gate_id, frame)
-            except Exception as exc:
-                logger.error("Error processing frame from %s: %s", gate_id, exc)
-
-    def process_frame(self, gate_id: str, frame: np.ndarray) -> Optional[str]:
+    def process_frame(
+        self,
+        gate_id: str,
+        frame: np.ndarray,
+        require_consensus: bool = False,
+    ) -> Optional[str]:
         """
         Executes the ANPR guardrail pipeline on a single frame:
         1. Laplacian sharpness check (>= 40.0)
-        2. Letterbox padding to 640x640
-        3. YOLO11n plate detection with aspect ratio clamping (1.5 <= w/h <= 6.0)
-        4. Track A OCR extraction & normalization
-        5. OpticalPlateMatcher registry fuzzy lookup
-        6. 60s debounce check
-        7. ObservationService ingestion
+        2. Letterbox padding to 640x640 with RGB conversion
+        3. YOLO11n plate detection with aspect ratio clamping (1.8 <= w/h <= 5.5)
+        4. Track A OCR extraction & statutory Indian normalization
+        5. Temporal multi-frame aggregation (5-8 frames) or direct single-frame evaluation
         """
         h, w = frame.shape[:2]
         if h < 50 or w < 50:
@@ -635,9 +658,9 @@ class CameraStreamManager:
                 logits = self._ocr_session.run(None, {self._ocr_session.get_inputs()[0].name: crop_res})[0]
                 raw_text, char_conf = decode_crnn_logits(logits)
 
-            # Reject OCR reads with low character confidence (< 0.50)
-            if char_conf < 0.50:
-                logger.debug("[%s] Dropping low-confidence OCR read '%s' (char_conf=%.2f < 0.50)", gate_id, raw_text, char_conf)
+            # Reject OCR reads with low character confidence (< 0.45)
+            if char_conf < 0.45:
+                logger.debug("[%s] Dropping low-confidence OCR read '%s' (char_conf=%.2f < 0.45)", gate_id, raw_text, char_conf)
                 continue
 
             norm_plate = normalize_plate(raw_text) if raw_text else None
@@ -645,58 +668,137 @@ class CameraStreamManager:
             if not norm_plate or len(norm_plate) < 7 or len(norm_plate) > 11:
                 continue
 
-            # Statutory Indian Plate Validation & Suggest Repairs
-            is_valid = is_valid_indian_plate(norm_plate)
-            candidate_plate = norm_plate
-            if not is_valid:
-                repairs = suggest_repairs(norm_plate)
-                if repairs:
-                    candidate_plate = repairs[0]
-                    is_valid = True
+            candidate = {
+                "raw_plate": raw_text,
+                "conf": max(score, char_conf),
+                "bbox": [x1, y1, x2, y2],
+                "frame": frame.copy(),
+                "sharpness": laplacian_var,
+                "timestamp": time.time(),
+            }
 
-            # 5. Registry Matching via OpticalPlateMatcher
-            self._refresh_registry_matcher()
-            effective_plate = candidate_plate
-            match_score = max(score, char_conf)
-            registry_matched = False
-            if self._matcher is not None:
-                res = self._matcher.match(candidate_plate)
-                if res.matched_plate and float(res.similarity_score) >= 0.70:
-                    effective_plate = res.matched_plate
-                    match_score = max(match_score, float(res.similarity_score))
-                    registry_matched = True
+            if not require_consensus:
+                return self._fuse_and_ingest(gate_id, [candidate])
 
-            # Guardrail Gate: Must strictly be either a valid statutory Indian plate or match campus vehicle registry
-            if not is_valid and not registry_matched:
-                logger.debug("[%s] Dropping non-statutory plate candidate '%s' (not a valid Indian plate and not in registry)", gate_id, norm_plate)
-                continue
+            # In live stream mode, accumulate candidates across 5-8 frames
+            self._temporal_tracks[gate_id].append(candidate)
+            self._temporal_track_last_update[gate_id] = time.time()
 
-            # Gate-level burst debounce (3.5s): prevents rapid duplicate rows when OCR jitters across video frames
-            now_sec = time.time()
-            last_gate = self._gate_last_ingest.get(gate_id)
-            if last_gate is not None:
-                last_ts, last_plate = last_gate
-                if (now_sec - last_ts) < 3.5:
-                    if _edit_distance(effective_plate, last_plate) <= 2:
-                        logger.debug("[%s] Suppressing burst flicker %s (within edit-dist 2 of %s seen %.1fs ago)", gate_id, effective_plate, last_plate, now_sec - last_ts)
-                        continue
+            # When 5-8 frames are collected, trigger consensus fusion
+            if len(self._temporal_tracks[gate_id]) >= 5:
+                batch = self._temporal_tracks[gate_id][:8]
+                self._temporal_tracks[gate_id] = self._temporal_tracks[gate_id][8:]
+                return self._fuse_and_ingest(gate_id, batch)
 
-            # 6. 60-Second Debounce per (gate_id, effective_plate)
-            debounce_key = (gate_id, effective_plate)
-            last_hit = self._debounce_cache.get(debounce_key, 0.0)
-            if now_sec - last_hit < 60.0:
-                logger.debug("[%s] Debounced plate %s (last seen %.1fs ago)", gate_id, effective_plate, now_sec - last_hit)
-                continue
-
-            self._debounce_cache[debounce_key] = now_sec
-            self._gate_last_ingest[gate_id] = (now_sec, effective_plate)
-
-            # 7. Ingestion into ObservationService
-            self._ingest_observation(gate_id, effective_plate, match_score, laplacian_var, [x1, y1, x2, y2], frame=frame)
-            best_plate = effective_plate
-            break
+            return None
 
         return best_plate
+
+    def _fuse_and_ingest(
+        self,
+        gate_id: str,
+        candidates: List[Dict[str, Any]],
+    ) -> Optional[str]:
+        """
+        Fuses 5-8 temporal candidate frames for an approaching vehicle, validates decomposed
+        slots against statutory Indian plate rules, applies registry matching, enforces debounce,
+        and ingests the highest-quality snapshot into ObservationService.
+        """
+        if not candidates:
+            return None
+
+        fused_res = fuse_multiframe_plate_reads(candidates)
+        if not fused_res:
+            logger.debug("[%s] Multi-frame fusion returned None for %d candidates", gate_id, len(candidates))
+            return None
+
+        fused_plate = fused_res["fused_plate"]
+        is_valid = fused_res["is_valid"]
+        best_frame = fused_res.get("best_frame")
+        best_bbox = fused_res.get("best_bbox") or []
+        confidence = fused_res.get("confidence", 0.85)
+        agreement_rate = fused_res.get("agreement_rate", 1.0)
+        slot_breakdown = fused_res.get("slot_breakdown", {})
+
+        # 1. Statutory Indian Plate Validation & Suggest Repairs (if not already valid)
+        candidate_plate = fused_plate
+        if not is_valid:
+            repairs = suggest_repairs(fused_plate)
+            if repairs:
+                candidate_plate = repairs[0]
+                is_valid = True
+
+        # 2. Registry Matching via OpticalPlateMatcher
+        self._refresh_registry_matcher()
+        effective_plate = candidate_plate
+        match_score = confidence
+        registry_matched = False
+        if self._matcher is not None:
+            res = self._matcher.match(candidate_plate)
+            if res.matched_plate and float(res.similarity_score) >= 0.70:
+                effective_plate = res.matched_plate
+                match_score = max(match_score, float(res.similarity_score))
+                registry_matched = True
+
+        # Guardrail Gate: Must strictly be either a valid statutory Indian plate or match campus vehicle registry
+        if not is_valid and not registry_matched:
+            logger.info(
+                "[%s] Dropped non-statutory plate candidate '%s' (not a valid Indian plate and not in registry)",
+                gate_id,
+                fused_plate,
+            )
+            return None
+
+        # Gate-level burst debounce (3.5s): prevents rapid duplicate rows when OCR jitters across video frames
+        now_sec = time.time()
+        last_gate = self._gate_last_ingest.get(gate_id)
+        if last_gate is not None:
+            last_ts, last_plate = last_gate
+            if (now_sec - last_ts) < 3.5:
+                if _edit_distance(effective_plate, last_plate) <= 2:
+                    logger.debug(
+                        "[%s] Suppressing burst flicker %s (within edit-dist 2 of %s seen %.1fs ago)",
+                        gate_id,
+                        effective_plate,
+                        last_plate,
+                        now_sec - last_ts,
+                    )
+                    return None
+
+        # 60-Second Debounce per (gate_id, effective_plate)
+        debounce_key = (gate_id, effective_plate)
+        last_hit = self._debounce_cache.get(debounce_key, 0.0)
+        if now_sec - last_hit < 60.0:
+            logger.debug(
+                "[%s] Debounced plate %s (last seen %.1fs ago)",
+                gate_id,
+                effective_plate,
+                now_sec - last_hit,
+            )
+            return None
+
+        self._debounce_cache[debounce_key] = now_sec
+        self._gate_last_ingest[gate_id] = (now_sec, effective_plate)
+
+        # Ingestion into ObservationService with multi-frame metadata
+        extra_meta = {
+            "multiframe_consensus": True,
+            "frame_count": len(candidates),
+            "agreement_rate": agreement_rate,
+            "slot_breakdown": slot_breakdown,
+            "candidate_reads": [c.get("raw_plate", "") for c in candidates if c.get("raw_plate")],
+        }
+        sharpness = max([float(c.get("sharpness", 50.0)) for c in candidates]) if candidates else 50.0
+        self._ingest_observation(
+            gate_id=gate_id,
+            plate=effective_plate,
+            confidence=match_score,
+            sharpness=sharpness,
+            bbox=best_bbox,
+            frame=best_frame,
+            extra_metadata=extra_meta,
+        )
+        return effective_plate
 
     def _ingest_observation(
         self,
@@ -706,6 +808,7 @@ class CameraStreamManager:
         sharpness: float,
         bbox: List[int],
         frame: Optional[np.ndarray] = None,
+        extra_metadata: Optional[Dict[str, Any]] = None,
     ):
         """Stores observation in PostgreSQL, persists snapshot image, and publishes to live feed."""
         try:
@@ -734,6 +837,16 @@ class CameraStreamManager:
                     logger.warning("[%s] Failed to save snapshot frame: %s", gate_id, write_err)
 
             with SessionLocal() as db:
+                meta = {
+                    "pipeline": "live_mobile_stream_runner",
+                    "sharpness_laplacian": round(sharpness, 1),
+                    "bbox": bbox,
+                    "has_snapshot": has_snap,
+                    "ingestion_time": datetime.now(timezone.utc).isoformat(),
+                }
+                if extra_metadata:
+                    meta.update(extra_metadata)
+
                 event_data = ObservationCreate(
                     gate_id=gate_id,
                     camera_id=f"{gate_id.lower()}_ip_cam",
@@ -745,13 +858,7 @@ class CameraStreamManager:
                     vehicle_type=ObservedVehicleType.CAR,
                     vehicle_confidence=0.9,
                     direction=ObservationDirection.ENTRY,
-                    metadata_payload={
-                        "pipeline": "live_mobile_stream_runner",
-                        "sharpness_laplacian": round(sharpness, 1),
-                        "bbox": bbox,
-                        "has_snapshot": has_snap,
-                        "ingestion_time": datetime.now(timezone.utc).isoformat(),
-                    },
+                    metadata_payload=meta,
                 )
                 obs = ObservationService.create_or_update_observation(db, event_data)
 

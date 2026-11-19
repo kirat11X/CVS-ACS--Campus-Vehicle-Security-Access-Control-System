@@ -40,14 +40,16 @@ from backend.app.models.stream_setting import GateStreamSetting
 from backend.app.models.vehicle import Vehicle
 from backend.app.schemas.observation import ObservationCreate
 from backend.app.services.observation_service import ObservationService
-from backend.app.services.plate_normalizer import normalize_plate
+from backend.app.services.plate_normalizer import is_valid_indian_plate, normalize_plate, suggest_repairs
 from research_track.track_a.src.registry_matcher import OpticalPlateMatcher
 
 logger = logging.getLogger("campus_security.camera_stream")
 
 ROOT_DIR = Path(BASE_DIR).resolve()
 WEIGHTS_DIR = ROOT_DIR / "weights"
-DETECTOR_PATH = WEIGHTS_DIR / "yolo11n_plate_detector_finetuned.onnx"
+DETECTOR_PATH = WEIGHTS_DIR / "yolo11n_plate_detector_fleet_best.onnx"
+if not DETECTOR_PATH.exists():
+    DETECTOR_PATH = WEIGHTS_DIR / "yolo11n_plate_detector_finetuned.onnx"
 if not DETECTOR_PATH.exists():
     DETECTOR_PATH = WEIGHTS_DIR / "yolo11n_plate_detector_best.onnx"
 
@@ -55,20 +57,56 @@ OCR_PATH = WEIGHTS_DIR / "indian_plate_crnn_best.onnx"
 if not OCR_PATH.exists():
     OCR_PATH = WEIGHTS_DIR / "track_a_ocr_cct.onnx"
 
+try:
+    from rapidocr_onnxruntime import RapidOCR
+    RAPID_OCR_AVAILABLE = True
+except Exception:
+    RAPID_OCR_AVAILABLE = False
+
 ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 IDX2CHAR = {i + 1: ch for i, ch in enumerate(ALPHABET)}
 
 
-def decode_crnn_logits(logits: np.ndarray) -> str:
-    """Decodes CTC greedy output from CRNN logits array."""
+def decode_crnn_logits(logits: np.ndarray) -> Tuple[str, float]:
+    """
+    Decodes CTC greedy output from CRNN logits array and calculates mean character confidence.
+    Returns:
+        (decoded_text, mean_char_confidence)
+    """
+    # Softmax along class axis to get true probabilities
+    exp_logits = np.exp(logits[0] - np.max(logits[0], axis=-1, keepdims=True))
+    probs = exp_logits / np.sum(exp_logits, axis=-1, keepdims=True)
+
     preds = np.argmax(logits[0], axis=-1)
     chars = []
+    confs = []
     prev = 0
-    for idx in preds:
+    for t, idx in enumerate(preds):
         if idx != prev and idx != 0 and idx in IDX2CHAR:
             chars.append(IDX2CHAR[idx])
+            confs.append(float(probs[t, idx]))
         prev = idx
-    return "".join(chars)
+
+    decoded = "".join(chars)
+    mean_conf = float(np.mean(confs)) if confs else 0.0
+    return decoded, mean_conf
+
+
+def _edit_distance(s1: str, s2: str) -> int:
+    """Levenshtein edit distance between two strings."""
+    if s1 == s2:
+        return 0
+    m, n = len(s1), len(s2)
+    dp = [[0] * (n + 1) for _ in range(m + 1)]
+    for i in range(m + 1):
+        dp[i][0] = i
+    for j in range(n + 1):
+        dp[0][j] = j
+    for i in range(1, m + 1):
+        for j in range(1, n + 1):
+            cost = 0 if s1[i - 1] == s2[j - 1] else 1
+            dp[i][j] = min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost)
+    return dp[m][n]
 
 
 def letterbox_image(image: np.ndarray, target_size: int = 640) -> Tuple[np.ndarray, float, int, int]:
@@ -117,11 +155,14 @@ class CameraStreamManager:
         # ML Sessions
         self._det_session = None
         self._ocr_session = None
+        self._rapid_ocr = None
         self._matcher: Optional[OpticalPlateMatcher] = None
         self._last_registry_sync: float = 0.0
 
         # Debounce: (gate_id, normalized_plate) -> timestamp
         self._debounce_cache: Dict[Tuple[str, str], float] = {}
+        # Gate-level burst debounce: gate_id -> (timestamp, plate)
+        self._gate_last_ingest: Dict[str, Tuple[float, str]] = {}
 
     # -------------------------------------------------------------------------
     # Lifecycle & Configuration
@@ -244,6 +285,10 @@ class CameraStreamManager:
             if OCR_PATH.exists() and self._ocr_session is None:
                 self._ocr_session = ort.InferenceSession(str(OCR_PATH), opts, providers=["CPUExecutionProvider"])
                 logger.info("Loaded Track A CRNN OCR from %s", OCR_PATH.name)
+
+            if RAPID_OCR_AVAILABLE and self._rapid_ocr is None:
+                self._rapid_ocr = RapidOCR()
+                logger.info("Loaded RapidOCR (PP-OCRv4) engine for high-accuracy Indian plate reading")
         except Exception as exc:
             logger.warning("ML inference engines failed to initialize (using fallback): %s", exc)
 
@@ -500,16 +545,17 @@ class CameraStreamManager:
             logger.debug("[%s] Dropping blurry frame (variance=%.1f < 40.0)", gate_id, laplacian_var)
             return None
 
-        # 2. Letterbox padding
+        # 2. Letterbox padding (with RGB conversion for YOLO)
         canvas, scale, dx, dy = letterbox_image(frame, 640)
+        canvas_rgb = cv2.cvtColor(canvas, cv2.COLOR_BGR2RGB)
 
         # 3. YOLO11n Plate Detection
         boxes = []
         if self._det_session is not None:
-            inp = canvas.transpose(2, 0, 1)[np.newaxis, :, :, :].astype(np.float32) / 255.0
+            inp = canvas_rgb.transpose(2, 0, 1)[np.newaxis, :, :, :].astype(np.float32) / 255.0
             det_out = self._det_session.run(None, {self._det_session.get_inputs()[0].name: inp})[0][0]
 
-            conf_thresh = 0.35
+            conf_thresh = 0.55
             for col in range(det_out.shape[1]):
                 score = float(det_out[4, col])
                 if score >= conf_thresh:
@@ -519,15 +565,15 @@ class CameraStreamManager:
                     bw_orig = bw_pad / scale
                     bh_orig = bh_pad / scale
 
-                    # Aspect-ratio clamping: 1.5 <= w/h <= 6.0
+                    # Aspect-ratio clamping: 1.8 <= w/h <= 5.5
                     aspect = bw_orig / max(1.0, bh_orig)
-                    if aspect < 1.5 or aspect > 6.0:
+                    if aspect < 1.8 or aspect > 5.5:
                         continue
 
                     # Reject oversized or tiny candidate boxes
-                    if bw_orig > 0.6 * w or bh_orig > 0.3 * h:
+                    if bw_orig > 0.7 * w or bh_orig > 0.35 * h:
                         continue
-                    if bw_orig < 20 or bh_orig < 10:
+                    if bw_orig < 60 or bh_orig < 18:
                         continue
 
                     x1 = max(0, int(cx_orig - bw_orig / 2))
@@ -541,48 +587,109 @@ class CameraStreamManager:
         if boxes:
             cv_boxes = [[b[0], b[1], b[2] - b[0], b[3] - b[1]] for b in boxes]
             scores = [b[4] for b in boxes]
-            indices = cv2.dnn.NMSBoxes(cv_boxes, scores, 0.35, 0.45)
+            indices = cv2.dnn.NMSBoxes(cv_boxes, scores, 0.55, 0.45)
             for idx in (indices.flatten() if len(indices) > 0 else []):
                 final_boxes.append(boxes[idx])
 
         if not final_boxes:
             return None
 
-        # 4. Track A OCR & Normalization
+        # 4. High-Accuracy OCR & Statutory Indian Plate Normalization
         best_plate = None
         for x1, y1, x2, y2, score in final_boxes:
             crop = frame[y1:y2, x1:x2]
-            if crop.size == 0 or crop.shape[0] < 8 or crop.shape[1] < 16:
+            if crop.size == 0 or crop.shape[0] < 12 or crop.shape[1] < 30:
                 continue
 
             raw_text = ""
-            if self._ocr_session is not None:
-                crop_res = cv2.resize(crop, (128, 32)).transpose(2, 0, 1)[np.newaxis, :, :, :].astype(np.float32) / 127.5 - 1.0
+            char_conf = 0.0
+
+            # 1. Primary Engine: RapidOCR (PP-OCRv4) - trained, robust on 1-line and 2-line Indian plates
+            if self._rapid_ocr is not None:
+                try:
+                    res, _ = self._rapid_ocr(crop)
+                    if res:
+                        lines = []
+                        confs = []
+                        for box, txt, r_score in res:
+                            norm = normalize_plate(txt)
+                            if norm == "IND":
+                                continue
+                            if norm.startswith("IND") and len(norm) > 4:
+                                norm = norm[3:]
+                            if norm.endswith("IND") and len(norm) > 4:
+                                norm = norm[:-3]
+                            if norm:
+                                lines.append(norm)
+                                confs.append(float(r_score))
+                        if lines:
+                            raw_text = "".join(lines)
+                            char_conf = float(np.mean(confs))
+                except Exception as ocr_err:
+                    logger.debug("[%s] RapidOCR inference error: %s", gate_id, ocr_err)
+
+            # 2. Fallback Engine: CRNN ONNX session
+            if not raw_text and self._ocr_session is not None:
+                crop_rgb = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
+                crop_res = cv2.resize(crop_rgb, (128, 32)).transpose(2, 0, 1)[np.newaxis, :, :, :].astype(np.float32) / 127.5 - 1.0
                 logits = self._ocr_session.run(None, {self._ocr_session.get_inputs()[0].name: crop_res})[0]
-                raw_text = decode_crnn_logits(logits)
+                raw_text, char_conf = decode_crnn_logits(logits)
+
+            # Reject OCR reads with low character confidence (< 0.50)
+            if char_conf < 0.50:
+                logger.debug("[%s] Dropping low-confidence OCR read '%s' (char_conf=%.2f < 0.50)", gate_id, raw_text, char_conf)
+                continue
 
             norm_plate = normalize_plate(raw_text) if raw_text else None
-            if not norm_plate or len(norm_plate) < 4:
+            # Statutory Indian plates have 7 to 11 characters
+            if not norm_plate or len(norm_plate) < 7 or len(norm_plate) > 11:
                 continue
+
+            # Statutory Indian Plate Validation & Suggest Repairs
+            is_valid = is_valid_indian_plate(norm_plate)
+            candidate_plate = norm_plate
+            if not is_valid:
+                repairs = suggest_repairs(norm_plate)
+                if repairs:
+                    candidate_plate = repairs[0]
+                    is_valid = True
 
             # 5. Registry Matching via OpticalPlateMatcher
             self._refresh_registry_matcher()
-            effective_plate = norm_plate
-            match_score = score
+            effective_plate = candidate_plate
+            match_score = max(score, char_conf)
+            registry_matched = False
             if self._matcher is not None:
-                res = self._matcher.match(norm_plate)
-                if res.matched_plate:
+                res = self._matcher.match(candidate_plate)
+                if res.matched_plate and float(res.similarity_score) >= 0.70:
                     effective_plate = res.matched_plate
-                    match_score = max(score, float(res.similarity_score))
+                    match_score = max(match_score, float(res.similarity_score))
+                    registry_matched = True
+
+            # Guardrail Gate: Must strictly be either a valid statutory Indian plate or match campus vehicle registry
+            if not is_valid and not registry_matched:
+                logger.debug("[%s] Dropping non-statutory plate candidate '%s' (not a valid Indian plate and not in registry)", gate_id, norm_plate)
+                continue
+
+            # Gate-level burst debounce (3.5s): prevents rapid duplicate rows when OCR jitters across video frames
+            now_sec = time.time()
+            last_gate = self._gate_last_ingest.get(gate_id)
+            if last_gate is not None:
+                last_ts, last_plate = last_gate
+                if (now_sec - last_ts) < 3.5:
+                    if _edit_distance(effective_plate, last_plate) <= 2:
+                        logger.debug("[%s] Suppressing burst flicker %s (within edit-dist 2 of %s seen %.1fs ago)", gate_id, effective_plate, last_plate, now_sec - last_ts)
+                        continue
 
             # 6. 60-Second Debounce per (gate_id, effective_plate)
             debounce_key = (gate_id, effective_plate)
-            now_sec = time.time()
             last_hit = self._debounce_cache.get(debounce_key, 0.0)
             if now_sec - last_hit < 60.0:
                 logger.debug("[%s] Debounced plate %s (last seen %.1fs ago)", gate_id, effective_plate, now_sec - last_hit)
                 continue
+
             self._debounce_cache[debounce_key] = now_sec
+            self._gate_last_ingest[gate_id] = (now_sec, effective_plate)
 
             # 7. Ingestion into ObservationService
             self._ingest_observation(gate_id, effective_plate, match_score, laplacian_var, [x1, y1, x2, y2], frame=frame)
@@ -602,7 +709,8 @@ class CameraStreamManager:
     ):
         """Stores observation in PostgreSQL, persists snapshot image, and publishes to live feed."""
         try:
-            source_event_id = f"stream_{gate_id}_{plate}_{int(time.time())}"
+            now_dt = datetime.now(timezone.utc)
+            source_event_id = f"stream_{gate_id}_{plate}_{int(now_dt.timestamp())}"
             has_snap = False
 
             if frame is not None and frame.size > 0:
@@ -629,6 +737,7 @@ class CameraStreamManager:
                 event_data = ObservationCreate(
                     gate_id=gate_id,
                     camera_id=f"{gate_id.lower()}_ip_cam",
+                    observed_at=now_dt,
                     source=ObservationSource.OTHER,
                     source_event_id=source_event_id,
                     raw_plate=plate,

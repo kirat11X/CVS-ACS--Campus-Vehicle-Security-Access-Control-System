@@ -261,10 +261,11 @@ def test_multi_word_allow_plus_alert_items():
 
 def test_totals_match_false_escalation_to_review():
     """
-    Verifies that whenever totals_match is False (arithmetic discrepancy or missing line price),
-    the overall screening verdict is escalated to REVIEW even if every individual line is ALLOW.
+    Verifies that when all items are ALLOW, fee/discount discrepancies do not escalate
+    overall to REVIEW (staying ALLOW / CLEARED), but if an unreadable/REVIEW item is present
+    or lines are missing, it escalates to REVIEW; and ALERT items remain ALERT.
     """
-    # Case 1: All items are ALLOW, but sum(lines) != total printed -> overall escalates to REVIEW
+    # Case 1: All items are ALLOW, but sum(lines) != total printed -> overall stays ALLOW (cleared)
     lines_allow = [
         ParsedLine(
             line_no=1,
@@ -288,14 +289,44 @@ def test_totals_match_false_escalation_to_review():
     parsed_mismatch = ParsedInvoice(
         lines=lines_allow,
         subtotal=Decimal("100.00"),
-        total=Decimal("250.00"),  # Mismatches items sum of 100.00!
+        total=Decimal("250.00"),  # Mismatches items sum of 100.00 (e.g. fee/handling/surge)
         order_number="D-9901",
     )
     result = DeliveryScreeningService.screen(parsed_mismatch, "D-9901")
     assert result.totals_match is False
-    assert result.overall == ScreeningVerdict.REVIEW, (
-        f"Expected overall to escalate to REVIEW on totals mismatch, got {result.overall}"
+    assert result.overall == ScreeningVerdict.ALLOW, (
+        f"Expected overall to remain ALLOW for safe items, got {result.overall}"
     )
+
+    # Case 1b: An unreadable or REVIEW line is present and totals_match is False -> escalates to REVIEW
+    lines_review = [
+        ParsedLine(
+            line_no=1,
+            item_name="Harvest Gold White Bread 400g",
+            quantity=1,
+            unit_price=Decimal("40.00"),
+            amount=Decimal("40.00"),
+            confidence=1.0,
+            readable=True,
+        ),
+        ParsedLine(
+            line_no=2,
+            item_name="Unreadable Row Text ???",
+            quantity=1,
+            unit_price=Decimal("50.00"),
+            amount=Decimal("50.00"),
+            confidence=0.10,
+            readable=False,  # Unreadable
+        ),
+    ]
+    parsed_review = ParsedInvoice(
+        lines=lines_review,
+        subtotal=Decimal("90.00"),
+        total=Decimal("150.00"),
+        order_number="D-9901B",
+    )
+    result_rev = DeliveryScreeningService.screen(parsed_review, "D-9901B")
+    assert result_rev.overall == ScreeningVerdict.REVIEW
 
     # Case 2: One item is ALERT, and totals_match is False -> overall remains ALERT (ALERT > REVIEW)
     lines_with_alert = [
@@ -823,6 +854,147 @@ def test_cvs_acs_screener_loads_45000_deliverables():
     assert res["matched_from_list"] is True
     assert res["verdict"] == "ALLOW"
     assert res["canonical_root"] == "giant slice"
+
+
+def test_zepto_paneer_eggs_safe_root_fast_pass_and_cleared_verdict():
+    """
+    Exact regression test for the Zepto screenshot case:
+    1. 'Verka Paneer Vacuum Pack' (Qty: 1) - ₹95.00
+    2. 'Eggoz Every Day White Farm Fresh Eggs' (Qty: 1) - ₹68.00
+    Bill Total: ₹174.00 (sum=163.00, variance=11.00 due to unextracted platform/handling fee)
+    Order ID: SNKRJSISE59003
+
+    Must assert:
+    - Zero ALERT / REVIEW keywords present
+    - Fast-pass recognizes 'paneer' and 'eggs' canonical safe food roots with confidence >= 0.95
+    - DeliveryScreeningService does NOT escalate overall to REVIEW over platform fee variance
+    - Overall verdict remains ScreeningVerdict.ALLOW ('CLEARED')
+    """
+    from backend.app.services.cvs_acs_screener import cvs_acs_screener
+
+    paneer_res = cvs_acs_screener.screen_item("Verka Paneer Vacuum Pack")
+    assert paneer_res["verdict"] == "ALLOW"
+    assert paneer_res["confidence"] >= 0.95
+    assert paneer_res["is_uncertain"] is False
+
+    eggs_res = cvs_acs_screener.screen_item("Eggoz Every Day White Farm Fresh Eggs")
+    assert eggs_res["verdict"] == "ALLOW"
+    assert eggs_res["confidence"] >= 0.95
+    assert eggs_res["is_uncertain"] is False
+
+    parsed = ParsedInvoice(
+        lines=[
+            ParsedLine(
+                line_no=1,
+                item_name="Verka Paneer Vacuum Pack",
+                quantity=1,
+                unit_price=Decimal("95.00"),
+                amount=Decimal("95.00"),
+                confidence=0.98,
+                readable=True,
+                raw_text="Verka Paneer Vacuum Pack 1unit 95",
+            ),
+            ParsedLine(
+                line_no=2,
+                item_name="Eggoz Every Day White Farm Fresh Eggs",
+                quantity=1,
+                unit_price=Decimal("68.00"),
+                amount=Decimal("68.00"),
+                confidence=0.97,
+                readable=True,
+                raw_text="Eggoz Every Day White Farm Fresh Eggs 1unit 68",
+            ),
+        ],
+        subtotal=Decimal("163.00"),
+        delivery_fee=None,  # Not explicitly broken out by quick commerce OCR
+        total=Decimal("174.00"),
+        vendor="Zepto",
+        platform="Zepto",
+        order_number="SNKRJSISE59003",
+    )
+
+    scr = DeliveryScreeningService.screen(parsed, "SNKRJSISE59003")
+    assert len(scr.lines) == 2
+    assert all(l.verdict == ScreeningVerdict.ALLOW for l in scr.lines)
+    # totals_match is False due to missing ₹11 platform fee row, but overall MUST remain ALLOW ('CLEARED')
+    assert scr.totals_match is False
+    assert scr.overall == ScreeningVerdict.ALLOW, (
+        f"Expected overall ALLOW (CLEARED) for safe food, but got {scr.overall}"
+    )
+
+
+def test_swiggy_lapinoz_discount_not_escalated_to_review():
+    """
+    Regression test for Swiggy La Pino'z screenshot case:
+    1. 'Batata Harra Burger' - ₹65.00
+    2. 'Cheesy Margherita Personal Giant Slice (22.5Cm)' - ₹149.00
+    Bill Total: ₹124.00 (coupon discount of ₹90 applied; sum=214.00)
+    Order ID: 250187291119426
+    """
+    from backend.app.services.cvs_acs_screener import cvs_acs_screener
+
+    burger_res = cvs_acs_screener.screen_item("Batata Harra Burger")
+    assert burger_res["verdict"] == "ALLOW"
+
+    slice_res = cvs_acs_screener.screen_item("Cheesy Margherita Personal Giant Slice (22.5Cm)")
+    assert slice_res["verdict"] == "ALLOW"
+
+    parsed = ParsedInvoice(
+        lines=[
+            ParsedLine(
+                line_no=1,
+                item_name="Batata Harra Burger",
+                quantity=1,
+                unit_price=Decimal("65.00"),
+                amount=Decimal("65.00"),
+                confidence=0.99,
+                readable=True,
+            ),
+            ParsedLine(
+                line_no=2,
+                item_name="Cheesy Margherita Personal Giant Slice (22.5Cm)",
+                quantity=1,
+                unit_price=Decimal("149.00"),
+                amount=Decimal("149.00"),
+                confidence=0.99,
+                readable=True,
+            ),
+        ],
+        subtotal=Decimal("214.00"),
+        total=Decimal("124.00"),
+        restaurant="La Pino'z Pizza",
+        platform="Swiggy",
+        order_number="250187291119426",
+    )
+
+    scr = DeliveryScreeningService.screen(parsed, "250187291119426")
+    assert all(l.verdict == ScreeningVerdict.ALLOW for l in scr.lines)
+    assert scr.overall == ScreeningVerdict.ALLOW
+
+
+def test_quick_commerce_platform_detection_no_item_fallback():
+    """
+    Verifies that quick-commerce platforms (Zepto, Blinkit, Swiggy Instamart, BigBasket, Amazon)
+    are recognized from text headers and do NOT fall back to line item names as restaurant.
+    """
+    from backend.app.services.invoice_reader import parse_rows, OcrRow
+    from backend.app.services.llm_invoice_extractor import llm_invoice_extractor
+
+    zepto_rows = [
+        OcrRow("Download Invoice / Credit Note", 0.95, None),
+        OcrRow("Order Details", 0.95, None),
+        OcrRow("Order ID #SNKRJSISE59003", 0.98, None),
+        OcrRow("Rate Order  Order Again", 0.92, None),
+        OcrRow("Verka Paneer Vacuum Pack  95", 0.98, None),
+        OcrRow("Eggoz Every Day White Farm Fresh Eggs  68", 0.97, None),
+        OcrRow("Total Bill  174", 0.98, None),
+    ]
+
+    parsed = parse_rows(zepto_rows)
+    assert parsed.vendor == "Zepto"
+    assert parsed.platform == "Zepto"
+    assert parsed.restaurant is None
+    assert parsed.order_number == "SNKRJSISE59003"
 
 
 

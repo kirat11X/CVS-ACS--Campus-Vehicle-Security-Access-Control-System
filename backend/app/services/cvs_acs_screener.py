@@ -60,13 +60,50 @@ PACK_SIZE_PATTERN = re.compile(
 )
 
 ALERT_KEYWORDS = {
+    # Tobacco & smoking
     "cigarette", "cigarettes", "cigar", "cigars", "bidi", "beedi", "gutka", "gutkha",
-    "zarda", "khaini", "tobacco", "vape", "vapes", "e-cigarette", "nicotine", "snus",
-    "beer", "whisky", "whiskey", "vodka", "rum", "gin", "wine", "alcohol", "liquor",
-    "knife", "knives", "dagger", "sword", "gun", "pistol", "revolver", "bullets", "blade",
-    "pepper spray", "taser", "lighter fluid", "acid", "cleaner", "toilet cleaner",
-    "drain cleaner", "harpic", "lizol", "bleach", "phenyl", "kerosene", "petrol", "diesel",
-    "insecticide", "pesticide", "rat poison", "hit spray", "baygon", "mortein",
+    "zarda", "khaini", "tobacco", "vape", "vapes", "e-cigarette", "e cigarette", "nicotine", "snus",
+    "hookah", "hukka", "marlboro", "gold flake", "classic milds",
+    # Alcohol
+    "beer", "beers", "whisky", "whiskey", "vodka", "rum", "gin", "wine", "brandy", "tequila", "liquor",
+    "alcohol", "daru", "old monk", "breezer", "champagne",
+    # Weapons & blades
+    "knife", "knives", "dagger", "sword", "machete", "gun", "pistol", "revolver", "air gun", "airgun",
+    "ammunition", "ammo", "cartridge", "bullets", "pepper spray", "taser", "stun gun", "knuckle duster", "blade",
+    # Corrosive / toxic poisons & flammables
+    "acid", "cleaner", "toilet cleaner", "drain cleaner", "harpic", "lizol", "bleach", "phenyl", "phenyle",
+    "kerosene", "petrol", "diesel", "lighter fluid", "insecticide", "pesticide", "rat poison",
+    "hit spray", "baygon", "mortein", "poison", "toxic",
+}
+
+REVIEW_KEYWORDS = {
+    # Detergents & household chemicals
+    "detergent", "surf excel", "ariel", "colin", "comfort", "domex", "all out", "good knight", "odonil",
+    "drano", "gainda", "thinner", "turpentine", "naphthalene", "butane", "methylated spirit", "mosquito spray",
+    # Pharmaceuticals & OTC meds
+    "medicine", "medicines", "tablet", "tablets", "capsule", "capsules", "syrup", "cough syrup", "paracetamol",
+    "crocin", "dolo", "ibuprofen", "antibiotic", "injection", "ointment", "codeine", "tramadol",
+    "alprazolam", "diazepam", "sleeping pill", "sleeping pills", "antiseptic", "bandage", "digene",
+    "electral", "eno", "moov", "ors", "vicks", "strepsils", "betadine", "boroline", "volini",
+    # High-wattage appliances
+    "heater", "room heater", "geyser", "water heater", "immersion rod", "induction cooktop", "electric kettle",
+    "iron", "steam iron", "hot plate", "microwave", "air fryer",
+}
+
+SAFE_FOOD_ROOTS = {
+    "paneer", "egg", "eggs", "eggoz", "milk", "curd", "dahi", "butter", "cheese", "bread", "atta",
+    "rice", "dal", "oil", "ghee", "pizza", "burger", "biryani", "dosa", "idli", "momos", "momo",
+    "chai", "tea", "coffee", "chips", "biscuit", "biscuits", "cookies", "noodles", "maggi",
+    "chocolate", "chocolates", "juice", "fruit", "fruits", "vegetable", "vegetables",
+    "potato", "potatoes", "onion", "onions", "tomato", "tomatoes", "samosa", "roll", "rolls",
+    "sandwich", "sandwiches", "roti", "paratha", "naan", "curry", "thali", "sweets", "sweet",
+    "halwa", "laddu", "ladoo", "jalebi", "gulab jamun", "rasgulla", "cake", "pastry", "pastries",
+    "waffle", "ice cream", "kheer", "poha", "dalia", "oats", "cereal", "cornflakes", "jam",
+    "sauce", "ketchup", "pasta", "soup", "namkeen", "bhujia", "sev", "makhana", "dry fruits",
+    "cashew", "cashews", "almond", "almonds", "walnut", "walnuts", "raisin", "raisins",
+    "peanut", "peanuts", "lassi", "shake", "milkshake", "water", "soda", "drink", "beverage",
+    "salt", "sugar", "besan", "sooji", "rava", "maida", "honey", "spices", "masala",
+    "verka", "amul", "mother dairy", "britannia", "nestle",
 }
 
 ALLOW_KEYWORDS = {
@@ -243,7 +280,57 @@ class CVSACSScreener:
         tokens = set(cleaned.split())
 
         # ------------------------------------------------------------------
-        # RULE 1: FOLLOW THE LIST IF PRESENT
+        # STEP 1: RESTRICTION PRECEDENCE (ALERT & REVIEW KEYWORD CHECKS)
+        # ------------------------------------------------------------------
+        # Check ALL ALERT keywords across every token / subphrase first
+        for alert_kw in ALERT_KEYWORDS:
+            if _matches_keyword(alert_kw, cleaned, tokens):
+                return {
+                    "item_name": item_str,
+                    "matched_from_list": False,
+                    "canonical_root": alert_kw,
+                    "category": "PROHIBITED_CONTRABAND",
+                    "verdict": "ALERT",
+                    "risk_tag": "CONTRABAND_OR_FLAMMABLE",
+                    "confidence": 0.95,
+                    "is_uncertain": False,
+                }
+
+        # Check ALL REVIEW keywords across every token / subphrase
+        for review_kw in REVIEW_KEYWORDS:
+            if _matches_keyword(review_kw, cleaned, tokens):
+                cat = "MEDICINE" if any(m in review_kw for m in ("tablet", "syrup", "paracetamol", "dolo", "pill", "capsule", "medicine")) else "HAZMAT"
+                return {
+                    "item_name": item_str,
+                    "matched_from_list": False,
+                    "canonical_root": review_kw,
+                    "category": cat,
+                    "verdict": "REVIEW",
+                    "risk_tag": "RESTRICTED_OR_CHEMICAL",
+                    "confidence": 0.90,
+                    "is_uncertain": False,
+                }
+
+        # ------------------------------------------------------------------
+        # STEP 2: SAFE-ROOT FAST-PASS (OBVIOUS GROCERIES / PREPARED FOOD)
+        # ------------------------------------------------------------------
+        # If ZERO ALERT and ZERO REVIEW tokens are present, immediately check safe roots.
+        # Obvious food and groceries MUST NOT be sent to the LLM where uncertainty downgrades to REVIEW.
+        for safe_root in SAFE_FOOD_ROOTS:
+            if _matches_keyword(safe_root, cleaned, tokens):
+                return {
+                    "item_name": item_str,
+                    "matched_from_list": True,
+                    "canonical_root": safe_root,
+                    "category": "FOOD_PREPARED",
+                    "verdict": "ALLOW",
+                    "risk_tag": "SAFE_FOOD",
+                    "confidence": 0.95,
+                    "is_uncertain": False,
+                }
+
+        # ------------------------------------------------------------------
+        # STEP 3: CANDIDATE LIST OVERLAP MATCH
         # ------------------------------------------------------------------
         matching_cands: List[Dict[str, Any]] = []
         for cand in candidates:
@@ -260,6 +347,8 @@ class CVSACSScreener:
                 is_match = True
             elif cand_clean and len(cand_clean.split()) >= 2 and re.search(r"\b" + re.escape(cand_clean) + r"\b", cleaned):
                 is_match = True
+            elif any(len(t) >= 3 and t in cand_clean.split() for t in tokens if t not in ("pack", "unit", "piece")):
+                is_match = True
 
             if is_match:
                 matching_cands.append(cand)
@@ -272,25 +361,6 @@ class CVSACSScreener:
                 key=lambda c: SEVERITY_ORDER.get(str(c.get("verdict", "ALLOW")).upper(), 1),
             )
 
-        # Check if an ALERT keyword is present in the line item even if an ALLOW matched from list
-        alert_kw_match = None
-        for alert_kw in ALERT_KEYWORDS:
-            if _matches_keyword(alert_kw, cleaned, tokens):
-                alert_kw_match = alert_kw
-                break
-
-        if alert_kw_match and (not best_match or str(best_match.get("verdict", "")).upper() != "ALERT"):
-            return {
-                "item_name": item_str,
-                "matched_from_list": False,
-                "canonical_root": alert_kw_match,
-                "category": "PROHIBITED_CONTRABAND",
-                "verdict": "ALERT",
-                "risk_tag": "CONTRABAND_OR_FLAMMABLE",
-                "confidence": 0.95,
-                "is_uncertain": False,
-            }
-
         if best_match:
             verd = str(best_match.get("verdict") or "REVIEW").upper()
             if verd not in ("ALLOW", "REVIEW", "ALERT"):
@@ -302,7 +372,7 @@ class CVSACSScreener:
                 "category": best_match.get("category", "FOOD_PREPARED"),
                 "verdict": verd,
                 "risk_tag": best_match.get("risk_tag", "SAFE_FOOD"),
-                "confidence": 1.0,
+                "confidence": 0.95 if verd == "ALLOW" else 1.0,
                 "is_uncertain": False,
             }
 
@@ -401,7 +471,21 @@ class CVSACSScreener:
                     "is_uncertain": False,
                 }
 
-        for allow_kw in ALLOW_KEYWORDS:
+        for review_kw in REVIEW_KEYWORDS:
+            if _matches_keyword(review_kw, cleaned, tokens):
+                cat = "MEDICINE" if any(m in review_kw for m in ("tablet", "syrup", "paracetamol", "dolo", "pill", "capsule", "medicine")) else "HAZMAT"
+                return {
+                    "item_name": line_item,
+                    "matched_from_list": False,
+                    "canonical_root": review_kw,
+                    "category": cat,
+                    "verdict": "REVIEW",
+                    "risk_tag": "RESTRICTED_OR_CHEMICAL",
+                    "confidence": 0.90,
+                    "is_uncertain": False,
+                }
+
+        for allow_kw in SAFE_FOOD_ROOTS.union(ALLOW_KEYWORDS):
             if _matches_keyword(allow_kw, cleaned, tokens):
                 return {
                     "item_name": line_item,
@@ -410,7 +494,7 @@ class CVSACSScreener:
                     "category": "FOOD_PREPARED",
                     "verdict": "ALLOW",
                     "risk_tag": "SAFE_FOOD",
-                    "confidence": 0.85,
+                    "confidence": 0.95,
                     "is_uncertain": False,
                 }
 

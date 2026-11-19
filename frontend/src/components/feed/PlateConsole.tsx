@@ -10,8 +10,8 @@ import {
   MOVEMENT_LABEL,
   describeOneEdit,
   formatDateTime,
+  formatFeedTimestamp,
   formatPercent,
-  formatShortTime,
   gateLabel,
   gateShort,
   humanize,
@@ -120,7 +120,7 @@ export function PlateRow({ card, selected, onSelect }: { card: FeedCard; selecte
               <Badge className="bg-white text-slate-700 ring-slate-300 dark:bg-slate-900 dark:text-slate-300 dark:ring-slate-600">{tag}</Badge>
             )}
             <span className="text-[11px] tabular-nums text-slate-500 dark:text-slate-400" title={`${obs.gate.name} · ${formatDateTime(obs.observed_at)}`}>
-              {gateShort(obs.gate)} · {formatShortTime(obs.observed_at)}
+              {gateShort(obs.gate)} · {formatFeedTimestamp(obs.observed_at, false)}
             </span>
           </div>
           <p className="truncate text-xs text-slate-600 dark:text-slate-400">{ownerLine(item)}</p>
@@ -243,6 +243,9 @@ export function PlateDetailPanel({ token, item, onResolved, onLink, onMarkVisito
       </div>
 
       <dl className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
+        <Fact label="Observed At">
+          <span className="font-medium text-slate-800 dark:text-slate-200">{formatDateTime(obs.observed_at)}</span>
+        </Fact>
         <Fact label="OCR read">
           <span className="font-mono">{obs.plate.raw ?? "—"}</span>
           <span className="text-xs text-slate-500 dark:text-slate-400"> · {manual ? "typed by guard" : `confidence ${formatPercent(obs.plate.confidence)}`}</span>
@@ -332,8 +335,8 @@ export function PlateDetailPanel({ token, item, onResolved, onLink, onMarkVisito
         <ol className="space-y-1">
           {trail.map((t, i) => (
             <li key={i} className="flex gap-3 text-xs">
-              <span className="w-12 shrink-0 tabular-nums text-slate-500 dark:text-slate-400" title={formatDateTime(t.at)}>
-                {formatShortTime(t.at)}
+              <span className="shrink-0 tabular-nums text-slate-500 dark:text-slate-400" title={formatDateTime(t.at)}>
+                {formatFeedTimestamp(t.at, true)}
               </span>
               <span className="min-w-0 text-slate-700 dark:text-slate-300">{t.text}</span>
             </li>

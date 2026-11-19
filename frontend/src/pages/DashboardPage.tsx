@@ -27,7 +27,7 @@ import { EmptyState, ErrorState, Skeleton } from "../components/ui/Feedback";
 import { FilterChips, PageHeader, Section, StatTile } from "../components/ui/Layout";
 import { useFeed } from "../feed/LiveFeedContext";
 import { cx } from "../lib/cx";
-import { DIRECTION_REASON, compactNumber, formatRelative, formatShortTime } from "../lib/format";
+import { DIRECTION_REASON, compactNumber, formatFeedTimestamp, formatRelative } from "../lib/format";
 import { directionSource } from "../lib/gates";
 import { useNow } from "../lib/hooks";
 
@@ -211,7 +211,7 @@ export function DashboardPage() {
                 const reason = typeof item.direction?.evidence?.reason === "string" ? DIRECTION_REASON[item.direction.evidence.reason as string] : undefined;
                 return (
                   <li key={item.observation.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 sm:px-5">
-                    <span className="w-20 whitespace-nowrap text-xs tabular-nums text-slate-500 dark:text-slate-400">{formatShortTime(item.observation.observed_at)}</span>
+                    <span className="whitespace-nowrap text-xs tabular-nums text-slate-500 dark:text-slate-400">{formatFeedTimestamp(item.observation.observed_at, false)}</span>
                     <span className="plate min-w-24 text-sm text-slate-900 dark:text-white">{item.observation.plate.normalized ?? "No plate"}</span>
                     <LinkStatusBadge status={item.link_status} short />
                     <span className="min-w-0 flex-1 truncate text-xs text-slate-500 dark:text-slate-400">

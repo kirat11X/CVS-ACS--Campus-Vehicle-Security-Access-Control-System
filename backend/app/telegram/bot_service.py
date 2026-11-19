@@ -1065,12 +1065,18 @@ class TelegramBotService:
                         else oid
                     )
 
-                    place_name = order.restaurant or invoice.vendor or "Store / Merchant"
                     plat_val = order.platform.value if order.platform else "Quick Commerce"
                     if plat_val.upper() == "OTHER":
                         plat_val = "Quick Commerce"
 
-                    if order.restaurant and order.restaurant.upper() != plat_val.upper():
+                    is_qc = plat_val.upper() in ("ZEPTO", "BLINKIT", "SWIGGY INSTAMART", "INSTAMART", "BIGBASKET", "AMAZON")
+                    item_words = {w for item in (invoice.items or []) for w in item.item_name.lower().split() if len(w) > 3}
+                    rest_words = set(order.restaurant.lower().split()) if order.restaurant else set()
+                    is_item_name_fallback = bool(order.restaurant and len(item_words.intersection(rest_words)) >= 2)
+
+                    place_name = plat_val.title() if is_qc else (order.restaurant or invoice.vendor or "Store / Merchant")
+
+                    if order.restaurant and not is_qc and not is_item_name_fallback and order.restaurant.upper() != plat_val.upper():
                         merchant_info = f"🍽️ *Ordered From:* *{order.restaurant}* (via {plat_val.title()})\n"
                     else:
                         merchant_info = f"🏪 *Ordered From:* *{place_name}*\n"
@@ -1170,12 +1176,18 @@ class TelegramBotService:
                         else oid
                     )
 
-                    place_name = order.restaurant or invoice.vendor or "Store / Merchant"
                     plat_val = order.platform.value if order.platform else "Direct Delivery"
                     if plat_val.upper() == "OTHER":
                         plat_val = "Direct Delivery"
 
-                    if order.restaurant and order.restaurant.upper() != plat_val.upper():
+                    is_qc = plat_val.upper() in ("ZEPTO", "BLINKIT", "SWIGGY INSTAMART", "INSTAMART", "BIGBASKET", "AMAZON")
+                    item_words = {w for item in (invoice.items or []) for w in item.item_name.lower().split() if len(w) > 3}
+                    rest_words = set(order.restaurant.lower().split()) if order.restaurant else set()
+                    is_item_name_fallback = bool(order.restaurant and len(item_words.intersection(rest_words)) >= 2)
+
+                    place_name = plat_val.title() if is_qc else (order.restaurant or invoice.vendor or "Store / Merchant")
+
+                    if order.restaurant and not is_qc and not is_item_name_fallback and order.restaurant.upper() != plat_val.upper():
                         merchant_info = f"🍽️ *Ordered From:* *{order.restaurant}* (via {plat_val.title()})\n"
                     else:
                         merchant_info = f"🏪 *Ordered From:* *{place_name}*\n"

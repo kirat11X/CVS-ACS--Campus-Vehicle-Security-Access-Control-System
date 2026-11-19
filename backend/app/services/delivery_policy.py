@@ -53,7 +53,7 @@ RULES: Tuple[CategoryRule, ...] = (
     )),
     CategoryRule("FOOD", "Food", "FOOD_OK", ScreeningVerdict.ALLOW, (
         "noodles", "instant noodles", "maggi", "chips", "biscuit", "biscuits", "bread", "rice", "dal", "atta",
-        "flour", "sugar", "salt", "milk", "butter", "cheese", "paneer", "egg", "eggs", "fruit", "fruits",
+        "flour", "sugar", "salt", "milk", "butter", "cheese", "paneer", "egg", "eggs", "eggoz", "fruit", "fruits",
         "apple", "apples", "banana", "bananas", "chocolate", "chocolates", "snack", "snacks", "namkeen",
         "kurkure", "lays", "pizza", "burger", "sandwich", "biryani", "roti", "paratha", "curry", "meal",
         "thali", "momos", "cake", "cookies", "oats", "cereal", "cornflakes", "jam", "sauce", "ketchup",
@@ -276,6 +276,17 @@ def classify_item(name: str) -> Tuple[CategoryRule, Optional[str]]:
 
     if tier1_match:
         return tier1_match
+
+    # Tier 2b: Safe canonical food/grocery root fast-pass
+    norm_tokens = set(norm.split())
+    for safe_kw in (
+        "paneer", "egg", "eggs", "eggoz", "milk", "curd", "dahi", "butter", "cheese", "bread",
+        "atta", "rice", "dal", "oil", "ghee", "pizza", "burger", "biryani", "dosa", "momos",
+        "chai", "coffee", "chips", "biscuit", "noodles", "chocolate", "juice", "fruit",
+        "vegetable", "potato", "onion", "tomato",
+    ):
+        if safe_kw in norm_tokens or re.search(r"\b" + re.escape(safe_kw) + r"\b", norm):
+            return RULE_BY_CAT["FOOD"], safe_kw
 
     # Tier 3: Unmapped fallback
     return UNKNOWN, None

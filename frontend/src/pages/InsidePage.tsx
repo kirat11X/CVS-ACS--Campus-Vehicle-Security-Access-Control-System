@@ -12,7 +12,7 @@ import { EmptyState, ErrorState, SkeletonRows } from "../components/ui/Feedback"
 import { SearchInput } from "../components/ui/Form";
 import { FilterChips, PageHeader, Section } from "../components/ui/Layout";
 import { useToast } from "../components/ui/Toast";
-import { formatDateTime, formatSince, formatTime } from "../lib/format";
+import { formatDateTime, formatFeedTimestamp, formatSince } from "../lib/format";
 import { useNow } from "../lib/hooks";
 import { normalizePlate } from "../app/nav";
 
@@ -125,7 +125,7 @@ export function InsidePage() {
           <ul className="divide-y divide-slate-100 dark:divide-slate-800">
             {data.unattributed_entries.map((m) => (
               <li key={m.id} className="flex flex-wrap items-center gap-3 px-4 py-3 text-sm">
-                <span className="tabular-nums text-slate-700 dark:text-slate-300">{formatTime(m.timestamp)}</span>
+                <span className="tabular-nums text-slate-700 dark:text-slate-300">{formatFeedTimestamp(m.timestamp, false)}</span>
                 <span className="text-slate-600 dark:text-slate-400">{m.gate.name}</span>
                 <MovementLabel direction={m.direction} method={m.direction_method} />
                 <Button size="sm" className="ml-auto" onClick={() => setCorrecting({ movementId: m.id, direction: m.direction, plate: null })}>

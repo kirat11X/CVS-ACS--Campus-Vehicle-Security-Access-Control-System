@@ -6,7 +6,7 @@ import { MOVEMENT_ROOTS, useInvalidate } from "../../api/queries";
 import type { MovementDirection, RegistrySuggestion, ResolvedObservation } from "../../api/types";
 import type { FeedCard } from "../../feed/useLiveFeed";
 import { cx } from "../../lib/cx";
-import { DIRECTION_REASON, LINK_STATUS_STYLE, METHOD_LABEL, MOVEMENT_LABEL, formatDateTime, formatPercent, formatTime, humanize } from "../../lib/format";
+import { DIRECTION_REASON, LINK_STATUS_STYLE, METHOD_LABEL, MOVEMENT_LABEL, formatDateTime, formatFeedTimestamp, formatPercent, formatTime, humanize } from "../../lib/format";
 import type { CorrectionTarget } from "../forms/CorrectionDialog";
 import type { ManualEntryPrefill } from "../forms/ManualEntryDialog";
 import { MovementLabel } from "../movement/MovementLabel";
@@ -236,7 +236,7 @@ export function ObservationCard({ token, card, onRegister, onManualEntry, onReso
           />
           <span className="text-xs text-slate-600 dark:text-slate-300">{obs.gate.name}</span>
           <span className="text-xs tabular-nums text-slate-500 dark:text-slate-400" title={formatDateTime(obs.observed_at)}>
-            {formatTime(obs.observed_at)}
+            {formatFeedTimestamp(obs.observed_at, true)}
           </span>
           <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-600 dark:bg-slate-800 dark:text-slate-400">
             {obs.source === "MANUAL" && <Keyboard className="h-3 w-3" aria-hidden />}
@@ -266,6 +266,7 @@ export function ObservationCard({ token, card, onRegister, onManualEntry, onReso
               </div>
             </div>
             <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 sm:grid-cols-3">
+              <Fact label="Observed At" value={formatDateTime(obs.observed_at)} />
               <Fact label={obs.source === "MANUAL" ? "Direction (guard)" : "Sensor direction"} value={obs.direction === "UNKNOWN" ? "Unknown" : humanize(obs.direction)} />
               <Fact
                 label="Vehicle type"

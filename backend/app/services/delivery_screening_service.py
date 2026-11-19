@@ -225,9 +225,35 @@ class DeliveryScreeningService:
                     except Exception:
                         pass
 
-        overall = worst(l.verdict for l in lines) if lines else ScreeningVerdict.REVIEW
-        if totals_match is False or parsed.total is None:
-            overall = worst([overall, ScreeningVerdict.REVIEW])
+        # Determine overall verdict from lines
+        if not lines:
+            overall = ScreeningVerdict.REVIEW
+        else:
+            has_missing_amount = any(l.amount is None for l in lines)
+            all_allow = all(l.verdict == ScreeningVerdict.ALLOW and l.category != "UNKNOWN" for l in lines) and not has_missing_amount
+            has_alert = any(l.verdict == ScreeningVerdict.ALERT for l in lines)
+            has_review = any(l.verdict == ScreeningVerdict.REVIEW or l.category == "UNKNOWN" for l in lines) or has_missing_amount
+
+            if has_alert:
+                overall = ScreeningVerdict.ALERT
+            elif has_review:
+                overall = ScreeningVerdict.REVIEW
+            elif all_allow:
+                # All items are explicitly ALLOW, have readable amounts, and are safe.
+                # Do NOT escalate overall to REVIEW solely because totals_match is False
+                # when the difference is explainable by unextracted delivery/handling fees or promo/coupon discounts.
+                if totals_match is False or parsed.total is None:
+                    logger.info(
+                        "TOTAL_MISMATCH_WITH_FEES_OR_DISCOUNT: All %d line items are ALLOW with prices. "
+                        "Not escalating to REVIEW for fee/discount arithmetic variance (computed: %s, parsed: %s).",
+                        len(lines),
+                        computed_total,
+                        parsed.total,
+                    )
+                overall = ScreeningVerdict.ALLOW
+            else:
+                overall = worst(l.verdict for l in lines)
+
         mismatch_order = bool(
             order_id
             and not order_id.startswith("TG-")
@@ -235,7 +261,7 @@ class DeliveryScreeningService:
             and not parsed.order_number.startswith("TG-")
             and normalize_order_id(order_id) != normalize_order_id(parsed.order_number)
         )
-        if not lines or mismatch_order:
+        if mismatch_order:
             overall = worst([overall, ScreeningVerdict.REVIEW])
         return ScreeningResult(lines, parsed, computed_total, totals_match, overall, parsed.order_number)
 
@@ -425,12 +451,7 @@ class DeliveryScreeningService:
             order.customer_name = customer_name
         if customer_id:
             order.customer_id = customer_id
-        if result.parsed.restaurant:
-            order.restaurant = result.parsed.restaurant
-        elif result.parsed.vendor:
-            order.restaurant = result.parsed.vendor
-
-        detected_plat = result.parsed.platform or (result.parsed.vendor if result.parsed.vendor in ("Zepto", "Blinkit", "Swiggy Instamart", "Zomato", "Amazon") else None)
+        detected_plat = result.parsed.platform or (result.parsed.vendor if result.parsed.vendor in ("Zepto", "Blinkit", "Swiggy Instamart", "Zomato", "Amazon", "BigBasket") else None)
         if detected_plat:
             plat_upper = detected_plat.strip().upper()
             try:
@@ -446,6 +467,24 @@ class DeliveryScreeningService:
                     order.platform = PlatformType.ZEPTO
                 elif "AMAZON" in plat_upper:
                     order.platform = PlatformType.AMAZON
+
+        plat_name = (order.platform.value if order.platform else (result.parsed.platform or "")).upper()
+        is_qc = plat_name in ("ZEPTO", "BLINKIT", "SWIGGY INSTAMART", "INSTAMART", "BIGBASKET", "AMAZON")
+
+        rest_val = result.parsed.restaurant
+        if rest_val:
+            # Check if restaurant string inadvertently contains item names or grocery words
+            item_words = {w for l in result.lines for w in l.item_name.lower().split() if len(w) > 3}
+            rest_words = set(rest_val.lower().split())
+            if is_qc or len(item_words.intersection(rest_words)) >= 2:
+                rest_val = None
+
+        if rest_val:
+            order.restaurant = rest_val
+        elif is_qc:
+            order.restaurant = (order.platform.value if order.platform else "Quick Commerce").title()
+        elif result.parsed.vendor:
+            order.restaurant = result.parsed.vendor
         if gate_id:
             order.gate_id = gate_id
         db.commit()

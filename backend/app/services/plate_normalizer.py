@@ -117,3 +117,35 @@ def is_valid_indian_plate(normalized_plate: str) -> bool:
 
     return False
 
+
+CONFUSION_PAIRS: dict[str, str] = {
+    "O": "0", "0": "O",
+    "I": "1", "1": "I",
+    "B": "8", "8": "B",
+    "S": "5", "5": "S",
+    "Z": "2", "2": "Z",
+}
+
+
+def suggest_repairs(raw: str | None) -> list[str]:
+    """
+    Evaluates O/0, I/1, B/8, S/5, Z/2 swaps to turn an invalid OCR read into a valid Indian plate.
+    Returns valid repaired plate candidates, fewest swaps first.
+    """
+    text = normalize_plate(raw)
+    if not text or is_valid_indian_plate(text):
+        return []
+    import itertools
+
+    positions = [i for i, ch in enumerate(text) if ch in CONFUSION_PAIRS][:8]
+    found: set[tuple[int, str]] = set()
+    for k in range(1, min(4, len(positions) + 1)):
+        for subset in itertools.combinations(positions, k):
+            chars = list(text)
+            for i in subset:
+                chars[i] = CONFUSION_PAIRS[chars[i]]
+            candidate = "".join(chars)
+            if is_valid_indian_plate(candidate):
+                found.add((k, candidate))
+    return [v for _, v in sorted(found)]
+

@@ -94,10 +94,12 @@ def clean_vendor_name(vendor: Optional[str], raw_text: str = "") -> Optional[str
             return "Swiggy Instamart"
         if "zepto" in low_text:
             return "Zepto"
-        if "zomato" in low_text:
-            return "Zomato"
+        if "bigbasket" in low_text or "bbdaily" in low_text or "bb now" in low_text:
+            return "BigBasket"
         if "amazon" in low_text:
             return "Amazon"
+        if "zomato" in low_text:
+            return "Zomato"
         return "Store / Quick Commerce"
     return v
 
@@ -277,22 +279,49 @@ class LLMInvoiceExtractor:
         parsed.platform = raw_plat.strip() if raw_plat and isinstance(raw_plat, str) else None
         parsed.outlet_location = raw_loc.strip() if raw_loc and isinstance(raw_loc, str) else None
 
-        raw_vendor = parsed.restaurant or parsed.platform or data.get("vendor") or (fallback.vendor if fallback else None)
-        parsed.vendor = clean_vendor_name(raw_vendor, clean_plain_text)
-
         low_text = (clean_plain_text or "").lower()
-        is_zepto = (
+        if (
             "zepto" in low_text
             or "credit note" in low_text
             or "creditnote" in low_text
             or "order again" in low_text
             or "orderagain" in low_text
             or bool(re.search(r"#[A-Z]{8,15}\d{4,6}\b", clean_plain_text))
-        )
-        if is_zepto:
+        ):
             parsed.platform = "Zepto"
-            if not parsed.vendor or parsed.vendor in ("Blinkit", "Swiggy", "Swiggy Instamart", "Store / Quick Commerce", "Verka", "Portronics", "Portronics Konnect", "Other"):
-                parsed.vendor = "Zepto"
+            parsed.vendor = "Zepto"
+        elif "instamart" in low_text or "swiggy instamart" in low_text:
+            parsed.platform = "Swiggy Instamart"
+            parsed.vendor = "Swiggy Instamart"
+        elif "blinkit" in low_text or "delivered in" in low_text or "grofers" in low_text:
+            parsed.platform = "Blinkit"
+            parsed.vendor = "Blinkit"
+        elif "bigbasket" in low_text or "bbdaily" in low_text or "bb now" in low_text:
+            parsed.platform = "BigBasket"
+            parsed.vendor = "BigBasket"
+        elif "amazon fresh" in low_text or "amazon" in low_text or "amzn" in low_text:
+            parsed.platform = "Amazon"
+            parsed.vendor = "Amazon"
+        elif "zomato" in low_text:
+            if not parsed.platform:
+                parsed.platform = "Zomato"
+            if not parsed.vendor:
+                parsed.vendor = "Zomato"
+        elif "swiggy" in low_text:
+            if not parsed.platform:
+                parsed.platform = "Swiggy"
+            if not parsed.vendor:
+                parsed.vendor = "Swiggy"
+
+        if not parsed.vendor:
+            raw_vendor = parsed.restaurant or parsed.platform or data.get("vendor") or (fallback.vendor if fallback else None)
+            parsed.vendor = clean_vendor_name(raw_vendor, clean_plain_text)
+
+        # Quick-commerce platforms have no separate restaurant.
+        # Clear parsed.restaurant if it matches quick-commerce or was hallucinated from item names.
+        is_qc = (parsed.platform or "").upper() in ("ZEPTO", "BLINKIT", "SWIGGY INSTAMART", "INSTAMART", "BIGBASKET", "AMAZON")
+        if is_qc and parsed.restaurant:
+            parsed.restaurant = None
 
         raw_oid = data.get("order_id")
         if raw_oid and isinstance(raw_oid, str):
@@ -374,6 +403,16 @@ class LLMInvoiceExtractor:
                     )
                 )
                 valid_idx += 1
+
+        # Check if restaurant duplicates item names or contains grocery roots
+        if parsed.restaurant and parsed.lines:
+            rest_low = parsed.restaurant.lower()
+            if any(
+                len(l.item_name) > 3 and (l.item_name.lower() in rest_low or rest_low in l.item_name.lower())
+                for l in parsed.lines
+            ):
+                logger.info("Cleared restaurant '%s' because it duplicates extracted item names.", parsed.restaurant)
+                parsed.restaurant = None
 
         # Fallback to deterministic lines if LLM returned 0 items
         if not parsed.lines and fallback and fallback.lines:

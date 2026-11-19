@@ -578,6 +578,12 @@ def parse_mobile_order_layout(rows: List[OcrRow]) -> ParsedInvoice:
     elif "blinkit" in all_low or "delivered in" in all_low:
         parsed.vendor = "Blinkit"
         parsed.platform = "Blinkit"
+    elif "bigbasket" in all_low or "bbdaily" in all_low or "bb now" in all_low or "bbnow" in all_low:
+        parsed.vendor = "BigBasket"
+        parsed.platform = "BigBasket"
+    elif "amazon" in all_low or "amzn" in all_low:
+        parsed.vendor = "Amazon"
+        parsed.platform = "Amazon"
     elif "zomato" in all_low:
         parsed.vendor = "Zomato"
         parsed.platform = "Zomato"
@@ -690,20 +696,53 @@ def parse_rows(rows: List[OcrRow]) -> ParsedInvoice:
     """
     parsed = ParsedInvoice()
     all_text = "\n".join(r.text for r in rows)
+    all_low = all_text.lower()
+    if (
+        "zepto" in all_low
+        or "credit note" in all_low
+        or "creditnote" in all_low
+        or "order again" in all_low
+        or "orderagain" in all_low
+        or re.search(r"#[A-Z]{8,15}\d{4,6}\b", all_text)
+    ):
+        parsed.vendor = "Zepto"
+        parsed.platform = "Zepto"
+    elif "instamart" in all_low or "swiggy instamart" in all_low:
+        parsed.vendor = "Swiggy Instamart"
+        parsed.platform = "Swiggy"
+    elif "blinkit" in all_low or "delivered in" in all_low or "grofers" in all_low:
+        parsed.vendor = "Blinkit"
+        parsed.platform = "Blinkit"
+    elif "bigbasket" in all_low or "bbdaily" in all_low or "bb now" in all_low or "bbnow" in all_low:
+        parsed.vendor = "BigBasket"
+        parsed.platform = "BigBasket"
+    elif "amazon" in all_low or "amzn" in all_low:
+        parsed.vendor = "Amazon"
+        parsed.platform = "Amazon"
+    elif "zomato" in all_low:
+        parsed.vendor = "Zomato"
+        parsed.platform = "Zomato"
+    elif "swiggy" in all_low:
+        parsed.vendor = "Swiggy"
+        parsed.platform = "Swiggy"
+
     m = _ORDER_NO.search(all_text)
     if m:
         parsed.order_number = normalize_order_id(m.group(1))
 
     header_idx = next((i for i, r in enumerate(rows) if _HEADER_ITEM.search(r.text) and _HEADER_COLS.search(r.text)), None)
-    for r in rows[: header_idx if header_idx is not None else len(rows)]:
-        t = _single_space(r.text)
-        # Avoid phone status bar junk like '8:48... 中 B.ll Ve 54%'
-        if re.search(r"^\d{1,2}:\d{2}|\b(?:am|pm)\b|\b\d{1,2}%\b|\.ll\b", t, re.IGNORECASE):
-            continue
-        if (re.search(r"[A-Za-z]{3}", t) and not re.search(r"(?i)invoice|order|date|bill|gstin|phone|tel", t)
-                and not _ANY_AMOUNT.search(t)):
-            parsed.vendor = t[:100]
-            break
+    if not parsed.vendor:
+        for r in rows[: header_idx if header_idx is not None else len(rows)]:
+            t = _single_space(r.text)
+            # Avoid phone status bar junk like '8:48... 中 B.ll Ve 54%'
+            if re.search(r"^\d{1,2}:\d{2}|\b(?:am|pm)\b|\b\d{1,2}%\b|\.ll\b", t, re.IGNORECASE):
+                continue
+            if re.search(r"(?i)download|invoice|credit\s*note|order\s*details|receiver|rate\s*order|order\s*again|bill\s*summary", t):
+                continue
+            if (re.search(r"[A-Za-z]{3}", t) and not re.search(r"(?i)invoice|order|date|bill|gstin|phone|tel", t)
+                    and not _ANY_AMOUNT.search(t)):
+                parsed.vendor = t[:100]
+                break
 
     in_items = header_idx is not None
     start = header_idx + 1 if header_idx is not None else 0

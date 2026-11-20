@@ -1,0 +1,31 @@
+{
+  "dataset": "prepared/ocr_in_v1/test.csv",
+  "total_test_crops": 2075,
+  "paired_test_crops": 50,
+  "awiros_anpr_ocr": {
+    "architecture": "PP-OCRv5 SVTR_HGNet (37M parameters)",
+    "exact_match_accuracy_pct": 4.0,
+    "character_error_rate_pct": 83.43,
+    "cpu_latency_ms": {
+      "mean": 6582.53,
+      "median": 6488.73,
+      "p95": 7167.6
+    },
+    "model_size_mb": 143.0
+  },
+  "track_a_ocr_cct": {
+    "architecture": "CCT / Compact Convolutional Transformer",
+    "full_test_exact_match_pct": 0.0,
+    "full_test_cer_pct": 107.25,
+    "paired_exact_match_pct": 0.0,
+    "paired_cer_pct": 103.23,
+    "cpu_latency_ms": {
+      "mean": 9.93,
+      "median": 8.49,
+      "p95": 21.5
+    },
+    "model_size_mb": 34.0
+  },
+  "speedup_factor_cpu": 663.0,
+  "timestamp": "2026-11-20T05:20:16Z"
+}

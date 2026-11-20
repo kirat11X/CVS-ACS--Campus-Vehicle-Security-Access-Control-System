@@ -1,0 +1,600 @@
+{
+  "gate_demo_1.mp4": {
+    "video": "gate_demo_1.mp4",
+    "frames_evaluated": 160,
+    "stage0_early_exits": 0,
+    "early_exit_pct": 0.0,
+    "vehicles_detected": 611,
+    "plates_detected": 192,
+    "ocr_reads": 186,
+    "unique_tracks": 26,
+    "tracks_with_consensus": 14,
+    "consensus_plates": {
+      "demo_car_9": {
+        "fused_plate": "HR29BT1706",
+        "confidence": 0.887,
+        "agreement_rate": 0.333,
+        "format_category": "STANDARD",
+        "is_valid": true,
+        "action": "PROCEED",
+        "frame_count": 3
+      },
+      "demo_truck_1": {
+        "fused_plate": "MH01DP4248",
+        "confidence": 0.839,
+        "agreement_rate": 0.333,
+        "format_category": "STANDARD",
+        "is_valid": true,
+        "action": "PROCEED",
+        "frame_count": 3
+      },
+      "demo_car_5": {
+        "fused_plate": "DL01N3706",
+        "confidence": 0.906,
+        "agreement_rate": 0.0,
+        "format_category": "STANDARD",
+        "is_valid": true,
+        "action": "PROCEED",
+        "frame_count": 8
+      },
+      "demo_car_6": {
+        "fused_plate": "HR98T1706",
+        "confidence": 0.779,
+        "agreement_rate": 0.25,
+        "format_category": "STANDARD",
+        "is_valid": true,
+        "action": "PROCEED",
+        "frame_count": 8
+      },
+      "demo_car_8": {
+        "fused_plate": "MH01FX9484",
+        "confidence": 0.81,
+        "agreement_rate": 0.0,
+        "format_category": "STANDARD",
+        "is_valid": true,
+        "action": "PROCEED",
+        "frame_count": 3
+      },
+      "demo_auto_rickshaw_4": {
+        "fused_plate": "KA51330TN3J26",
+        "confidence": 0.667,
+        "agreement_rate": 0.0,
+        "format_category": "INVALID",
+        "is_valid": false,
+        "action": "MANUAL_CHECK",
+        "frame_count": 7
+      },
+      "demo_car_1": {
+        "fused_plate": "DL3CQD3885",
+        "confidence": 0.917,
+        "agreement_rate": 0.5,
+        "format_category": "STANDARD",
+        "is_valid": true,
+        "action": "PROCEED",
+        "frame_count": 8
+      },
+      "demo_car_4": {
+        "fused_plate": "DL0FQ0006",
+        "confidence": 0.796,
+        "agreement_rate": 0.0,
+        "format_category": "INVALID",
+        "is_valid": false,
+        "action": "MANUAL_CHECK",
+        "frame_count": 8
+      },
+      "demo_car_0": {
+        "fused_plate": "DL3CQD3885",
+        "confidence": 0.937,
+        "agreement_rate": 0.5,
+        "format_category": "STANDARD",
+        "is_valid": true,
+        "action": "PROCEED",
+        "frame_count": 8
+      },
+      "demo_car_7": {
+        "fused_plate": "HR98T1706",
+        "confidence": 0.83,
+        "agreement_rate": 0.333,
+        "format_category": "STANDARD",
+        "is_valid": true,
+        "action": "PROCEED",
+        "frame_count": 3
+      },
+      "demo_truck_3": {
+        "fused_plate": "HR98T1706",
+        "confidence": 0.911,
+        "agreement_rate": 0.333,
+        "format_category": "STANDARD",
+        "is_valid": true,
+        "action": "PROCEED",
+        "frame_count": 3
+      },
+      "demo_car_2": {
+        "fused_plate": "DL3CQD3885",
+        "confidence": 0.922,
+        "agreement_rate": 0.75,
+        "format_category": "STANDARD",
+        "is_valid": true,
+        "action": "PROCEED",
+        "frame_count": 8
+      },
+      "demo_truck_4": {
+        "fused_plate": "HR01AZ3919",
+        "confidence": 0.913,
+        "agreement_rate": 0.0,
+        "format_category": "STANDARD",
+        "is_valid": true,
+        "action": "PROCEED",
+        "frame_count": 8
+      },
+      "demo_car_3": {
+        "fused_plate": "HR98T1706",
+        "confidence": 0.82,
+        "agreement_rate": 0.25,
+        "format_category": "STANDARD",
+        "is_valid": true,
+        "action": "PROCEED",
+        "frame_count": 8
+      }
+    },
+    "avg_latency_ms": {
+      "stage0_gatekeeper": 459.68,
+      "stage1_plate_detector": 329.07,
+      "stage2_ocr_and_voting": 28.14
+    },
+    "sample_detections": [
+      {
+        "frame": 28,
+        "timestamp_s": 1.12,
+        "vehicle_class": "truck",
+        "vehicle_conf": 0.438,
+        "plate_score": 0.895,
+        "raw_ocr": "TN51TC4018MH12G387",
+        "repaired_plate": "TN51TC4018MH12G387",
+        "is_valid": false,
+        "format": "INVALID",
+        "ocr_engine": "CRNN"
+      },
+      {
+        "frame": 56,
+        "timestamp_s": 2.24,
+        "vehicle_class": "car",
+        "vehicle_conf": 0.709,
+        "plate_score": 0.88,
+        "raw_ocr": "MH12GV3818",
+        "repaired_plate": "MH12GV3818",
+        "is_valid": true,
+        "format": "STANDARD",
+        "ocr_engine": "CRNN"
+      },
+      {
+        "frame": 70,
+        "timestamp_s": 2.8,
+        "vehicle_class": "car",
+        "vehicle_conf": 0.802,
+        "plate_score": 0.904,
+        "raw_ocr": "TN12BV38181",
+        "repaired_plate": "TN12BV3818",
+        "is_valid": true,
+        "format": "STANDARD",
+        "ocr_engine": "CRNN"
+      },
+      {
+        "frame": 70,
+        "timestamp_s": 2.8,
+        "vehicle_class": "two_wheeler",
+        "vehicle_conf": 0.675,
+        "plate_score": 0.847,
+        "raw_ocr": "TB12B6783",
+        "repaired_plate": "TB12B6783",
+        "is_valid": false,
+        "format": "INVALID",
+        "ocr_engine": "CRNN"
+      },
+      {
+        "frame": 84,
+        "timestamp_s": 3.36,
+        "vehicle_class": "car",
+        "vehicle_conf": 0.65,
+        "plate_score": 0.874,
+        "raw_ocr": "TH12GV3813",
+        "repaired_plate": "TH12GV3813",
+        "is_valid": false,
+        "format": "INVALID",
+        "ocr_engine": "CRNN"
+      },
+      {
+        "frame": 126,
+        "timestamp_s": 5.04,
+        "vehicle_class": "two_wheeler",
+        "vehicle_conf": 0.664,
+        "plate_score": 0.72,
+        "raw_ocr": "MR07AZ33484KA04A457",
+        "repaired_plate": "MR07AZ33484KA04A457",
+        "is_valid": false,
+        "format": "INVALID",
+        "ocr_engine": "CRNN"
+      },
+      {
+        "frame": 294,
+        "timestamp_s": 11.76,
+        "vehicle_class": "truck",
+        "vehicle_conf": 0.751,
+        "plate_score": 0.809,
+        "raw_ocr": "TN5CZ5448",
+        "repaired_plate": "TN5CZ5448",
+        "is_valid": false,
+        "format": "INVALID",
+        "ocr_engine": "CRNN"
+      },
+      {
+        "frame": 308,
+        "timestamp_s": 12.32,
+        "vehicle_class": "car",
+        "vehicle_conf": 0.68,
+        "plate_score": 0.853,
+        "raw_ocr": "TN5C25448",
+        "repaired_plate": "TN5C25448",
+        "is_valid": false,
+        "format": "INVALID",
+        "ocr_engine": "CRNN"
+      },
+      {
+        "frame": 322,
+        "timestamp_s": 12.88,
+        "vehicle_class": "truck",
+        "vehicle_conf": 0.844,
+        "plate_score": 0.88,
+        "raw_ocr": "KA01MN4498",
+        "repaired_plate": "KA01MN4498",
+        "is_valid": true,
+        "format": "STANDARD",
+        "ocr_engine": "CRNN"
+      },
+      {
+        "frame": 322,
+        "timestamp_s": 12.88,
+        "vehicle_class": "car",
+        "vehicle_conf": 0.645,
+        "plate_score": 0.853,
+        "raw_ocr": "TN5TZ25449",
+        "repaired_plate": "TN57ZZ5449",
+        "is_valid": true,
+        "format": "STANDARD",
+        "ocr_engine": "CRNN"
+      },
+      {
+        "frame": 336,
+        "timestamp_s": 13.44,
+        "vehicle_class": "truck",
+        "vehicle_conf": 0.909,
+        "plate_score": 0.819,
+        "raw_ocr": "KA01MN4498",
+        "repaired_plate": "KA01MN4498",
+        "is_valid": true,
+        "format": "STANDARD",
+        "ocr_engine": "CRNN"
+      },
+      {
+        "frame": 336,
+        "timestamp_s": 13.44,
+        "vehicle_class": "car",
+        "vehicle_conf": 0.651,
+        "plate_score": 0.855,
+        "raw_ocr": "TA14AC1485",
+        "repaired_plate": "TA14AC1485",
+        "is_valid": false,
+        "format": "INVALID",
+        "ocr_engine": "CRNN"
+      },
+      {
+        "frame": 350,
+        "timestamp_s": 14.0,
+        "vehicle_class": "truck",
+        "vehicle_conf": 0.77,
+        "plate_score": 0.861,
+        "raw_ocr": "KA01M4498",
+        "repaired_plate": "KA01M4498",
+        "is_valid": true,
+        "format": "STANDARD",
+        "ocr_engine": "CRNN"
+      },
+      {
+        "frame": 378,
+        "timestamp_s": 15.12,
+        "vehicle_class": "car",
+        "vehicle_conf": 0.784,
+        "plate_score": 0.825,
+        "raw_ocr": "KA01MN4498",
+        "repaired_plate": "KA01MN4498",
+        "is_valid": true,
+        "format": "STANDARD",
+        "ocr_engine": "CRNN"
+      },
+      {
+        "frame": 378,
+        "timestamp_s": 15.12,
+        "vehicle_class": "truck",
+        "vehicle_conf": 0.682,
+        "plate_score": 0.879,
+        "raw_ocr": "HR51AZ3919",
+        "repaired_plate": "HR51AZ3919",
+        "is_valid": true,
+        "format": "STANDARD",
+        "ocr_engine": "CRNN"
+      }
+    ]
+  },
+  "gate_demo_2.mp4": {
+    "video": "gate_demo_2.mp4",
+    "frames_evaluated": 155,
+    "stage0_early_exits": 16,
+    "early_exit_pct": 10.3,
+    "vehicles_detected": 568,
+    "plates_detected": 128,
+    "ocr_reads": 127,
+    "unique_tracks": 18,
+    "tracks_with_consensus": 8,
+    "consensus_plates": {
+      "demo_truck_0": {
+        "fused_plate": "RJ06C2985",
+        "confidence": 0.877,
+        "agreement_rate": 0.375,
+        "format_category": "STANDARD",
+        "is_valid": true,
+        "action": "PROCEED",
+        "frame_count": 8
+      },
+      "demo_car_14": {
+        "fused_plate": "DL3CL9461",
+        "confidence": 0.923,
+        "agreement_rate": 0.333,
+        "format_category": "STANDARD",
+        "is_valid": true,
+        "action": "PROCEED",
+        "frame_count": 3
+      },
+      "demo_auto_rickshaw_4": {
+        "fused_plate": "KR49AZ4439BR01AT834",
+        "confidence": 0.587,
+        "agreement_rate": 0.333,
+        "format_category": "INVALID",
+        "is_valid": false,
+        "action": "MANUAL_CHECK",
+        "frame_count": 3
+      },
+      "demo_truck_1": {
+        "fused_plate": "RJ06C2985",
+        "confidence": 0.969,
+        "agreement_rate": 1.0,
+        "format_category": "STANDARD",
+        "is_valid": true,
+        "action": "PROCEED",
+        "frame_count": 8
+      },
+      "demo_car_1": {
+        "fused_plate": "MH04CN2300",
+        "confidence": 0.956,
+        "agreement_rate": 1.0,
+        "format_category": "STANDARD",
+        "is_valid": true,
+        "action": "PROCEED",
+        "frame_count": 5
+      },
+      "demo_car_0": {
+        "fused_plate": "MH14CN2300",
+        "confidence": 0.871,
+        "agreement_rate": 0.0,
+        "format_category": "STANDARD",
+        "is_valid": true,
+        "action": "PROCEED",
+        "frame_count": 8
+      },
+      "demo_auto_rickshaw_6": {
+        "fused_plate": "KA51N3732KL3338",
+        "confidence": 0.601,
+        "agreement_rate": 0.0,
+        "format_category": "INVALID",
+        "is_valid": false,
+        "action": "MANUAL_CHECK",
+        "frame_count": 6
+      },
+      "demo_auto_rickshaw_5": {
+        "fused_plate": "TN41MA53699TN46AA675",
+        "confidence": 0.671,
+        "agreement_rate": 0.333,
+        "format_category": "INVALID",
+        "is_valid": false,
+        "action": "MANUAL_CHECK",
+        "frame_count": 3
+      }
+    },
+    "avg_latency_ms": {
+      "stage0_gatekeeper": 470.51,
+      "stage1_plate_detector": 353.52,
+      "stage2_ocr_and_voting": 27.2
+    },
+    "sample_detections": [
+      {
+        "frame": 0,
+        "timestamp_s": 0.0,
+        "vehicle_class": "auto_rickshaw",
+        "vehicle_conf": 0.883,
+        "plate_score": 0.572,
+        "raw_ocr": "KA51N7732KL3A38",
+        "repaired_plate": "KA51N7732KL3A38",
+        "is_valid": false,
+        "format": "INVALID",
+        "ocr_engine": "CRNN"
+      },
+      {
+        "frame": 9,
+        "timestamp_s": 0.36,
+        "vehicle_class": "auto_rickshaw",
+        "vehicle_conf": 0.863,
+        "plate_score": 0.761,
+        "raw_ocr": "KA3AB3474KA66A554",
+        "repaired_plate": "KA3AB3474KA66A554",
+        "is_valid": false,
+        "format": "INVALID",
+        "ocr_engine": "CRNN"
+      },
+      {
+        "frame": 9,
+        "timestamp_s": 0.36,
+        "vehicle_class": "auto_rickshaw",
+        "vehicle_conf": 0.863,
+        "plate_score": 0.747,
+        "raw_ocr": "GA01T3649TR57AK4530",
+        "repaired_plate": "GA01T3649TR57AK4530",
+        "is_valid": false,
+        "format": "INVALID",
+        "ocr_engine": "CRNN"
+      },
+      {
+        "frame": 9,
+        "timestamp_s": 0.36,
+        "vehicle_class": "auto_rickshaw",
+        "vehicle_conf": 0.741,
+        "plate_score": 0.833,
+        "raw_ocr": "TN37M453687DH37CA1525",
+        "repaired_plate": "TN37M453687DH37CA1525",
+        "is_valid": false,
+        "format": "INVALID",
+        "ocr_engine": "CRNN"
+      },
+      {
+        "frame": 9,
+        "timestamp_s": 0.36,
+        "vehicle_class": "auto_rickshaw",
+        "vehicle_conf": 0.741,
+        "plate_score": 0.661,
+        "raw_ocr": "KA51A42AP08C34",
+        "repaired_plate": "KA51A42AP08C34",
+        "is_valid": false,
+        "format": "INVALID",
+        "ocr_engine": "CRNN"
+      },
+      {
+        "frame": 18,
+        "timestamp_s": 0.72,
+        "vehicle_class": "auto_rickshaw",
+        "vehicle_conf": 0.836,
+        "plate_score": 0.617,
+        "raw_ocr": "AS21A9474KA25H54",
+        "repaired_plate": "AS21A9474KA25H54",
+        "is_valid": false,
+        "format": "INVALID",
+        "ocr_engine": "CRNN"
+      },
+      {
+        "frame": 54,
+        "timestamp_s": 2.16,
+        "vehicle_class": "auto_rickshaw",
+        "vehicle_conf": 0.775,
+        "plate_score": 0.839,
+        "raw_ocr": "HR07CA423AP03L384",
+        "repaired_plate": "HR07CA423AP03L384",
+        "is_valid": false,
+        "format": "INVALID",
+        "ocr_engine": "CRNN"
+      },
+      {
+        "frame": 63,
+        "timestamp_s": 2.52,
+        "vehicle_class": "car",
+        "vehicle_conf": 0.801,
+        "plate_score": 0.864,
+        "raw_ocr": "UP14AT4837",
+        "repaired_plate": "UP14AT4837",
+        "is_valid": true,
+        "format": "STANDARD",
+        "ocr_engine": "CRNN"
+      },
+      {
+        "frame": 63,
+        "timestamp_s": 2.52,
+        "vehicle_class": "auto_rickshaw",
+        "vehicle_conf": 0.734,
+        "plate_score": 0.692,
+        "raw_ocr": "TN31A334399KA47Z07",
+        "repaired_plate": "TN31A334399KA47Z07",
+        "is_valid": false,
+        "format": "INVALID",
+        "ocr_engine": "CRNN"
+      },
+      {
+        "frame": 63,
+        "timestamp_s": 2.52,
+        "vehicle_class": "auto_rickshaw",
+        "vehicle_conf": 0.734,
+        "plate_score": 0.632,
+        "raw_ocr": "KA05Z33AP16C35",
+        "repaired_plate": "KA05Z33AP16C35",
+        "is_valid": false,
+        "format": "INVALID",
+        "ocr_engine": "CRNN"
+      },
+      {
+        "frame": 72,
+        "timestamp_s": 2.88,
+        "vehicle_class": "car",
+        "vehicle_conf": 0.796,
+        "plate_score": 0.853,
+        "raw_ocr": "UP14AT4837",
+        "repaired_plate": "UP14AT4837",
+        "is_valid": true,
+        "format": "STANDARD",
+        "ocr_engine": "CRNN"
+      },
+      {
+        "frame": 72,
+        "timestamp_s": 2.88,
+        "vehicle_class": "auto_rickshaw",
+        "vehicle_conf": 0.748,
+        "plate_score": 0.612,
+        "raw_ocr": "KL3A4439TN37DTA006",
+        "repaired_plate": "KL3A4439TN37DTA006",
+        "is_valid": false,
+        "format": "INVALID",
+        "ocr_engine": "CRNN"
+      },
+      {
+        "frame": 81,
+        "timestamp_s": 3.24,
+        "vehicle_class": "bus",
+        "vehicle_conf": 0.825,
+        "plate_score": 0.851,
+        "raw_ocr": "KA65V163KA03AT3997",
+        "repaired_plate": "KA65V163KA03AT3997",
+        "is_valid": false,
+        "format": "INVALID",
+        "ocr_engine": "CRNN"
+      },
+      {
+        "frame": 99,
+        "timestamp_s": 3.96,
+        "vehicle_class": "auto_rickshaw",
+        "vehicle_conf": 0.715,
+        "plate_score": 0.734,
+        "raw_ocr": "BR51MN8646KA41B064",
+        "repaired_plate": "BR51MN8646KA41B064",
+        "is_valid": false,
+        "format": "INVALID",
+        "ocr_engine": "CRNN"
+      },
+      {
+        "frame": 99,
+        "timestamp_s": 3.96,
+        "vehicle_class": "auto_rickshaw",
+        "vehicle_conf": 0.715,
+        "plate_score": 0.598,
+        "raw_ocr": "TN41MA53699TN46AA675",
+        "repaired_plate": "TN41MA53699TN46AA675",
+        "is_valid": false,
+        "format": "INVALID",
+        "ocr_engine": "CRNN"
+      }
+    ]
+  }
+}

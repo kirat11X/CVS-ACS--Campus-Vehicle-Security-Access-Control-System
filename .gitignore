@@ -23,6 +23,7 @@ training_1/
 runs/
 data/
 data/campus_gate_datasets/
+prepared/
 .coverage
 .pytest_cache/
 .mypy_cache/

@@ -1,0 +1,17 @@
+{
+  "run_id": "track_a_ocr_cct_finetuned",
+  "architecture": "Compact Convolutional Transformer (CCT)",
+  "dataset": "prepared/ocr_in_v2",
+  "dataset_split": {
+    "train": 34813,
+    "val": 6507,
+    "test": 2075
+  },
+  "trained_epochs": 25,
+  "batch_size": 32,
+  "mixed_precision": "mixed_float16",
+  "device": "cuda:0 (NVIDIA GeForce RTX 4050 Laptop GPU)",
+  "training_time_minutes": 40.96,
+  "target_onnx": "/home/kirat/coding/honours/weights/track_a_ocr_cct.onnx",
+  "timestamp": "2026-11-20T06:08:34Z"
+}

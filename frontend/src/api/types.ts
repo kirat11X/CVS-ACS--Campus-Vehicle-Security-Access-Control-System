@@ -56,6 +56,7 @@ export interface FeedObservation {
   created_by: UserSummary | null;
   update_count: number;
   has_snapshot: boolean;
+  metadata_payload?: Record<string, any> | null;
 }
 
 export interface LinkedVehicle {
@@ -217,10 +218,16 @@ export type ObservedVehicleType = "CAR" | "MOTORCYCLE" | "BUS" | "TRUCK" | "BICY
 
 export interface ManualObservationCreate {
   gate_id: string;
-  plate: string;
+  plate?: string;
   direction: Direction;
   vehicle_type?: ObservedVehicleType;
   note?: string | null;
+  is_visitor?: boolean;
+  visitor_name?: string | null;
+  visitor_phone?: string | null;
+  place_of_visit?: string | null;
+  reference_person?: string | null;
+  allowed_duration_hours?: number | null;
 }
 
 export interface ResolutionCreate {

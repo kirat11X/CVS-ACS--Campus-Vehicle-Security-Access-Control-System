@@ -18,6 +18,7 @@ from backend.app.models.enums import ObservationSource
 from backend.app.models.observation import ObservationEvent
 from backend.app.schemas.feed import FeedPage
 from backend.app.services.feed_service import feed_service
+from backend.app.services.visitor_service import check_and_trigger_visitor_overstay_alerts
 
 router = APIRouter(prefix="/feed", tags=["Live Feed"])
 
@@ -32,6 +33,11 @@ def get_feed(
     Without since_id: the latest observations with their registry linkage, plus a cursor.
     With since_id: observations whose linkage view changed after that cursor (polling fallback).
     """
+    try:
+        check_and_trigger_visitor_overstay_alerts(db)
+    except Exception:
+        pass
+
     if since_id is None:
         return feed_service.snapshot(db, limit=limit)
     return feed_service.changes_since(db, since_id, limit=limit)

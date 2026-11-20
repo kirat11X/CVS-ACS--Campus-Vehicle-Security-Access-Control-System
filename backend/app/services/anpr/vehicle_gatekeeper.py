@@ -90,6 +90,7 @@ COCO_VEHICLE_MAP: Dict[int, str] = {
 
 UNIFIED_TO_OBSERVED_TYPE: Dict[str, ObservedVehicleType] = {
     "two_wheeler": ObservedVehicleType.MOTORCYCLE,
+    "bicycle": ObservedVehicleType.BICYCLE,
     "auto_rickshaw": ObservedVehicleType.CAR,
     "car": ObservedVehicleType.CAR,
     "bus": ObservedVehicleType.BUS,
@@ -157,6 +158,7 @@ class VehicleTrack:
     hits: int = 1
     vx: float = 0.0  # Horizontal velocity (pixels/second)
     vy: float = 0.0  # Vertical velocity (pixels/second)
+    raw_class_name: str = ""
 
     @property
     def centroid(self) -> Tuple[float, float]:
@@ -311,6 +313,7 @@ class SimpleVehicleTracker:
             trk.confidence = max(trk.confidence, det.confidence)
             trk.vehicle_class = det.vehicle_class
             trk.observed_type = det.observed_type
+            trk.raw_class_name = det.class_name
             trk.last_seen_ts = ts
             trk.hits += 1
 
@@ -335,6 +338,7 @@ class SimpleVehicleTracker:
                 hits=1,
                 vx=0.0,
                 vy=0.0,
+                raw_class_name=det.class_name,
             )
             self._tracks[tid] = trk
             matched.append((trk, det))
@@ -501,7 +505,10 @@ class VehicleGatekeeper:
             u_cls = unified_classes[idx]
             conf = scores[idx]
             c_name = name_map.get(c_id, u_cls)
-            obs_type = UNIFIED_TO_OBSERVED_TYPE.get(u_cls, ObservedVehicleType.CAR)
+            if str(c_name).lower() == "bicycle":
+                obs_type = ObservedVehicleType.BICYCLE
+            else:
+                obs_type = UNIFIED_TO_OBSERVED_TYPE.get(u_cls, ObservedVehicleType.CAR)
 
             final_detections.append(
                 VehicleDetection(

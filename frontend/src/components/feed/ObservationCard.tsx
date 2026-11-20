@@ -1,4 +1,4 @@
-import { ArrowLeftFromLine, ArrowRightToLine, History, Keyboard, Link2, NotebookPen, PlusCircle } from "lucide-react";
+import { ArrowLeftFromLine, ArrowRightToLine, Check, Clock, Edit3, History, Keyboard, Link2, NotebookPen, PlusCircle, ShieldAlert, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { ApiError, api } from "../../api/client";
@@ -204,6 +204,36 @@ export function ObservationCard({ token, card, onRegister, onManualEntry, onReso
   const [recentlyUpdated, setRecentlyUpdated] = useState(false);
   const plate = obs.plate.normalized;
 
+  // Direct Plate Inline Editing State
+  const [isEditingPlate, setIsEditingPlate] = useState(false);
+  const [editedPlateValue, setEditedPlateValue] = useState(plate || "");
+  const [updatingPlate, setUpdatingPlate] = useState(false);
+  const [plateError, setPlateError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setEditedPlateValue(plate || "");
+    setIsEditingPlate(false);
+    setPlateError(null);
+  }, [obs.id, plate]);
+
+  const handleSavePlate = async () => {
+    const clean = editedPlateValue.trim().toUpperCase();
+    if (!clean) return;
+    setUpdatingPlate(true);
+    setPlateError(null);
+    try {
+      const updatedItem = await api.updateObservationPlate(token, obs.id, clean, "Direct plate edit on feed card");
+      onResolved(updatedItem);
+      setIsEditingPlate(false);
+    } catch (err) {
+      setPlateError(err instanceof Error ? err.message : "Failed to update plate");
+    } finally {
+      setUpdatingPlate(false);
+    }
+  };
+
+  const vInfo = (obs as any).metadata_payload?.visitor_info;
+
   useEffect(() => {
     if (kind === "SNAPSHOT" || kind === "OBSERVATION_CREATED") return;
     setRecentlyUpdated(true);
@@ -223,6 +253,36 @@ export function ObservationCard({ token, card, onRegister, onManualEntry, onReso
       aria-label={`Observation ${plate ?? "without plate"} at ${obs.gate.name}`}
     >
       <div className="p-4">
+        {/* Visitor Overstay Alert Top Banner */}
+        {vInfo && vInfo.is_visitor && (
+          <div className={`mb-3 rounded-lg p-2.5 text-xs ${
+            vInfo.overstay_alert || (vInfo.expected_exit_time && new Date() > new Date(vInfo.expected_exit_time))
+              ? "bg-rose-50 border border-rose-300 text-rose-800 dark:bg-rose-950/40 dark:border-rose-900 dark:text-rose-300"
+              : "bg-sky-50 border border-sky-200 text-sky-800 dark:bg-sky-950/40 dark:border-sky-900/60 dark:text-sky-300"
+          }`}>
+            <div className="flex items-center justify-between font-bold">
+              <span className="flex items-center gap-1.5">
+                {vInfo.overstay_alert || (vInfo.expected_exit_time && new Date() > new Date(vInfo.expected_exit_time)) ? (
+                  <>
+                    <ShieldAlert className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+                    <span className="text-rose-700 dark:text-rose-300">OVERSTAY: Allotted Time Expired!</span>
+                  </>
+                ) : (
+                  <>
+                    <Clock className="h-4 w-4 text-sky-600 dark:text-sky-400" />
+                    <span>Guest: {vInfo.visitor_name} ({vInfo.allowed_duration_hours}h)</span>
+                  </>
+                )}
+              </span>
+              <span className="font-mono text-[11px]">{vInfo.visitor_phone}</span>
+            </div>
+            <div className="mt-1 text-[11px] text-slate-600 dark:text-slate-400">
+              Visiting: <strong className="text-slate-800 dark:text-slate-200">{vInfo.place_of_visit}</strong>
+              {vInfo.reference_person ? ` · Ref: ${vInfo.reference_person}` : ""}
+            </div>
+          </div>
+        )}
+
         <header className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1">
           <LinkStatusBadge status={item.link_status} />
           <ReasonCodeBadge
@@ -249,13 +309,67 @@ export function ObservationCard({ token, card, onRegister, onManualEntry, onReso
           <SnapshotImage token={token} observation={obs} />
           <div className="min-w-0 flex-1 space-y-2">
             <div>
-              {plate ? (
-                <Link to={`/vehicles/${encodeURIComponent(plate)}`} className="plate text-xl text-slate-900 underline-offset-4 hover:underline dark:text-white sm:text-2xl">
-                  {plate}
-                </Link>
+              {isEditingPlate ? (
+                <div className="flex flex-wrap items-center gap-1.5 py-1">
+                  <input
+                    type="text"
+                    className="plate w-40 rounded border-2 border-sky-500 bg-white px-2 py-0.5 text-base font-bold uppercase text-slate-900 shadow-sm focus:outline-none dark:bg-slate-900 dark:text-white"
+                    value={editedPlateValue}
+                    onChange={(e) => setEditedPlateValue(e.target.value.toUpperCase())}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") void handleSavePlate();
+                      if (e.key === "Escape") setIsEditingPlate(false);
+                    }}
+                    autoFocus
+                    maxLength={30}
+                    disabled={updatingPlate}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSavePlate}
+                    disabled={updatingPlate || !editedPlateValue.trim()}
+                    className="inline-flex items-center justify-center rounded bg-emerald-600 px-2 py-1 text-xs font-bold text-white shadow hover:bg-emerald-700 disabled:opacity-50 cursor-pointer"
+                    title="Save (Enter)"
+                  >
+                    <Check className="h-3 w-3" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditedPlateValue(plate || "");
+                      setIsEditingPlate(false);
+                    }}
+                    disabled={updatingPlate}
+                    className="inline-flex items-center justify-center rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 cursor-pointer"
+                    title="Cancel (Esc)"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
               ) : (
-                <span className="plate text-xl text-slate-400 sm:text-2xl">— — —</span>
+                <div className="flex items-center gap-2">
+                  {plate ? (
+                    <Link to={`/vehicles/${encodeURIComponent(plate)}`} className="plate text-xl text-slate-900 underline-offset-4 hover:underline dark:text-white sm:text-2xl">
+                      {plate}
+                    </Link>
+                  ) : (
+                    <span className="plate text-xl text-slate-400 sm:text-2xl">— — —</span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditedPlateValue(plate || "");
+                      setIsEditingPlate(true);
+                    }}
+                    className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[11px] font-medium text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer"
+                    title="Edit plate directly"
+                  >
+                    <Edit3 className="h-3 w-3 text-sky-600 dark:text-sky-400" />
+                    <span>Edit</span>
+                  </button>
+                </div>
               )}
+              {plateError && <p className="text-[11px] text-rose-600 dark:text-rose-400">{plateError}</p>}
               <div className="text-xs text-slate-500 dark:text-slate-400">
                 {obs.plate.raw ? (
                   <>

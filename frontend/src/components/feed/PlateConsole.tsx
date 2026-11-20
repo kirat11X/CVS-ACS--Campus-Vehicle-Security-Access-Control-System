@@ -1,6 +1,7 @@
-import { Eye, EyeOff, History, Link2, NotebookPen, UserPlus } from "lucide-react";
-import { useState, type FormEvent, type ReactNode } from "react";
+import { Check, Clock, Edit3, Eye, EyeOff, History, Link2, NotebookPen, ShieldAlert, UserPlus, X } from "lucide-react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Link } from "react-router";
+import { api } from "../../api/client";
 import { useHistory } from "../../api/queries";
 import type { PersonType, ResolvedObservation } from "../../api/types";
 import type { FeedCard } from "../../feed/useLiveFeed";
@@ -175,6 +176,36 @@ export function PlateDetailPanel({ token, item, onResolved, onLink, onMarkVisito
   const manual = obs.source === "MANUAL";
   const o = item.owner;
 
+  // Direct Plate Inline Editing State
+  const [isEditingPlate, setIsEditingPlate] = useState(false);
+  const [editedPlateValue, setEditedPlateValue] = useState(plate || "");
+  const [updatingPlate, setUpdatingPlate] = useState(false);
+  const [plateError, setPlateError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setEditedPlateValue(plate || "");
+    setIsEditingPlate(false);
+    setPlateError(null);
+  }, [obs.id, plate]);
+
+  const handleSavePlate = async () => {
+    const clean = editedPlateValue.trim().toUpperCase();
+    if (!clean) return;
+    setUpdatingPlate(true);
+    setPlateError(null);
+    try {
+      const updatedItem = await api.updateObservationPlate(token, obs.id, clean, "Direct plate edit in large window");
+      onResolved(updatedItem);
+      setIsEditingPlate(false);
+    } catch (err) {
+      setPlateError(err instanceof Error ? err.message : "Failed to update plate");
+    } finally {
+      setUpdatingPlate(false);
+    }
+  };
+
+  const vInfo = (obs as any).metadata_payload?.visitor_info;
+
   const submitLink = (e: FormEvent) => {
     e.preventDefault();
     if (plate) onLink(plate, belongsTo, reference.trim());
@@ -222,13 +253,99 @@ export function PlateDetailPanel({ token, item, onResolved, onLink, onMarkVisito
         )}
       </div>
 
+      {/* Visitor Overstay Alert Banner if applicable */}
+      {vInfo && vInfo.is_visitor && (
+        <div className={`rounded-lg p-3 text-xs ${
+          vInfo.overstay_alert || (vInfo.expected_exit_time && new Date() > new Date(vInfo.expected_exit_time))
+            ? "bg-rose-50 border border-rose-200 text-rose-800 dark:bg-rose-950/30 dark:border-rose-900/60 dark:text-rose-300"
+            : "bg-sky-50 border border-sky-200 text-sky-800 dark:bg-sky-950/30 dark:border-sky-900/60 dark:text-sky-300"
+        }`}>
+          <div className="flex items-center gap-1.5 font-bold mb-1">
+            {vInfo.overstay_alert || (vInfo.expected_exit_time && new Date() > new Date(vInfo.expected_exit_time)) ? (
+              <>
+                <ShieldAlert className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+                <span className="text-rose-700 dark:text-rose-300">CAMPUS OVERSTAY ALERT: Allotted Visit Time Expired!</span>
+              </>
+            ) : (
+              <>
+                <Clock className="h-4 w-4 text-sky-600 dark:text-sky-400" />
+                <span>Guest Pass: {vInfo.visitor_name} ({vInfo.allowed_duration_hours}h allotted)</span>
+              </>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[11px]">
+            <div><strong>Visitor:</strong> {vInfo.visitor_name} ({vInfo.visitor_phone || "No phone"})</div>
+            <div><strong>Visiting:</strong> {vInfo.place_of_visit}</div>
+            {vInfo.reference_person && <div><strong>Reference:</strong> {vInfo.reference_person}</div>}
+            {vInfo.expected_exit_time && <div><strong>Expected Exit:</strong> {new Date(vInfo.expected_exit_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>}
+          </div>
+        </div>
+      )}
+
+      {/* Plate Section with Direct Edit Capability */}
       <div className="flex flex-wrap items-center gap-2">
-        {plate ? (
-          <Link to={`/vehicles/${encodeURIComponent(plate)}`} className="plate text-2xl text-slate-900 underline-offset-4 hover:underline dark:text-white">
-            {plate}
-          </Link>
+        {isEditingPlate ? (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <input
+              type="text"
+              className="plate rounded-md border-2 border-sky-500 bg-white px-2.5 py-1 text-xl font-bold uppercase text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500 dark:bg-slate-900 dark:text-white"
+              value={editedPlateValue}
+              onChange={(e) => setEditedPlateValue(e.target.value.toUpperCase())}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void handleSavePlate();
+                if (e.key === "Escape") setIsEditingPlate(false);
+              }}
+              autoFocus
+              maxLength={30}
+              placeholder="ENTER CORRECT PLATE"
+              disabled={updatingPlate}
+            />
+            <button
+              type="button"
+              onClick={handleSavePlate}
+              disabled={updatingPlate || !editedPlateValue.trim()}
+              className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow hover:bg-emerald-700 disabled:opacity-50 cursor-pointer"
+              title="Save corrected plate (Enter)"
+            >
+              <Check className="h-3.5 w-3.5" />
+              <span>{updatingPlate ? "Saving…" : "Save"}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setEditedPlateValue(plate || "");
+                setIsEditingPlate(false);
+              }}
+              disabled={updatingPlate}
+              className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer"
+              title="Cancel (Esc)"
+            >
+              <X className="h-3.5 w-3.5" />
+              <span>Cancel</span>
+            </button>
+          </div>
         ) : (
-          <span className="plate text-2xl text-slate-400">— — —</span>
+          <div className="flex items-center gap-2">
+            {plate ? (
+              <Link to={`/vehicles/${encodeURIComponent(plate)}`} className="plate text-2xl text-slate-900 underline-offset-4 hover:underline dark:text-white">
+                {plate}
+              </Link>
+            ) : (
+              <span className="plate text-2xl text-slate-400">— — —</span>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setEditedPlateValue(plate || "");
+                setIsEditingPlate(true);
+              }}
+              className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer transition-colors"
+              title="Directly edit number plate if OCR was inaccurate"
+            >
+              <Edit3 className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400" />
+              <span>Edit Plate</span>
+            </button>
+          </div>
         )}
         <PlatePill status={item.link_status} />
         <ReasonCodeBadge
@@ -241,6 +358,7 @@ export function PlateDetailPanel({ token, item, onResolved, onLink, onMarkVisito
         />
         {item.vehicle && <RegistryStatus status={item.vehicle.registry_status} prefix />}
       </div>
+      {plateError && <p className="text-xs text-rose-600 dark:text-rose-400">{plateError}</p>}
 
       <dl className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
         <Fact label="Observed At">

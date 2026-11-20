@@ -224,6 +224,14 @@ export const api = {
   // ---- Observations & guard actions ----
   logManualObservation: (token: string, body: ManualObservationCreate) =>
     request<ResolvedObservation>("/observations/manual", { method: "POST", token, body }),
+  updateObservationPlate: (token: string, observationId: string, plate: string, note?: string) =>
+    request<ResolvedObservation>(`/observations/${enc(observationId)}/plate`, { method: "PATCH", token, body: { plate, note } }),
+  captureGateSnapshot: (token: string, gateId: string) =>
+    request<{ success: boolean; gate_id: string; snapshot_id: string; filename: string; path: string; timestamp: string }>(
+      `/gates/stream-settings/${enc(gateId)}/snapshot`,
+      { method: "POST", token }
+    ),
+  activeVisitors: (token: string) => request<any[]>("/logs/visitors/active", { token }),
   recordResolution: (token: string, body: ResolutionCreate) =>
     request<{ item: ResolvedObservation }>("/resolutions", { method: "POST", token, body }),
 

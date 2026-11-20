@@ -1,9 +1,16 @@
+import asyncio
 from datetime import datetime, timezone
+import json
+from pathlib import Path
+import time
 from typing import Optional
+import uuid
 import cv2
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
+from backend.app.config import BASE_DIR, MEDIA_ROOT
 from backend.app.dependencies import CurrentUser, get_db, require_admin, require_staff
 from backend.app.models.enums import GateStatus
 from backend.app.models.gate import Gate
@@ -234,5 +241,99 @@ def get_gate_live_frame(
     return Response(
         content=buffer.tobytes(),
         media_type="image/jpeg",
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
+
+
+@router.post("/gates/stream-settings/{gate_id}/snapshot")
+@router.post("/api/gates/stream-settings/{gate_id}/snapshot")
+def capture_gate_snapshot(
+    gate_id: str,
+    user: CurrentUser = Depends(require_staff),
+):
+    """
+    Captures and permanently stores a live camera snapshot from the specified gate.
+    Saves to media/snapshots/ and data/rl_dataset/images/ for active learning and auditing.
+    """
+    gid = gate_id.strip().upper()
+    frame = camera_stream_manager.get_latest_frame(gid)
+    if frame is None or frame.size == 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No live frame available for gate '{gid}'. Camera stream may be offline or initializing.",
+        )
+
+    now_ts = int(time.time())
+    snap_id = f"manual_snap_{gid}_{now_ts}_{uuid.uuid4().hex[:6]}"
+    filename = f"{snap_id}.jpg"
+
+    # 1. Save to media/snapshots
+    snap_dir = Path(MEDIA_ROOT) / "snapshots"
+    snap_dir.mkdir(parents=True, exist_ok=True)
+    snap_path = snap_dir / filename
+    cv2.imwrite(str(snap_path), frame, [int(cv2.IMWRITE_JPEG_QUALITY), 92])
+
+    # 2. Save to RL dataset storage (never purged)
+    rl_dir = Path(BASE_DIR) / "data" / "rl_dataset" / "images"
+    rl_dir.mkdir(parents=True, exist_ok=True)
+    rl_path = rl_dir / filename
+    cv2.imwrite(str(rl_path), frame, [int(cv2.IMWRITE_JPEG_QUALITY), 92])
+
+    # 3. Log to manifest
+    manifest_path = Path(BASE_DIR) / "data" / "rl_dataset" / "manifest.jsonl"
+    record = {
+        "id": snap_id,
+        "gate_id": gid,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "event_type": "MANUAL_LIVE_SNAPSHOT",
+        "captured_by": str(user.full_name),
+        "image_path": f"data/rl_dataset/images/{filename}",
+        "media_snapshot_url": f"/media/snapshots/{filename}",
+    }
+    try:
+        with open(manifest_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
+
+    return {
+        "success": True,
+        "gate_id": gid,
+        "snapshot_id": snap_id,
+        "filename": filename,
+        "path": f"/media/snapshots/{filename}",
+        "timestamp": record["timestamp"],
+    }
+
+
+@router.get("/gates/stream-settings/{gate_id}/mjpeg")
+@router.get("/api/gates/stream-settings/{gate_id}/mjpeg")
+async def stream_gate_mjpeg(
+    gate_id: str,
+    fps: float = Query(5.0, ge=1.0, le=15.0),
+    user: CurrentUser = Depends(require_staff),
+):
+    """
+    Streams live video from the gate camera as standard Motion-JPEG (MJPEG) over HTTP.
+    Renders continuously in standard <img> elements without buffering.
+    """
+    gid = gate_id.strip().upper()
+
+    async def mjpeg_generator():
+        interval = 1.0 / max(1.0, fps)
+        while True:
+            frame = camera_stream_manager.get_latest_frame(gid)
+            if frame is not None and frame.size > 0:
+                ret, buf = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 75])
+                if ret:
+                    yield (
+                        b"--frame\r\n"
+                        b"Content-Type: image/jpeg\r\n\r\n" + buf.tobytes() + b"\r\n"
+                    )
+            await asyncio.sleep(interval)
+
+    return StreamingResponse(
+        mjpeg_generator(),
+        media_type="multipart/x-mixed-replace; boundary=frame",
         headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
     )

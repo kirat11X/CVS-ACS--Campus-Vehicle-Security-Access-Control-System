@@ -73,3 +73,8 @@ class ObservationResponse(BaseModel):
             metadata_payload=obs.metadata_payload,
             created_at=obs.created_at
         )
+
+
+class ObservationPlateUpdate(BaseModel):
+    plate: str = Field(..., min_length=1, max_length=30, description="Corrected license plate number")
+    note: Optional[str] = Field(None, max_length=500, description="Optional reason for manual edit")

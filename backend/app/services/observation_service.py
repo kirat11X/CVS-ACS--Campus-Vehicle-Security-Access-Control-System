@@ -112,23 +112,51 @@ class ObservationService:
         if not gate:
             raise ValueError(f"Gate '{data.gate_id}' not found in gate registry.")
 
-        normalized_plate = normalize_plate(data.plate)
-        if not normalized_plate:
-            raise ValueError("Plate must contain at least one letter or digit.")
+        raw_input = (data.plate or "").strip()
+        if not raw_input:
+            if data.vehicle_type == ObservedVehicleType.BICYCLE:
+                raw_plate = "CYCLE"
+                normalized_plate = "CYCLE"
+            elif data.is_visitor and data.visitor_name:
+                raw_plate = f"GUEST-{data.visitor_name[:6].upper().replace(' ', '')}"
+                normalized_plate = raw_plate
+            else:
+                raise ValueError("Plate must contain at least one letter or digit (or choose Bicycle for cycle labor).")
+        else:
+            normalized_plate = normalize_plate(raw_input) or raw_input.upper()
+            raw_plate = raw_input
+
+        now_dt = utc_now()
+        meta = {}
+        if data.is_visitor or data.visitor_name:
+            dur_hours = float(data.allowed_duration_hours) if data.allowed_duration_hours else 2.0
+            from datetime import timedelta
+            exp_exit = now_dt + timedelta(hours=dur_hours)
+            meta["visitor_info"] = {
+                "is_visitor": True,
+                "visitor_name": data.visitor_name or "Visitor",
+                "visitor_phone": data.visitor_phone or "",
+                "place_of_visit": data.place_of_visit or "Campus",
+                "reference_person": data.reference_person or "",
+                "allowed_duration_hours": dur_hours,
+                "entry_time": now_dt.isoformat(),
+                "expected_exit_time": exp_exit.isoformat(),
+                "overstay_alert": False,
+            }
 
         obs = ObservationEvent(
             gate_id=gate.id,
             camera_id=None,
-            observed_at=utc_now(),
+            observed_at=now_dt,
             source=ObservationSource.MANUAL,
             source_event_id=None,
-            raw_plate=data.plate.strip(),
+            raw_plate=raw_plate,
             normalized_plate=normalized_plate,
             plate_confidence=None,
             vehicle_type=data.vehicle_type,
             vehicle_confidence=None,
             direction=data.direction,
-            metadata_payload=None,
+            metadata_payload=meta or None,
             created_by_id=created_by_id,
             note=data.note
         )

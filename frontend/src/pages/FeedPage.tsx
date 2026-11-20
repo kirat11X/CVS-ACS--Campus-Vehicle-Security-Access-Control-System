@@ -1,4 +1,4 @@
-import { AlertCircle, Building2, Camera, FlaskConical, LayoutGrid, List, Package, Plus, Radio, Unlink } from "lucide-react";
+import { AlertCircle, Building2, Camera, Check, Download, FlaskConical, LayoutGrid, List, Package, Pause, Play, Plus, Radio, Unlink, Video } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import { api } from "../api/client";
@@ -132,22 +132,17 @@ export function FeedPage() {
         description="Plates read at every gate as they arrive, matched against the registry. The software never moves a barrier; you decide at the gate."
         actions={
           <>
-            {streamSettings && streamSettings.active_gates_count > 0 && (
-              <button
-                type="button"
-                onClick={() => {
-                  const running = streamSettings.gates.find((g) => g.is_running || g.enabled);
-                  if (running) setDialog({ type: "camera", gateId: running.gate_id });
-                }}
-                className="hidden items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 sm:inline-flex cursor-pointer transition-colors"
-                title={`Click to view live camera stream snapshot (${streamSettings.total_fps_budget} FPS budget)`}
-              >
-                <Camera className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400" />
-                <span>
-                  {streamSettings.active_gates_count} Gate{streamSettings.active_gates_count === 1 ? "" : "s"} · {streamSettings.per_gate_target_fps.toFixed(1)} FPS
-                </span>
-              </button>
-            )}
+            <Button
+              variant="secondary"
+              icon={<Video className="h-4 w-4 text-sky-500 animate-pulse" />}
+              onClick={() => {
+                const running = streamSettings?.gates.find((g) => g.is_running || g.enabled);
+                setDialog({ type: "camera", gateId: running?.gate_id || "GATE_1" });
+              }}
+              title="Open Live Camera Stream & Capture Snapshots"
+            >
+              Live Camera Feed
+            </Button>
             <ConnectionIndicator state={connection} lastSyncAt={lastSyncAt} />
             {user.role === "ADMIN" && (
               <Button icon={<FlaskConical className="h-4 w-4" />} onClick={() => setDialog({ type: "simulate" })}>
@@ -394,90 +389,216 @@ export function FeedPage() {
 
 function FeedCameraDialog({
   token,
-  gateId,
+  gateId: initialGateId,
   onClose,
 }: {
   token: string;
   gateId: string;
   onClose: () => void;
 }) {
+  const [activeGate, setActiveGate] = useState(initialGateId || "GATE_1");
   const [url, setUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [refreshKey, setRefreshKey] = useState(Date.now());
+  const [isLive, setIsLive] = useState(true);
+  const [frameCount, setFrameCount] = useState(0);
 
+  // Snapshot Storage State
+  const [storingSnapshot, setStoringSnapshot] = useState(false);
+  const [storedSnapshot, setStoredSnapshot] = useState<{
+    filename: string;
+    path: string;
+    timestamp: string;
+  } | null>(null);
+
+  // Continuous Live Stream frame loop
   useEffect(() => {
+    let active = true;
     let objectUrl: string | null = null;
-    const controller = new AbortController();
+    let timer: number | null = null;
+
+    const fetchFrame = async () => {
+      if (!active || !isLive) return;
+      try {
+        const { blob, status } = await api.gateLiveFrame(token, activeGate);
+        if (!active) return;
+        if (blob) {
+          if (objectUrl) URL.revokeObjectURL(objectUrl);
+          objectUrl = URL.createObjectURL(blob);
+          setUrl(objectUrl);
+          setLoading(false);
+          setError(null);
+          setFrameCount((c) => c + 1);
+        } else if (status !== 200) {
+          setError(`Camera stream offline or idle at ${activeGate} (HTTP ${status})`);
+          setLoading(false);
+        }
+      } catch (err) {
+        if (active) {
+          setError(err instanceof Error ? err.message : "Live stream dropped");
+          setLoading(false);
+        }
+      }
+      if (active && isLive) {
+        timer = window.setTimeout(fetchFrame, 350); // ~3 FPS smooth preview
+      }
+    };
+
     setLoading(true);
     setError(null);
-    api
-      .gateLiveFrame(token, gateId, controller.signal)
-      .then(({ blob, status }) => {
-        if (!blob) {
-          setError(`Could not grab snapshot from ${gateId} (HTTP ${status}). Stream may be idle.`);
-          setLoading(false);
-          return;
-        }
-        objectUrl = URL.createObjectURL(blob);
-        setUrl(objectUrl);
-        setLoading(false);
-      })
-      .catch((err) => {
-        if (!controller.signal.aborted) {
-          setError(err instanceof Error ? err.message : "Failed to load snapshot");
-          setLoading(false);
-        }
-      });
+    void fetchFrame();
 
     return () => {
-      controller.abort();
+      active = false;
+      if (timer) window.clearTimeout(timer);
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [token, gateId, refreshKey]);
+  }, [token, activeGate, isLive]);
+
+  const handleTakeSnapshot = async () => {
+    setStoringSnapshot(true);
+    setStoredSnapshot(null);
+    try {
+      const res = await api.captureGateSnapshot(token, activeGate);
+      if (res && res.success) {
+        setStoredSnapshot({
+          filename: res.filename,
+          path: res.path,
+          timestamp: res.timestamp,
+        });
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to store snapshot");
+    } finally {
+      setStoringSnapshot(false);
+    }
+  };
 
   return (
     <ModalDialog
-      title={`Live Camera Stream · ${gateId}`}
-      description="Live snapshot grabbed directly from the gate's camera feed"
+      title={`Live Camera Feed & Snapshot Recorder · ${activeGate}`}
+      description="Real-time optical camera stream from campus perimeter access gate with permanent RL dataset snapshot storage."
       onClose={onClose}
       size="xl"
       footer={
-        <div className="flex w-full items-center justify-between">
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={<Camera className="h-3.5 w-3.5" />}
-            onClick={() => setRefreshKey(Date.now())}
-          >
-            Refresh Snapshot
-          </Button>
-          <Button variant="primary" size="sm" onClick={onClose}>
+        <div className="flex w-full flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Button
+              variant={isLive ? "secondary" : "primary"}
+              size="sm"
+              icon={isLive ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+              onClick={() => setIsLive((v) => !v)}
+            >
+              {isLive ? "Pause Stream" : "Resume Live Stream"}
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              icon={<Camera className="h-3.5 w-3.5" />}
+              loading={storingSnapshot}
+              onClick={handleTakeSnapshot}
+              title="Capture and permanently store this frame for active learning / RL"
+            >
+              📸 Take Snapshot & Store
+            </Button>
+          </div>
+          <Button variant="secondary" size="sm" onClick={onClose}>
             Close
           </Button>
         </div>
       }
     >
-      <div className="flex min-h-[300px] flex-col items-center justify-center rounded-lg bg-slate-950 p-2">
-        {loading && !url && (
-          <div className="flex flex-col items-center gap-2 py-12 text-slate-400">
-            <Camera className="h-8 w-8 animate-pulse text-sky-400" />
-            <span className="text-xs">Capturing snapshot from live stream...</span>
+      <div className="space-y-3">
+        {/* Gate Switcher & Stream Controls */}
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-100 p-2 dark:bg-slate-800">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Select Gate:</span>
+            {["GATE_1", "GATE_2", "GATE_3"].map((g) => (
+              <button
+                key={g}
+                type="button"
+                onClick={() => {
+                  setActiveGate(g);
+                  setUrl(null);
+                  setStoredSnapshot(null);
+                }}
+                className={`rounded px-2.5 py-1 text-xs font-bold transition-all cursor-pointer ${
+                  activeGate === g
+                    ? "bg-sky-600 text-white shadow-sm"
+                    : "bg-white text-slate-700 hover:bg-slate-200 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-700"
+                }`}
+              >
+                {g.replace("_", " ")}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2">
+            {isLive ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700 ring-1 ring-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-400 dark:ring-emerald-800">
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
+                ● LIVE FEED (Frame #{frameCount})
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-bold text-amber-700 ring-1 ring-amber-300 dark:bg-amber-950/40 dark:text-amber-400">
+                ❚❚ PAUSED
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Snapshot Confirmation Alert Banner */}
+        {storedSnapshot && (
+          <div className="flex items-center justify-between rounded-lg border border-emerald-300 bg-emerald-50 p-2.5 text-xs text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
+            <div className="flex items-center gap-2">
+              <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+              <div>
+                <strong>Snapshot Stored:</strong> {storedSnapshot.filename}
+                <div className="text-[11px] text-emerald-700 dark:text-emerald-300">
+                  Permanently saved to disk (<code className="font-mono">media/snapshots/</code> & <code className="font-mono">data/rl_dataset/</code>)
+                </div>
+              </div>
+            </div>
+            <a
+              href={storedSnapshot.path}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 rounded bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white shadow hover:bg-emerald-700"
+            >
+              <Download className="h-3 w-3" />
+              View / Download
+            </a>
           </div>
         )}
-        {error && (
-          <div className="flex flex-col items-center gap-2 py-8 text-rose-400">
-            <AlertCircle className="h-6 w-6" />
-            <span className="max-w-sm text-center text-xs">{error}</span>
-          </div>
-        )}
-        {url && (
-          <img
-            src={url}
-            alt={`Live stream from ${gateId}`}
-            className="max-h-[68vh] w-auto rounded-md object-contain shadow-lg"
-          />
-        )}
+
+        {/* Video Canvas Container */}
+        <div className="relative flex min-h-[340px] flex-col items-center justify-center overflow-hidden rounded-xl bg-slate-950 p-2 shadow-inner ring-1 ring-slate-800">
+          {loading && !url && (
+            <div className="flex flex-col items-center gap-2 py-16 text-slate-400">
+              <Video className="h-10 w-10 animate-pulse text-sky-400" />
+              <span className="text-xs font-medium">Connecting to {activeGate} live video pipeline...</span>
+            </div>
+          )}
+          {error && !url && (
+            <div className="flex flex-col items-center gap-2 py-12 text-rose-400">
+              <AlertCircle className="h-8 w-8" />
+              <span className="max-w-md text-center text-xs font-semibold">{error}</span>
+              <p className="text-[11px] text-slate-400">The RTSP/HTTP camera stream runner may be initializing or in idle standby.</p>
+            </div>
+          )}
+          {url && (
+            <div className="relative">
+              <img
+                src={url}
+                alt={`Live stream from ${activeGate}`}
+                className="max-h-[65vh] w-auto rounded-lg object-contain shadow-2xl"
+              />
+              <div className="pointer-events-none absolute bottom-3 left-3 rounded-md bg-slate-950/80 px-2.5 py-1 font-mono text-xs font-bold text-white shadow">
+                {activeGate} · LIVE ANPR ACTIVE
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </ModalDialog>
   );

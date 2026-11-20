@@ -37,6 +37,7 @@ class FeedObservation(BaseModel):
     created_by: Optional[UserSummary] = None
     update_count: int = 0
     has_snapshot: bool = False
+    metadata_payload: Optional[Dict[str, Any]] = None
 
 class LinkedVehicle(BaseModel):
     id: UUID
@@ -136,10 +137,18 @@ class FeedPage(BaseModel):
 
 class ManualObservationCreate(BaseModel):
     gate_id: str = Field(..., max_length=30)
-    plate: str = Field(..., min_length=1, max_length=30, description="Plate as read by the guard")
+    plate: Optional[str] = Field(None, max_length=30, description="Plate as read by the guard (optional for cycles)")
     direction: ObservationDirection = Field(..., description="Direction as chosen by the guard (UNKNOWN allowed)")
     vehicle_type: ObservedVehicleType = ObservedVehicleType.UNKNOWN
     note: Optional[str] = Field(None, max_length=1000)
+
+    # Guest / Visitor fields
+    is_visitor: bool = False
+    visitor_name: Optional[str] = Field(None, max_length=100, description="Full name of guest/visitor")
+    visitor_phone: Optional[str] = Field(None, max_length=25, description="Mobile number of visitor")
+    place_of_visit: Optional[str] = Field(None, max_length=150, description="Place/Department/Hostel of visit on campus")
+    reference_person: Optional[str] = Field(None, max_length=100, description="Optional reference or host person name/department")
+    allowed_duration_hours: Optional[float] = Field(None, ge=0.1, le=168.0, description="Allowed visit hours from entry point")
 
 class ResolutionCreate(BaseModel):
     observation_id: UUID

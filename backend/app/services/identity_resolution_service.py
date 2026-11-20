@@ -424,6 +424,7 @@ class IdentityResolutionService:
                     )
                 )
             ),
+            metadata_payload=meta,
         )
 
         return ResolvedObservation(

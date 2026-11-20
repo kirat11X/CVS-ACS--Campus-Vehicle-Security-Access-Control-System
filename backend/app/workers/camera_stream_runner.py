@@ -48,6 +48,7 @@ from backend.app.services.anpr.ocr_engine import (
     split_two_line_plate,
 )
 from backend.app.services.anpr.polarity_normalizer import normalize_plate_agnostic
+from backend.app.services.anpr.rl_dataset_logger import log_anpr_observation_sample
 from backend.app.services.anpr.track_voter import TrackVoter
 from backend.app.services.anpr.vehicle_gatekeeper import (
     FALLBACK_MODEL_PATH,
@@ -1032,6 +1033,7 @@ class CameraStreamManager:
                 "sharpness": laplacian_var,
                 "timestamp": now_ts,
                 "vehicle_class": track.vehicle_class,
+                "raw_class_name": getattr(track, "raw_class_name", "") or track.vehicle_class,
                 "observed_type": track.observed_type,
                 "vehicle_confidence": track.confidence,
                 "vehicle_track_id": track.track_id,
@@ -1356,6 +1358,29 @@ class CameraStreamManager:
                     metadata_payload=meta,
                 )
                 obs = ObservationService.create_or_update_observation(db, event_data)
+
+                # Persist to permanent active learning & RL dataset (never purged)
+                try:
+                    p_crop = None
+                    if bbox and len(bbox) == 4 and frame is not None and frame.size > 0:
+                        bx1, by1, bx2, by2 = bbox
+                        if by2 > by1 and bx2 > bx1:
+                            p_crop = frame[by1:by2, bx1:bx2].copy()
+                    log_anpr_observation_sample(
+                        observation_id=str(obs.id),
+                        gate_id=gate_id,
+                        raw_text=extra_metadata.get("raw_text", plate) if extra_metadata else plate,
+                        normalized_plate=plate,
+                        confidence=float(confidence),
+                        vehicle_class=extra_metadata.get("vehicle_class", "car") if extra_metadata else "car",
+                        full_frame=frame,
+                        plate_crop=p_crop,
+                        vehicle_bbox=extra_metadata.get("vehicle_bbox") if extra_metadata else None,
+                        plate_bbox=bbox,
+                        extra_meta=meta,
+                    )
+                except Exception as rl_err:
+                    logger.debug("[%s] RL dataset sample logging failed: %s", gate_id, rl_err)
 
                 if has_snap:
                     try:

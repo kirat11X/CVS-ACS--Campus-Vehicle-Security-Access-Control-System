@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from backend.app.dependencies import CurrentUser, get_db, require_staff
 from backend.app.schemas.movement import MovementConfirm, MovementCorrection, MovementDetail, MovementPage
 from backend.app.services.movement_service import MovementError, movement_service
+from backend.app.services.visitor_service import check_and_trigger_visitor_overstay_alerts, get_active_campus_visitors
 
 router = APIRouter(prefix="/logs", tags=["Movement Log"])
 
@@ -57,3 +58,16 @@ def correct_log(log_id: UUID, payload: MovementCorrection, db: Session = Depends
     except MovementError as e:
         raise _http(e)
     return movement_service.detail(db, movement.id)
+
+
+@router.get("/visitors/active")
+def get_active_visitors(
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(require_staff),
+):
+    """
+    Returns current active visitors on campus and evaluates overstay status.
+    Generates high-priority SecurityAlerts when a visitor overstays their allotted hours.
+    """
+    check_and_trigger_visitor_overstay_alerts(db)
+    return get_active_campus_visitors(db)

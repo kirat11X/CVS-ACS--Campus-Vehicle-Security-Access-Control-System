@@ -284,16 +284,22 @@ class TrackVoterList(list):
         if len(self) > self.max_track_frames:
             del self[:-self.max_track_frames]
 
-    def get_consensus(self, track_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
-        return self.voter.get_consensus(track_id or self.gate_id)
+    def get_consensus(
+        self,
+        track_id: Optional[str] = None,
+        allow_fast_consensus: bool = False,
+    ) -> Optional[Dict[str, Any]]:
+        return self.voter.get_consensus(track_id or self.gate_id, allow_fast_consensus=allow_fast_consensus)
 
     def clear(self) -> None:
         super().clear()
-        self.voter.clear_track(self.gate_id)
+        self.voter.clear()
 
     def clear_track(self, track_id: Optional[str] = None) -> None:
         super().clear()
-        self.voter.clear_track(track_id or self.gate_id)
+        if track_id:
+            self.voter.clear_track(track_id)
+        self.voter.clear_track(self.gate_id)
 
     def get_track_frame_count(self, track_id: Optional[str] = None) -> int:
         return self.voter.get_track_frame_count(track_id or self.gate_id)
@@ -319,7 +325,7 @@ class TrackVoterList(list):
 
 
 class _TemporalTracksDict(dict):
-    """Default-instantiating dict mapping gate_id to TrackVoterList."""
+    """Default-instantiating dict mapping gate_id/track_id to TrackVoterList."""
 
     def __missing__(self, gate_id: str) -> TrackVoterList:
         val = TrackVoterList(gate_id=gate_id, min_consensus_frames=5, max_track_frames=8)
@@ -756,21 +762,23 @@ class CameraStreamManager:
                     except Exception as exc:
                         logger.error("Error processing frame from %s: %s", gate_id, exc)
 
-            # Check for temporal tracks that need flushing (e.g. vehicle departed or short burst)
+            # Check for temporal tracks that need flushing (e.g. vehicle departed or fast vehicle burst)
             now = time.time()
             for tid in list(self._temporal_tracks.keys()):
                 track = self._temporal_tracks[tid]
-                if not track:
+                obs_cnt = len(track)
+                if obs_cnt == 0:
                     continue
                 last_ts = self._temporal_track_last_update.get(tid, 0.0)
                 idle_sec = now - last_ts
                 gid = tid.split("_veh_")[0] if "_veh_" in tid else tid
-                # If vehicle accumulated at least 3 frames and has now moved past (idle >= 0.8s)
-                if len(track) >= 3 and idle_sec >= 0.8:
+
+                # If vehicle accumulated at least 2 frames and has now moved past (idle >= 0.7s)
+                if obs_cnt >= 2 and idle_sec >= 0.7:
                     candidates = list(track[:8])
                     consensus = track.get_consensus(tid)
-                    if consensus is None and len(candidates) >= 3:
-                        temp_voter = TrackVoter(min_consensus_frames=len(candidates), max_track_frames=8)
+                    if consensus is None and len(candidates) >= 2:
+                        temp_voter = TrackVoter(min_consensus_frames=min(2, len(candidates)), max_track_frames=8)
                         for c in candidates:
                             temp_voter.add_observation(
                                 track_id=tid,
@@ -781,14 +789,16 @@ class CameraStreamManager:
                                 frame_bgr=c.get("frame"),
                             )
                         consensus = temp_voter.get_consensus(tid)
-                    self._temporal_tracks[tid].clear()
+                    self._temporal_tracks[tid].clear_track(tid)
+                    self._temporal_track_last_update.pop(tid, None)
                     try:
                         self._fuse_and_ingest(gid, consensus if consensus else candidates)
                     except Exception as exc:
                         logger.error("Error fusing flushed track for %s: %s", gid, exc)
-                elif len(track) < 3 and idle_sec >= 1.5:
-                    # Discard transient false-alarm or sub-threshold track
-                    self._temporal_tracks[tid].clear()
+                elif obs_cnt < 2 and idle_sec >= 1.5:
+                    # Discard transient 1-frame noise after 1.5s idle
+                    self._temporal_tracks[tid].clear_track(tid)
+                    self._temporal_track_last_update.pop(tid, None)
 
     def process_frame(
         self,
@@ -941,6 +951,7 @@ class CameraStreamManager:
         # ---------------------------------------------------------------------
         # Stage 2: Preprocessing + Dual-Pass OCR + Positional Grammar + Voting
         # ---------------------------------------------------------------------
+        ingested_plates: List[str] = []
         best_plate = None
         for x1, y1, x2, y2, score, track in final_boxes:
             # Geometry & Bounding Box Padding (+8% W, +5% H)
@@ -1028,7 +1039,10 @@ class CameraStreamManager:
             }
 
             if not require_consensus:
-                return self._fuse_and_ingest(gate_id, [candidate])
+                res = self._fuse_and_ingest(gate_id, [candidate])
+                if res and res not in ingested_plates:
+                    ingested_plates.append(res)
+                continue
 
             # Accumulate observation into per-track (or per-gate) TrackVoter
             target_track_id = track.track_id if track.track_id != gate_id else gate_id
@@ -1043,19 +1057,30 @@ class CameraStreamManager:
             )
             self._temporal_track_last_update[target_track_id] = now_ts
 
-            consensus = track_voter.get_consensus(target_track_id)
+            # Fast-vehicle detection based on estimated kinematic velocity
+            speed_px = float(np.hypot(getattr(track, "vx", 0.0), getattr(track, "vy", 0.0)))
+            is_fast_vehicle = bool(track.track_id != gate_id and speed_px > 50.0)
+
+            consensus = track_voter.get_consensus(
+                target_track_id,
+                allow_fast_consensus=is_fast_vehicle,
+            )
             if consensus is not None:
-                track_voter.clear()
+                track_voter.clear_track(target_track_id)
                 consensus["vehicle_class"] = track.vehicle_class
                 consensus["observed_type"] = track.observed_type
                 consensus["vehicle_confidence"] = track.confidence
                 consensus["vehicle_track_id"] = track.track_id
                 consensus["vehicle_bbox"] = track.bbox
-                return self._fuse_and_ingest(gate_id, consensus)
+                res = self._fuse_and_ingest(gate_id, consensus)
+                if res and res not in ingested_plates:
+                    ingested_plates.append(res)
 
-            return None
-
-        return best_plate
+        if ingested_plates:
+            return ingested_plates[0]
+        if not require_consensus and best_plate:
+            return best_plate
+        return None
 
     def _fuse_and_ingest(
         self,

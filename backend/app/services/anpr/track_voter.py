@@ -85,9 +85,14 @@ class TrackVoter:
         if len(track_buffer) > self.max_track_frames:
             self._tracks[track_id] = track_buffer[-self.max_track_frames :]
 
-    def get_consensus(self, track_id: str) -> Optional[Dict[str, Any]]:
+    def get_consensus(
+        self,
+        track_id: str,
+        allow_fast_consensus: bool = False,
+    ) -> Optional[Dict[str, Any]]:
         """
-        Evaluates consensus when buffered frames >= min_consensus_frames.
+        Evaluates consensus when buffered frames >= min_consensus_frames
+        (or >= 2 frames when allow_fast_consensus is True and consecutive reads agree 100% on statutory format).
         - Calculates confidence-weighted character frequency matrix for each position.
         - Produces voted candidate string.
         - Runs correct_indian_plate(voted).
@@ -96,7 +101,27 @@ class TrackVoter:
         - Returns consensus dict.
         """
         observations = self._tracks.get(track_id)
-        if not observations or len(observations) < self.min_consensus_frames:
+        if not observations:
+            return None
+
+        # Fast-vehicle early consensus:
+        # High-speed vehicles are only visible in the gate readable zone for 2-4 frames.
+        # If allow_fast_consensus is True and the latest 2 observations agree on the exact same
+        # valid statutory Indian plate with high confidence (>= 0.82), grant immediate consensus.
+        allow_early = False
+        if allow_fast_consensus and len(observations) >= 2:
+            o_prev, o_curr = observations[-2], observations[-1]
+            p_prev, _, cat_prev = correct_indian_plate(o_prev.plate_text)
+            p_curr, _, cat_curr = correct_indian_plate(o_curr.plate_text)
+            if (
+                p_prev
+                and p_prev == p_curr
+                and cat_curr in ("STANDARD", "BHARAT_SERIES", "VINTAGE")
+                and min(o_prev.confidence, o_curr.confidence) >= 0.82
+            ):
+                allow_early = True
+
+        if len(observations) < self.min_consensus_frames and not allow_early:
             return None
 
         # Prepare cleaned text for each observation
@@ -199,6 +224,46 @@ class TrackVoter:
         """Clears all buffered observations for a vehicle track."""
         self._tracks.pop(track_id, None)
 
+    def clear(self) -> None:
+        """Clears all buffered observations across all tracks."""
+        self._tracks.clear()
+
     def get_track_frame_count(self, track_id: str) -> int:
         """Returns the number of buffered observations for a track."""
         return len(self._tracks.get(track_id, []))
+
+    def get_observations(self, track_id: str) -> List[TrackObservation]:
+        """Returns the list of buffered observations for a track."""
+        return list(self._tracks.get(track_id, []))
+
+    def __len__(self) -> int:
+        """Returns the total number of observations buffered across all tracks."""
+        return sum(len(obs_list) for obs_list in self._tracks.values())
+
+    def __getitem__(self, index: Any) -> Any:
+        """Enables list-like slicing and indexing over buffered observations."""
+        all_obs: List[Dict[str, Any]] = []
+        for obs_list in self._tracks.values():
+            for o in obs_list:
+                all_obs.append({
+                    "raw_plate": o.plate_text,
+                    "conf": o.confidence,
+                    "bbox": o.bbox,
+                    "frame": o.frame_bgr,
+                    "timestamp": o.frame_ts,
+                    "sharpness": o.sharpness,
+                })
+        return all_obs[index]
+
+    def __iter__(self):
+        """Iterates over all observations as candidate dicts."""
+        for obs_list in self._tracks.values():
+            for o in obs_list:
+                yield {
+                    "raw_plate": o.plate_text,
+                    "conf": o.confidence,
+                    "bbox": o.bbox,
+                    "frame": o.frame_bgr,
+                    "timestamp": o.frame_ts,
+                    "sharpness": o.sharpness,
+                }

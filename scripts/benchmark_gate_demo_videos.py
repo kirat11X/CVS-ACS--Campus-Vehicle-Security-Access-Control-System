@@ -27,6 +27,7 @@ sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "backend"))
 
 from backend.app.workers.camera_stream_runner import (
+    SimpleVehicleTracker,
     VehicleGatekeeper,
     VehicleTrack,
     letterbox_image,
@@ -79,6 +80,7 @@ def evaluate_video(
     print(f"Stats: {total_frames} frames | {video_fps:.1f} FPS | {duration_s:.1f}s")
 
     track_voter = TrackVoter(min_consensus_frames=3, max_track_frames=8)
+    tracker = SimpleVehicleTracker(gate_id=video_path.stem)
 
     frames_processed = 0
     stage0_early_exits = 0
@@ -122,10 +124,11 @@ def evaluate_video(
         # Stage 1: Zoomed Plate Detection inside each vehicle crop
         # -------------------------------------------------------------
         t1 = time.perf_counter()
+        tracked_vehicles = tracker.update(v_dets, frame_ts)
         frame_plate_boxes = []
 
-        for v_idx, v_det in enumerate(v_dets):
-            v_crop, (vx1, vy1, vx2, vy2) = VehicleGatekeeper.crop_vehicle(frame, v_det.bbox, pad_pct=0.05)
+        for track, v_det in tracked_vehicles:
+            v_crop, (vx1, vy1, vx2, vy2) = VehicleGatekeeper.crop_vehicle(frame, track.bbox, pad_pct=0.05)
             if v_crop.size == 0 or v_crop.shape[0] < 20 or v_crop.shape[1] < 20:
                 continue
 
@@ -164,7 +167,7 @@ def evaluate_video(
                     orig_y1 = min(h, max(0, vy1 + local_y1))
                     orig_x2 = min(w, max(0, vx1 + local_x2))
                     orig_y2 = min(h, max(0, vy1 + local_y2))
-                    cand_boxes.append((orig_x1, orig_y1, orig_x2, orig_y2, score, v_det))
+                    cand_boxes.append((orig_x1, orig_y1, orig_x2, orig_y2, score, track))
 
             if cand_boxes:
                 cv_boxes = [[b[0], b[1], b[2] - b[0], b[3] - b[1]] for b in cand_boxes]
@@ -180,8 +183,8 @@ def evaluate_video(
         # Stage 2: Agnostic Preprocessing, OCR & Positional Repair
         # -------------------------------------------------------------
         t2 = time.perf_counter()
-        for px1, py1, px2, py2, p_score, v_det in frame_plate_boxes:
-            track_id = f"demo_{v_det.vehicle_class}_{v_idx}"
+        for px1, py1, px2, py2, p_score, track in frame_plate_boxes:
+            track_id = track.track_id
             unique_tracks.add(track_id)
 
             pad_x1, pad_y1, pad_x2, pad_y2 = pad_plate_bbox(
@@ -212,8 +215,8 @@ def evaluate_video(
                 detections_log.append({
                     "frame": f_idx,
                     "timestamp_s": round(frame_ts, 2),
-                    "vehicle_class": v_det.vehicle_class,
-                    "vehicle_conf": round(float(v_det.confidence), 3),
+                    "vehicle_class": track.vehicle_class,
+                    "vehicle_conf": round(float(track.confidence), 3),
                     "plate_score": round(p_score, 3),
                     "raw_ocr": raw_text,
                     "repaired_plate": repaired,

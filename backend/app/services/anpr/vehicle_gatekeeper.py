@@ -139,6 +139,10 @@ class VehicleDetection:
     def area(self) -> int:
         return self.width * self.height
 
+    @property
+    def centroid(self) -> Tuple[float, float]:
+        return ((self.bbox[0] + self.bbox[2]) / 2.0, (self.bbox[1] + self.bbox[3]) / 2.0)
+
 
 @dataclass
 class VehicleTrack:
@@ -151,26 +155,111 @@ class VehicleTrack:
     last_seen_ts: float
     first_seen_ts: float
     hits: int = 1
+    vx: float = 0.0  # Horizontal velocity (pixels/second)
+    vy: float = 0.0  # Vertical velocity (pixels/second)
 
     @property
     def centroid(self) -> Tuple[float, float]:
         return ((self.bbox[0] + self.bbox[2]) / 2.0, (self.bbox[1] + self.bbox[3]) / 2.0)
 
+    @property
+    def width(self) -> int:
+        return max(0, self.bbox[2] - self.bbox[0])
+
+    @property
+    def height(self) -> int:
+        return max(0, self.bbox[3] - self.bbox[1])
+
+    def predict_bbox(self, now_ts: float) -> List[int]:
+        """Predicts vehicle position based on estimated velocity vector."""
+        dt = max(0.0, min(1.0, now_ts - self.last_seen_ts))
+        if dt <= 0.0 or (self.vx == 0.0 and self.vy == 0.0):
+            return list(self.bbox)
+
+        dx = int(round(self.vx * dt))
+        dy = int(round(self.vy * dt))
+        return [self.bbox[0] + dx, self.bbox[1] + dy, self.bbox[2] + dx, self.bbox[3] + dy]
+
+
+def compute_vehicle_association_score(
+    trk: VehicleTrack,
+    det: VehicleDetection,
+    now_ts: float,
+) -> float:
+    """
+    Computes a composite spatial, kinematic, and scale association score between
+    an existing VehicleTrack and a new VehicleDetection.
+    Combines:
+    1. Direct spatial IoU and predicted velocity-projected IoU.
+    2. Normalized horizontal/lane offset (Delta x).
+    3. Traffic flow forward motion consistency (Delta y).
+    4. Vehicle area/aspect scale similarity.
+    """
+    # 1. IoU against current bbox and velocity-predicted bbox
+    pred_bbox = trk.predict_bbox(now_ts)
+    iou_direct = compute_box_iou(trk.bbox, det.bbox)
+    iou_pred = compute_box_iou(pred_bbox, det.bbox)
+    max_iou = max(iou_direct, iou_pred)
+
+    # 2. Centroid distances normalized by vehicle dimensions
+    trk_cx, trk_cy = trk.centroid
+    det_cx, det_cy = det.centroid
+    norm_w = max(trk.width, det.width, 1)
+    norm_h = max(trk.height, det.height, 1)
+
+    dx_norm = abs(det_cx - trk_cx) / float(norm_w)
+    dy_norm = abs(det_cy - trk_cy) / float(norm_h)
+
+    # 3. Area scale consistency
+    area_trk = max(1, trk.width * trk.height)
+    area_det = max(1, det.width * det.height)
+    area_ratio = min(area_trk, area_det) / float(max(area_trk, area_det))
+
+    # Overlap-dominated match
+    if max_iou >= 0.15:
+        score = max_iou + 0.35 * max(0.0, 1.0 - dx_norm) * area_ratio
+    elif dx_norm <= 0.45 and dy_norm <= 2.2 and area_ratio >= 0.30:
+        # Kinematic displacement match for fast vehicles
+        score = (
+            max_iou
+            + 0.40 * max(0.0, 1.0 - dx_norm)
+            + 0.25 * max(0.0, 1.0 - dy_norm / 2.2) * area_ratio
+        )
+    else:
+        score = max_iou
+
+    # Class consistency bonus
+    if trk.vehicle_class == det.vehicle_class:
+        score += 0.08
+
+    return float(score)
+
 
 class SimpleVehicleTracker:
     """
-    Lightweight IoU + Centroid proximity tracker to assign persistent track_ids
-    to vehicles across camera frames.
+    Kinematic IoU + Lane Centroid Proximity Tracker.
+    Maintains persistent track_ids across camera frames even for fast vehicles
+    and simultaneous side-by-side vehicles.
     """
 
-    def __init__(self, gate_id: str = "GATE_1", max_age_sec: float = 2.0, iou_match_thresh: float = 0.20):
+    def __init__(
+        self,
+        gate_id: str = "GATE_1",
+        max_age_sec: float = 2.0,
+        iou_match_thresh: float = 0.20,
+    ):
         self.gate_id = str(gate_id)
         self.max_age_sec = max_age_sec
         self.iou_match_thresh = iou_match_thresh
+        self.match_thresh = min(0.20, iou_match_thresh)
         self._next_id = 1
         self._tracks: Dict[str, VehicleTrack] = {}
 
-    def update(self, detections: List[VehicleDetection], now_ts: Optional[float] = None) -> List[Tuple[VehicleTrack, VehicleDetection]]:
+    def update(
+        self,
+        detections: List[VehicleDetection],
+        now_ts: Optional[float] = None,
+    ) -> List[Tuple[VehicleTrack, VehicleDetection]]:
         ts = float(now_ts if now_ts is not None else time.time())
 
         # 1. Prune expired tracks
@@ -179,30 +268,60 @@ class SimpleVehicleTracker:
             del self._tracks[tid]
 
         matched: List[Tuple[VehicleTrack, VehicleDetection]] = []
-        unmatched_dets = list(detections)
+        if not detections:
+            return matched
 
-        # 2. Greedy match against existing tracks
-        for tid, trk in list(self._tracks.items()):
-            best_det = None
-            best_iou = 0.0
-            for det in unmatched_dets:
-                iou = compute_box_iou(trk.bbox, det.bbox)
-                if iou > best_iou:
-                    best_iou = iou
-                    best_det = det
+        # 2. Global bipartite matching sorted by highest association score
+        # Prevents race conditions between simultaneous side-by-side vehicles
+        candidate_matches: List[Tuple[float, str, int]] = []
+        for tid, trk in self._tracks.items():
+            for d_idx, det in enumerate(detections):
+                score = compute_vehicle_association_score(trk, det, ts)
+                if score >= self.match_thresh:
+                    candidate_matches.append((score, tid, d_idx))
 
-            if best_det is not None and best_iou >= self.iou_match_thresh:
-                trk.bbox = best_det.bbox
-                trk.confidence = max(trk.confidence, best_det.confidence)
-                trk.vehicle_class = best_det.vehicle_class
-                trk.observed_type = best_det.observed_type
-                trk.last_seen_ts = ts
-                trk.hits += 1
-                matched.append((trk, best_det))
-                unmatched_dets.remove(best_det)
+        # Sort descending by association score
+        candidate_matches.sort(key=lambda x: x[0], reverse=True)
+
+        assigned_tracks: Set[str] = set()
+        assigned_dets: Set[int] = set()
+
+        for score, tid, d_idx in candidate_matches:
+            if tid in assigned_tracks or d_idx in assigned_dets:
+                continue
+
+            trk = self._tracks[tid]
+            det = detections[d_idx]
+
+            # Velocity vector update with exponential moving average
+            dt = max(0.01, ts - trk.last_seen_ts)
+            old_cx, old_cy = trk.centroid
+            new_cx, new_cy = det.centroid
+            inst_vx = (new_cx - old_cx) / dt
+            inst_vy = (new_cy - old_cy) / dt
+
+            if trk.hits == 1:
+                trk.vx = inst_vx
+                trk.vy = inst_vy
+            else:
+                trk.vx = 0.6 * trk.vx + 0.4 * inst_vx
+                trk.vy = 0.6 * trk.vy + 0.4 * inst_vy
+
+            trk.bbox = det.bbox
+            trk.confidence = max(trk.confidence, det.confidence)
+            trk.vehicle_class = det.vehicle_class
+            trk.observed_type = det.observed_type
+            trk.last_seen_ts = ts
+            trk.hits += 1
+
+            matched.append((trk, det))
+            assigned_tracks.add(tid)
+            assigned_dets.add(d_idx)
 
         # 3. Create new tracks for unmatched detections
-        for det in unmatched_dets:
+        for d_idx, det in enumerate(detections):
+            if d_idx in assigned_dets:
+                continue
             tid = f"{self.gate_id}_veh_{self._next_id}"
             self._next_id += 1
             trk = VehicleTrack(
@@ -214,6 +333,8 @@ class SimpleVehicleTracker:
                 last_seen_ts=ts,
                 first_seen_ts=ts,
                 hits=1,
+                vx=0.0,
+                vy=0.0,
             )
             self._tracks[tid] = trk
             matched.append((trk, det))
